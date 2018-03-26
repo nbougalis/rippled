@@ -50,12 +50,12 @@ Json::Value doSubmit (RPC::Context& context)
         auto const failType = getFailHard (context);
 
         return RPC::transactionSubmit (
-        context.params,
-        failType,
-        context.role,
-        context.ledgerMaster.getValidatedLedgerAge(),
-        context.app,
-        RPC::getProcessTxnFn (context.netOps));
+            context.params,
+            failType,
+            context.role,
+            context.ledgerMaster.getValidatedLedgerAge(),
+            context.app,
+            RPC::getProcessTxnFn (context.netOps));
     }
 
     Json::Value jvResult;

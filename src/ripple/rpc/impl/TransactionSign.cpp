@@ -29,6 +29,7 @@
 #include <ripple/app/tx/apply.h>              // Validity::Valid
 #include <ripple/basics/Log.h>
 #include <ripple/basics/mulDiv.h>
+#include <ripple/beast/core/ByteOrder.h>
 #include <ripple/json/json_writer.h>
 #include <ripple/net/RPCErr.h>
 #include <ripple/protocol/Sign.h>
@@ -401,6 +402,40 @@ transactionPreProcessImpl (
 
         if (RPC::contains_error (err))
             return std::move (err);
+
+        // If the "Destination" field is present, check if it contains a tagged
+        // address; if so, attempt to split it into an address and a tag,
+        // updating the transaction's JSON.
+        if (tx_json.isMember (jss::Destination))
+        {
+            auto destination = tx_json[jss::Destination].asString();
+
+            if (destination.empty())
+                return rpcError (rpcDST_ACT_MALFORMED);
+
+            if (destination[0] == 'R')
+            {
+                destination[0] = 'r';
+
+                auto const result = decodeBase58Token(destination, TokenType::TOKEN_ACCOUNT_ID);
+
+                std::cout << "Decoded buffer is " << result.size() << " bytes long!\n";
+
+                if (result.size() != AccountID::bytes + sizeof(std::uint32_t))
+                    return rpcError (rpcDST_ACT_MALFORMED);
+
+                AccountID dst = AccountID::fromVoid (result.data());
+
+                std::uint32_t tag = beast::fromNetworkByteOrder(
+                    *reinterpret_cast<std::uint32_t const*>(result.data() + 20));
+
+                if (tx_json.isMember (jss::DestinationTag))
+                    return rpcError (rpcINVALID_PARAMS);
+
+                tx_json[jss::Destination] = toBase58 (dst);
+                tx_json[jss::DestinationTag] = tag;
+            }
+        }
 
         err = checkPayment (
             params,
