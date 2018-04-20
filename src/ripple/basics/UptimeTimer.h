@@ -21,8 +21,13 @@
 #define RIPPLE_BASICS_UPTIMETIMER_H_INCLUDED
 
 #include <ctime>
+#include <chrono>
 
 namespace ripple {
+
+/** Returns the number of seconds since program start */
+std::chrono::seconds
+uptime();
 
 /** Tracks program uptime.
 

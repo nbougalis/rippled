@@ -1794,7 +1794,7 @@ LedgerMaster::makeFetchPack (
     uint256 haveLedgerHash,
     std::uint32_t uUptime)
 {
-    if (UptimeTimer::getInstance ().getElapsedSeconds () > (uUptime + 1))
+    if (static_cast<std::uitn32_t>(uptime().count()) > (uUptime + 1))
     {
         JLOG(m_journal.info()) << "Fetch pack request got stale";
         return;
@@ -1916,7 +1916,7 @@ LedgerMaster::makeFetchPack (
             wantLedger = getLedgerByHash (haveLedger->info().parentHash);
         }
         while (wantLedger &&
-               UptimeTimer::getInstance ().getElapsedSeconds () <= uUptime + 1);
+               static_cast<std::uint32_t>(uptime().count()) <= uUptime + 1);
 
         JLOG(m_journal.info())
             << "Built fetch pack with " << reply.objects ().size () << " nodes";

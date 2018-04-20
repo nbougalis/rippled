@@ -111,7 +111,7 @@ Json::Value doGetCounts (RPC::Context& context)
     ret[jss::treenode_track_size] = context.app.family().treecache().getTrackSize();
 
     std::string uptime;
-    int s = UptimeTimer::getInstance ().getElapsedSeconds ();
+    int s = static_cast<int>(uptime().count());
     textTime (uptime, s, "year", 365 * 24 * 60 * 60);
     textTime (uptime, s, "day", 24 * 60 * 60);
     textTime (uptime, s, "hour", 60 * 60);

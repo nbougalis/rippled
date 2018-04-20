@@ -293,8 +293,8 @@ PeerImp::json()
             ret[jss::latency] = static_cast<Json::UInt> (latency.count());
     }
 
-    ret[jss::uptime] = static_cast<Json::UInt>(
-        std::chrono::duration_cast<std::chrono::seconds>(uptime()).count());
+    ret[jss::uptime] = static_cast<Json::UInt>(0);
+        //std::chrono::duration_cast<std::chrono::seconds>(uptime()).count());
 
     std::uint32_t minSeq, maxSeq;
     ledgerRange(minSeq, maxSeq);
@@ -1864,7 +1864,7 @@ PeerImp::doFetchPack (const std::shared_ptr<protocol::TMGetObjectByHash>& packet
     memcpy (hash.begin (), packet->ledgerhash ().data (), 32);
 
     std::weak_ptr<PeerImp> weak = shared_from_this();
-    auto elapsed = UptimeTimer::getInstance().getElapsedSeconds();
+    auto elapsed = static_cast<int>(uptime().count());
     auto const pap = &app_;
     app_.getJobQueue ().addJob (
         jtPACK, "MakeFetchPack",

@@ -20,6 +20,7 @@
 #include <ripple/basics/UptimeTimer.h>
 
 #include <atomic>
+#include <iostream>
 
 namespace ripple {
 
@@ -48,7 +49,7 @@ int UptimeTimer::getElapsedSeconds () const
         // VFALCO TODO use time_t instead of int return
         result = static_cast <int> (::time (0) - m_startTime);
     }
-
+    
     return result;
 }
 
@@ -77,6 +78,13 @@ UptimeTimer& UptimeTimer::getInstance ()
     static UptimeTimer instance;
 
     return instance;
+}
+
+std::chrono::seconds
+uptime()
+{
+    static auto const started = std::chrono::steady_clock::now();
+    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - started);
 }
 
 } // ripple

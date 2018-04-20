@@ -47,6 +47,7 @@
 #include <ripple/basics/ResolverAsio.h>
 #include <ripple/basics/Sustain.h>
 #include <ripple/basics/PerfLog.h>
+#include <ripple/basics/UptimeTimer.h>
 #include <ripple/json/json_reader.h>
 #include <ripple/nodestore/DummyScheduler.h>
 #include <ripple/overlay/Cluster.h>
@@ -228,13 +229,23 @@ public:
     }
 };
 
+/** Convenience class to ensure that we begin counting uptime early */
+struct UptimeTimer2
+{
+    UptimeTimer2()
+    {
+        (void)uptime();
+    }
+};
+
 } // detail
 
 //------------------------------------------------------------------------------
 
 // VFALCO TODO Move the function definitions into the class declaration
 class ApplicationImp
-    : public Application
+    : public detail::UptimeTimer2
+    , public Application
     , public RootStoppable
     , public BasicApp
 {
