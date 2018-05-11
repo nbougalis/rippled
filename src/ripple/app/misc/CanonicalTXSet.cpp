@@ -123,12 +123,4 @@ CanonicalTXSet::prune(AccountID const& account,
     return result;
 }
 
-CanonicalTXSet::iterator CanonicalTXSet::erase (iterator const& it)
-{
-    iterator tmp = it;
-    ++tmp;
-    mMap.erase (it);
-    return tmp;
-}
-
 } // ripple

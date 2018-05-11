@@ -23,6 +23,7 @@
 #include <ripple/app/consensus/RCLCxLedger.h>
 #include <ripple/app/consensus/RCLCxPeerPos.h>
 #include <ripple/app/consensus/RCLCxTx.h>
+#include <ripple/app/consensus/RCLCensorshipDetector.h>
 #include <ripple/app/misc/FeeVote.h>
 #include <ripple/basics/CountedObject.h>
 #include <ripple/basics/Log.h>
@@ -75,6 +76,10 @@ class RCLConsensus
         std::atomic<std::chrono::milliseconds> prevRoundTime_{
             std::chrono::milliseconds{0}};
         std::atomic<ConsensusMode> mode_{ConsensusMode::observing};
+
+        // Temporary:
+        std::shared_ptr<SHAMap> initialSet_;
+        RCLCensorshipDetector<TxID, LedgerIndex> censorshipDetector_;
 
     public:
         using Ledger_t = RCLCxLedger;
@@ -151,11 +156,11 @@ class RCLConsensus
 
             If not available, asynchronously acquires from the network.
 
-            @param ledger The ID/hash of the ledger acquire
+            @param hash The ID/hash of the ledger acquire
             @return Optional ledger, will be seated if we locally had the ledger
         */
         boost::optional<RCLCxLedger>
-        acquireLedger(LedgerHash const& ledger);
+        acquireLedger(LedgerHash const& hash);
 
         /** Share the given proposal with all peers
 

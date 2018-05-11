@@ -97,16 +97,19 @@ public:
         mMap.clear ();
     }
 
-    iterator erase (iterator const& it);
+    const_iterator erase (const_iterator const& it)
+    {
+        return mMap.erase(it);
+    }
 
-    iterator begin ()
-    {
-        return mMap.begin ();
-    }
-    iterator end ()
-    {
-        return mMap.end ();
-    }
+//    iterator begin ()
+//    {
+//        return mMap.begin ();
+//    }
+//    iterator end ()
+//    {
+//        return mMap.end ();
+//    }
     const_iterator begin ()  const
     {
         return mMap.begin ();
