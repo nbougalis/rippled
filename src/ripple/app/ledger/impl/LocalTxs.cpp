@@ -123,7 +123,7 @@ public:
     CanonicalTXSet
     getTxSet () override
     {
-        CanonicalTXSet tset (uint256 {});
+        CanonicalTXSet tset;
 
         // Get the set of local transactions as a canonical
         // set (so they apply in a valid order)

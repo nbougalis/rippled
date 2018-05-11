@@ -319,7 +319,7 @@ private:
 
     LedgerHistory mLedgerHistory;
 
-    CanonicalTXSet mHeldTransactions {uint256()};
+    CanonicalTXSet mHeldTransactions;
 
     // A set of transactions to replay during the next close
     std::unique_ptr<LedgerReplay> replayData;

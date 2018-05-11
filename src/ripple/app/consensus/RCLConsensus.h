@@ -36,6 +36,7 @@
 #include <ripple/shamap/SHAMap.h>
 #include <atomic>
 #include <mutex>
+#include <set>
 
 namespace ripple {
 
@@ -354,7 +355,8 @@ class RCLConsensus
             bool closeTimeCorrect,
             NetClock::duration closeResolution,
             std::chrono::milliseconds roundTime,
-            CanonicalTXSet& retriableTxs);
+            CanonicalTXSet& retriableTxs,
+            std::set<TxID>& failedTxs);
 
         /** Validate the given ledger and share with peers as necessary
 

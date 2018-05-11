@@ -75,21 +75,16 @@ private:
     uint256 accountKey (AccountID const& account);
 
 public:
-    using iterator = std::map <Key, std::shared_ptr<STTx const>>::iterator;
     using const_iterator = std::map <Key, std::shared_ptr<STTx const>>::const_iterator;
 
 public:
-    explicit CanonicalTXSet (LedgerHash const& saltHash)
-        : mSetHash (saltHash)
-    {
-    }
+    CanonicalTXSet () = default;
 
     void insert (std::shared_ptr<STTx const> const& txn);
 
     std::vector<std::shared_ptr<STTx const>>
     prune(AccountID const& account, std::uint32_t const seq);
 
-    // VFALCO TODO remove this function
     void reset (LedgerHash const& saltHash)
     {
         mSetHash = saltHash;
@@ -102,29 +97,29 @@ public:
         return mMap.erase(it);
     }
 
-//    iterator begin ()
-//    {
-//        return mMap.begin ();
-//    }
-//    iterator end ()
-//    {
-//        return mMap.end ();
-//    }
     const_iterator begin ()  const
     {
         return mMap.begin ();
     }
+
     const_iterator end () const
     {
         return mMap.end ();
     }
+
     size_t size () const
     {
         return mMap.size ();
     }
+
     bool empty () const
     {
         return mMap.empty ();
+    }
+
+    uint256 const& key() const
+    {
+        return mSetHash;
     }
 
 private:

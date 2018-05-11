@@ -418,8 +418,8 @@ RCLConsensus::Adaptor::doAccept(
                      << prevLedger.seq();
 
     //--------------------------------------------------------------------------
-    // Put transactions into a deterministic, but unpredictable, order
-    CanonicalTXSet retriableTxs{result.txns.id()};
+    CanonicalTXSet retriableTxs;
+    std::set<TxID> failedTxs;
 
     auto sharedLCL = buildLCL(
         prevLedger,
@@ -428,7 +428,8 @@ RCLConsensus::Adaptor::doAccept(
         closeTimeCorrect,
         closeResolution,
         result.roundTime.read(),
-        retriableTxs);
+        retriableTxs,
+        failedTxs);
 
     auto const newLCLHash = sharedLCL.id();
     JLOG(j_.debug()) << "Report: NewL  = " << newLCLHash << ":"
@@ -436,6 +437,50 @@ RCLConsensus::Adaptor::doAccept(
 
     // Tell directly connected peers that we have a new LCL
     notify(protocol::neACCEPTED_LEDGER, sharedLCL, haveCorrectLCL);
+
+    // Attempt to detect attempts at censorship of transaction which we propose
+    // by tracking which ones don't make it in after a period of time.
+    if (mode == ConsensusMode::proposing && result.state != ConsensusState::MovedOn)
+    {
+        std::vector<TxID> proposed;
+        std::vector<TxID> accepted;
+
+        initialSet_->visitLeaves ([&proposed](std::shared_ptr<SHAMapItem const> const& item)
+        {
+            proposed.push_back(item->key());
+        });
+
+        result.txns.map_->visitLeaves ([&accepted](std::shared_ptr<SHAMapItem const> const& item)
+        {
+            accepted.push_back(item->key());
+        });
+
+        for (auto const& r : retriableTxs)
+            failedTxs.insert (r.first.getTXID());
+
+        censorshipDetector_(proposed, accepted, sharedLCL.seq(),
+            [curr=sharedLCL.seq(), j=app_.journal("CensorshipDetector"), &failedTxs]
+                (uint256 const& id, LedgerIndex seq)
+            {
+                if (failedTxs.count(id))
+                    return true;
+
+                auto wait = curr - seq;
+
+                if (wait == censorshipLowThreshold)
+                {
+                    JLOG(j.warn()) << "Eligible tx " << id <<
+                        " not included after " << censorshipLowThreshold << " ledgers.";
+                }
+
+                if (wait == censorshipHighThreshold)
+                {
+                    JLOG(j.error()) << "Eligible tx " << id <<
+                        " not included after " << censorshipHighThreshold << " ledgers.";
+                }
+                return false;
+            });
+    }
 
     if (validating_)
         validating_ = ledgerMaster_.isCompatible(
@@ -639,6 +684,7 @@ std::size_t
 applyTransactions(
     Application& app,
     CanonicalTXSet& txns,
+    std::set<TxID>& failedTxns,
     OpenView& view)
 {
     auto j = app.journal("LedgerConsensus");
@@ -669,7 +715,7 @@ applyTransactions(
                         break;
 
                     case ApplyResult::Fail:
-                        // FIXME: add this to the set of failed transactions!
+                        failedTxns.insert(it->first.getTXID());
                         it = txns.erase(it);
                         break;
 
@@ -711,7 +757,8 @@ RCLConsensus::Adaptor::buildLCL(
     bool closeTimeCorrect,
     NetClock::duration closeResolution,
     std::chrono::milliseconds roundTime,
-    CanonicalTXSet& retriableTxs)
+    CanonicalTXSet& retriableTxs,
+    std::set<TxID>& failedTxs)
 {
     auto replay = ledgerMaster_.releaseReplay();
     if (replay)
@@ -754,10 +801,10 @@ RCLConsensus::Adaptor::buildLCL(
         {
             // Normal case: deterministically sort transactions into an
             // unpredictable order and then attempt to apply them.
-            JLOG(j_.debug()) <<
-                "Building canonical tx set: " << txns.map_->getHash().as_uint256();
-
             retriableTxs.reset(txns.map_->getHash().as_uint256());
+
+            JLOG(j_.debug()) <<
+                "Building canonical tx set: " << retriableTxs.key();
 
             for (auto const& item : *txns.map_)
             {
@@ -782,9 +829,10 @@ RCLConsensus::Adaptor::buildLCL(
                 "Attempting to apply " << retriableTxs.size() << " transactions";
 
             // Attempt to apply the transactions that made it into the consensus
-            // set. Those that couldn't be applied and need to be retried will
-            // be left in retriableTxs.
-            auto const applied = applyTransactions(app_, retriableTxs, accum);
+            // set, tracking those that failed and leaving any that couldn't be
+            // applied and must be retried in retriableTxs.
+            auto const applied = applyTransactions(app_,
+                retriableTxs, failedTxs, accum);
 
             JLOG(j_.debug()) <<
                 "Applied " << applied <<

@@ -26,6 +26,12 @@
 
 namespace ripple {
 
+/** Threshold for issuing initial warning about potential censorship */
+constexpr unsigned int censorshipLowThreshold = 10;
+
+/** Threshold for issuing second warning about potential censorship */
+constexpr unsigned int censorshipHighThreshold = 50;
+
 template <class TxID, class Sequence>
 class RCLCensorshipDetector
 {
@@ -59,8 +65,6 @@ public:
         Sequence seq,
         Predicate pred)
     {
-        std::cerr << "Beginning censorship detection for ledger #" << seq << "\n";
-
         // Find all the entries that we proposed but which were not accepted:
         std::vector<TxID> missing;
 
@@ -71,8 +75,6 @@ public:
             proposed.begin(), proposed.end(),
             accepted.begin(), accepted.end(),
             std::inserter(missing, missing.begin()));
-
-        std::cerr << "    Calculated difference between proposed and accepted sets: " << missing.size() << "\n";
 
         // Eliminate all entries that were accepted:
         for (auto const &a : accepted)
