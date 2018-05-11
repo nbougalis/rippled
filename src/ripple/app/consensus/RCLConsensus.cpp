@@ -418,12 +418,27 @@ RCLConsensus::Adaptor::doAccept(
                      << prevLedger.seq();
 
     //--------------------------------------------------------------------------
-    CanonicalTXSet retriableTxs;
     std::set<TxID> failedTxs;
+    CanonicalTXSet retriableTxs(result.txns.map_->getHash().as_uint256());
+
+    JLOG(j_.debug()) << "Building canonical tx set: " << retriableTxs.key();
+
+    for (auto const& item : *result.txns.map_)
+    {
+        try
+        {
+            retriableTxs.insert(
+                std::make_shared<STTx const>(SerialIter{item.slice()}));
+            JLOG(j_.debug()) << "    Tx: " << item.key();
+        }
+        catch (std::exception const&)
+        {
+            JLOG(j_.warn()) << "    Tx: " << item.key() << " throws!";
+        }
+    }
 
     auto sharedLCL = buildLCL(
         prevLedger,
-        result.txns,
         consensusCloseTime,
         closeTimeCorrect,
         closeResolution,
@@ -683,6 +698,7 @@ RCLConsensus::Adaptor::notify(
 std::size_t
 applyTransactions(
     Application& app,
+    std::shared_ptr<Ledger const> const& built,
     CanonicalTXSet& txns,
     std::set<TxID>& failedTxns,
     OpenView& view)
@@ -705,6 +721,12 @@ applyTransactions(
         {
             try
             {
+                if (pass == 0 && built->txExists(it->first.getTXID()))
+                {
+                    it = txns.erase(it);
+                    continue;
+                }
+
                 switch (applyTransaction(
                     app, view, *it->second, certainRetry, tapNO_CHECK_SIGN, j))
                 {
@@ -752,7 +774,6 @@ applyTransactions(
 RCLCxLedger
 RCLConsensus::Adaptor::buildLCL(
     RCLCxLedger const& previousLedger,
-    RCLTxSet const& txns,
     NetClock::time_point closeTime,
     bool closeTimeCorrect,
     NetClock::duration closeResolution,
@@ -768,7 +789,7 @@ RCLConsensus::Adaptor::buildLCL(
         closeTimeCorrect = ((replay->closeFlags_ & sLCF_NoConsensusTime) == 0);
     }
 
-    JLOG(j_.debug()) << "Report: TxSt = " << txns.id() << ", close "
+    JLOG(j_.debug()) << "Report: TxSt = " << retriableTxs.key() << ", close "
                      << closeTime.time_since_epoch().count()
                      << (closeTimeCorrect ? "" : " (incorrect)");
 
@@ -801,37 +822,13 @@ RCLConsensus::Adaptor::buildLCL(
         {
             // Normal case: deterministically sort transactions into an
             // unpredictable order and then attempt to apply them.
-            retriableTxs.reset(txns.map_->getHash().as_uint256());
-
-            JLOG(j_.debug()) <<
-                "Building canonical tx set: " << retriableTxs.key();
-
-            for (auto const& item : *txns.map_)
-            {
-                if (built->txExists(item.key()))
-                    continue;
-
-                try
-                {
-                    retriableTxs.insert(
-                        std::make_shared<STTx const>(SerialIter{item.slice()}));
-                    JLOG(j_.debug()) <<
-                        "    Tx: " << item.key();
-                }
-                catch (std::exception const&)
-                {
-                    JLOG(j_.warn()) <<
-                        "    Tx: " << item.key() << " throws!";
-                }
-            }
-
             JLOG(j_.debug()) <<
                 "Attempting to apply " << retriableTxs.size() << " transactions";
 
             // Attempt to apply the transactions that made it into the consensus
             // set, tracking those that failed and leaving any that couldn't be
             // applied and must be retried in retriableTxs.
-            auto const applied = applyTransactions(app_,
+            auto const applied = applyTransactions(app_, built,
                 retriableTxs, failedTxs, accum);
 
             JLOG(j_.debug()) <<

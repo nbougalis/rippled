@@ -350,7 +350,6 @@ class RCLConsensus
         RCLCxLedger
         buildLCL(
             RCLCxLedger const& previousLedger,
-            RCLTxSet const& txns,
             NetClock::time_point closeTime,
             bool closeTimeCorrect,
             NetClock::duration closeResolution,

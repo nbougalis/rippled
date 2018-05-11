@@ -78,17 +78,20 @@ public:
     using const_iterator = std::map <Key, std::shared_ptr<STTx const>>::const_iterator;
 
 public:
-    CanonicalTXSet () = default;
+    CanonicalTXSet (LedgerHash const& hash)
+        : mSetHash (hash)
+    {
+
+    }
 
     void insert (std::shared_ptr<STTx const> const& txn);
 
     std::vector<std::shared_ptr<STTx const>>
     prune(AccountID const& account, std::uint32_t const seq);
 
-    void reset (LedgerHash const& saltHash)
+    void reset (LedgerHash const& hash)
     {
-        mSetHash = saltHash;
-
+        mSetHash = hash;
         mMap.clear ();
     }
 
