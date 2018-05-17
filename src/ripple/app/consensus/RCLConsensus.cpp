@@ -87,24 +87,23 @@ RCLConsensus::Adaptor::Adaptor(
 }
 
 boost::optional<RCLCxLedger>
-RCLConsensus::Adaptor::acquireLedger(LedgerHash const& ledger)
+RCLConsensus::Adaptor::acquireLedger(LedgerHash const& hash)
 {
     // we need to switch the ledger we're working from
-    auto buildLCL = ledgerMaster_.getLedgerByHash(ledger);
-    if (!buildLCL)
+    auto ledger = ledgerMaster_.getLedgerByHash(hash);
+    if (!ledger)
     {
-        if (acquiringLedger_ != ledger)
+        if (acquiringLedger_ != hash)
         {
             // need to start acquiring the correct consensus LCL
-            JLOG(j_.warn()) << "Need consensus ledger " << ledger;
+            JLOG(j_.warn()) << "Need consensus ledger " << hash;
 
             // Tell the ledger acquire system that we need the consensus ledger
-            acquiringLedger_ = ledger;
+            acquiringLedger_ = hash;
 
-            auto app = &app_;
-            auto hash = acquiringLedger_;
-            app_.getJobQueue().addJob(
-                jtADVANCE, "getConsensusLedger", [app, hash](Job&) {
+            app_.getJobQueue().addJob(jtADVANCE, "getConsensusLedger",
+                [app = &app_, hash](Job&)
+                {
                     app->getInboundLedgers().acquire(
                         hash, 0, InboundLedger::Reason::CONSENSUS);
                 });
@@ -112,18 +111,17 @@ RCLConsensus::Adaptor::acquireLedger(LedgerHash const& ledger)
         return boost::none;
     }
 
-    assert(!buildLCL->open() && buildLCL->isImmutable());
-    assert(buildLCL->info().hash == ledger);
+    assert(!ledger->open() && ledger->isImmutable());
+    assert(ledger->info().hash == hash);
 
     // Notify inbound transactions of the new ledger sequence number
-    inboundTransactions_.newRound(buildLCL->info().seq);
+    inboundTransactions_.newRound(ledger->info().seq);
 
     // Use the ledger timing rules of the acquired ledger
-    parms_.useRoundedCloseTime = buildLCL->rules().enabled(fix1528);
+    parms_.useRoundedCloseTime = ledger->rules().enabled(fix1528);
 
-    return RCLCxLedger(buildLCL);
+    return RCLCxLedger(ledger);
 }
-
 
 void
 RCLConsensus::Adaptor::share(RCLCxPeerPos const& peerPos)
