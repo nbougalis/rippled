@@ -56,7 +56,6 @@ buildLedger(
     NetClock::time_point closeTime,
     const bool closeTimeCorrect,
     NetClock::duration closeResolution,
-    SHAMap const& txs,
     Application& app,
     CanonicalTXSet& retriableTxs,
     beast::Journal j);

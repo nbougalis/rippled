@@ -90,40 +90,18 @@ buildLedgerImpl(
   @param app Handle to application
   @param txns Consensus transactions to apply
   @param view Ledger to apply to
-  @param buildLCL Ledger to check if transaction already exists
+  @param built Ledger to check if transaction already exists
   @param j Journal for logging
-  @return Any retriable transactions
+  @return Number of transactions applied
 */
-
-CanonicalTXSet
+std::size_t
 applyTransactions(
     Application& app,
-    SHAMap const& txns,
+    CanonicalTXSet& txns,
     OpenView& view,
-    std::shared_ptr<Ledger> const& buildLCL,
+    std::shared_ptr<Ledger> const& built,
     beast::Journal j)
 {
-    CanonicalTXSet retriableTxs(txns.getHash().as_uint256());
-
-    for (auto const& item : txns)
-    {
-        if (buildLCL->txExists(item.key()))
-            continue;
-
-        // The transaction wasn't filtered
-        // Add it to the set to be tried in canonical order
-        JLOG(j.debug()) << "Processing candidate transaction: " << item.key();
-        try
-        {
-            retriableTxs.insert(
-                std::make_shared<STTx const>(SerialIter{item.slice()}));
-        }
-        catch (std::exception const&)
-        {
-            JLOG(j.warn()) << "Txn " << item.key() << " throws";
-        }
-    }
-
     bool certainRetry = true;
     // Attempt to apply all of the retriable transactions
     for (int pass = 0; pass < LEDGER_TOTAL_PASSES; ++pass)
@@ -186,7 +164,6 @@ buildLedger(
     NetClock::time_point closeTime,
     const bool closeTimeCorrect,
     NetClock::duration closeResolution,
-    SHAMap const& txs,
     Application& app,
     CanonicalTXSet& retriableTxs,
     beast::Journal j)
@@ -203,7 +180,7 @@ buildLedger(
         app,
         j,
         [&](OpenView& accum, std::shared_ptr<Ledger> const& buildLCL) {
-            retriableTxs = applyTransactions(app, txs, accum, buildLCL, j);
+            applyTransactions(app, retriableTxs, accum, buildLCL, j);
         });
 }
 

@@ -637,35 +637,62 @@ RCLConsensus::Adaptor::buildLCL(
     std::chrono::milliseconds roundTime,
     CanonicalTXSet& retriableTxs)
 {
-    std::shared_ptr<Ledger> buildLCL = [&]() {
-        auto const replayData = ledgerMaster_.releaseReplay();
-        if (replayData)
+    std::shared_ptr<Ledger> built = [&]()
+    {
+        if (auto const replayData = ledgerMaster_.releaseReplay())
         {
             assert(replayData->parent()->info().hash == previousLedger.id());
             return buildLedger(*replayData, tapNO_CHECK_SIGN, app_, j_);
         }
+
+        /* Sort the transactions we are going to apply in a deterministic but
+           unpredictable order by using the hash of the transaction set itself.
+         */
+        retriableTxs.reset(txns.map_->getHash().as_uint256());
+
+        JLOG(j_.debug()) << "Ordering candidates transactions: " << retriableTxs.key();
+
+        for (auto const& item : *txns.map_)
+        {
+            try
+            {
+                // We want to skip any transactions that already exist:
+                if (previousLedger.ledger_->txExists(item.key()))
+                    continue;
+
+                retriableTxs.insert(
+                    std::make_shared<STTx const>(SerialIter{item.slice()}));
+                JLOG(j_.debug()) << "    Tx: " << item.key();
+            }
+            catch (std::exception const&)
+            {
+                JLOG(j_.warn()) << "    Tx: " << item.key() << " throws!";
+            }
+        }
+
+        JLOG(j_.debug()) << "Transactions ordered (" << retriableTxs.size() << ")";
+
         return buildLedger(
             previousLedger.ledger_,
             closeTime,
             closeTimeCorrect,
             closeResolution,
-            *txns.map_,
             app_,
             retriableTxs,
             j_);
     }();
 
     // Update fee computations based on accepted txs
-    app_.getTxQ().processClosedLedger(app_, *buildLCL, roundTime > 5s);
+    app_.getTxQ().processClosedLedger(app_, *built, roundTime > 5s);
 
     // And stash the ledger in the ledger master
-    if (ledgerMaster_.storeLedger(buildLCL))
+    if (ledgerMaster_.storeLedger(built))
         JLOG(j_.debug()) << "Consensus built ledger we already had";
-    else if (app_.getInboundLedgers().find(buildLCL->info().hash))
+    else if (app_.getInboundLedgers().find(built->info().hash))
         JLOG(j_.debug()) << "Consensus built ledger we were acquiring";
     else
         JLOG(j_.debug()) << "Consensus built new ledger";
-    return RCLCxLedger{std::move(buildLCL)};
+    return RCLCxLedger{std::move(built)};
 }
 
 void

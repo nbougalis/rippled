@@ -124,6 +124,11 @@ public:
         return mMap.empty ();
     }
 
+    uint256 const& key() const
+    {
+        return mSetHash;
+    }
+
 private:
     // Used to salt the accounts so people can't mine for low account numbers
     uint256 mSetHash;
