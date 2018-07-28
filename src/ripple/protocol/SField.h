@@ -438,6 +438,7 @@ extern SF_Amount const sfDeliverMin;
 extern SF_Amount const sfMinimumOffer;
 extern SF_Amount const sfRippleEscrow;
 extern SF_Amount const sfDeliveredAmount;
+extern SF_Amount const sfRequestedAmount;
 
 // variable length (common)
 extern SF_Blob const sfPublicKey;

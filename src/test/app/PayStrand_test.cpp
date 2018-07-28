@@ -1304,10 +1304,10 @@ struct PayStrand_test : public beast::unit_test::suite
 
             PathSet paths(p);
 
-            env(pay(alice, alice, EUR(1)),
+            env(partial_pay(alice, alice, EUR(1)),
                 json(paths.json()),
                 sendmax(XRP(10)),
-                txflags(tfNoRippleDirect | tfPartialPayment),
+                txflags(tfNoRippleDirect),
                 ter(temBAD_PATH));
         }
 

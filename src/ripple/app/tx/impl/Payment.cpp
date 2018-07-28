@@ -28,25 +28,30 @@
 
 namespace ripple {
 
-// See https://ripple.com/wiki/Transaction_Format#Payment_.280.29
-
 XRPAmount
 Payment::calculateMaxSpend(STTx const& tx)
 {
-    if (tx.isFieldPresent(sfSendMax))
+    auto const amt = [&tx]()
     {
-        auto const& sendMax = tx[sfSendMax];
-        return sendMax.native() ? sendMax.xrp() : beast::zero;
-    }
-    /* If there's no sfSendMax in XRP, and the sfAmount isn't
-    in XRP, then the transaction can not send XRP. */
-    auto const& saDstAmount = tx.getFieldAmount(sfAmount);
-    return saDstAmount.native() ? saDstAmount.xrp() : beast::zero;
+        if (tx.isFieldPresent(sfSendMax))
+            return tx[sfSendMax];
+
+        return tx.getFieldAmount(
+            tx.getTxnType() == ttPARTIAL_PAYMENT
+                ? sfRequestedAmount
+                : sfAmount);
+    }();
+
+    return amt.native() ? amt.xrp() : beast::zero;
 }
 
 NotTEC
 Payment::preflight (PreflightContext const& ctx)
 {
+    if (ctx.tx.getTxnType() == ttPARTIAL_PAYMENT &&
+            ! ctx.rules.enabled(featurePartialPayments))
+        return temUNKNOWN;
+
     auto const ret = preflight1 (ctx);
     if (!isTesSuccess (ret))
         return ret;
@@ -54,22 +59,37 @@ Payment::preflight (PreflightContext const& ctx)
     auto& tx = ctx.tx;
     auto& j = ctx.j;
 
-    std::uint32_t const uTxFlags = tx.getFlags ();
+    std::uint32_t const uTxFlags = tx.getFlags();
+
+    if (ctx.rules.enabled(featurePartialPayments))
+    {
+        // Partial payments must use a special transaction and not a flag.
+        if (ctx.tx.getFlags() & tfPartialPayment)
+            return temINVALID_FLAG;
+    }
 
     if (uTxFlags & tfPaymentMask)
     {
-        JLOG(j.trace()) << "Malformed transaction: " <<
-            "Invalid flags set.";
+        JLOG(j.trace()) << "Malformed transaction: Invalid flags set.";
         return temINVALID_FLAG;
     }
 
-    bool const partialPaymentAllowed = uTxFlags & tfPartialPayment;
+    bool const partialPaymentAllowed = [&ctx]()
+    {
+        if (ctx.rules.enabled(featurePartialPayments))
+            return ctx.tx.getTxnType() == ttPARTIAL_PAYMENT;
+        return (ctx.tx.getFlags() & tfPartialPayment) != 0;
+    }();
+
     bool const limitQuality = uTxFlags & tfLimitQuality;
     bool const defaultPathsAllowed = !(uTxFlags & tfNoRippleDirect);
     bool const bPaths = tx.isFieldPresent (sfPaths);
     bool const bMax = tx.isFieldPresent (sfSendMax);
 
-    STAmount const saDstAmount (tx.getFieldAmount (sfAmount));
+    STAmount const saDstAmount = tx.getFieldAmount (
+        tx.getTxnType() == ttPARTIAL_PAYMENT
+            ? sfRequestedAmount
+            : sfAmount);
 
     STAmount maxSourceAmount;
     auto const account = tx.getAccountID(sfAccount);
@@ -121,8 +141,8 @@ Payment::preflight (PreflightContext const& ctx)
     }
     if (account == uDstAccountID && uSrcCurrency == uDstCurrency && !bPaths)
     {
-        // You're signing yourself a payment.
-        // If bPaths is true, you might be trying some arbitrage.
+        // You're sending yourself a payment. If bPaths is true, you might
+        // be trying some arbitrage.
         JLOG(j.trace()) << "Malformed transaction: " <<
             "Redundant payment from " << to_string (account) <<
             " to self without path for " << to_string (uDstCurrency);
@@ -205,13 +225,21 @@ TER
 Payment::preclaim(PreclaimContext const& ctx)
 {
     // Ripple if source or destination is non-native or if there are paths.
-    std::uint32_t const uTxFlags = ctx.tx.getFlags();
-    bool const partialPaymentAllowed = uTxFlags & tfPartialPayment;
+    bool const partialPaymentAllowed = [&ctx]()
+    {
+        if (ctx.view.rules().enabled(featurePartialPayments))
+            return ctx.tx.getTxnType() == ttPARTIAL_PAYMENT;
+        return (ctx.tx.getFlags() & tfPartialPayment) != 0;
+    }();
+
     auto const paths = ctx.tx.isFieldPresent(sfPaths);
     auto const sendMax = ctx.tx[~sfSendMax];
 
     AccountID const uDstAccountID(ctx.tx[sfDestination]);
-    STAmount const saDstAmount(ctx.tx[sfAmount]);
+    STAmount const saDstAmount = ctx.tx.getFieldAmount (
+        ctx.tx.getTxnType() == ttPARTIAL_PAYMENT
+            ? sfRequestedAmount
+            : sfAmount);
 
     auto const k = keylet::account(uDstAccountID);
     auto const sleDst = ctx.view.read(k);
@@ -228,8 +256,7 @@ Payment::preclaim(PreclaimContext const& ctx)
             // transaction would succeed.
             return tecNO_DST;
         }
-        else if (ctx.view.open()
-            && partialPaymentAllowed)
+        else if (ctx.view.open() && partialPaymentAllowed)
         {
             // You cannot fund an account with a partial payment.
             // Make retry work smaller, by rejecting this.
@@ -303,14 +330,25 @@ Payment::doApply ()
 
     // Ripple if source or destination is non-native or if there are paths.
     std::uint32_t const uTxFlags = ctx_.tx.getFlags ();
-    bool const partialPaymentAllowed = uTxFlags & tfPartialPayment;
+    bool const partialPaymentAllowed = [this]()
+    {
+        if (view().rules().enabled(featurePartialPayments))
+            return ctx_.tx.getTxnType() == ttPARTIAL_PAYMENT;
+        return (ctx_.tx.getFlags() & tfPartialPayment) != 0;
+    }();
     bool const limitQuality = uTxFlags & tfLimitQuality;
     bool const defaultPathsAllowed = !(uTxFlags & tfNoRippleDirect);
     auto const paths = ctx_.tx.isFieldPresent(sfPaths);
     auto const sendMax = ctx_.tx[~sfSendMax];
 
     AccountID const uDstAccountID (ctx_.tx.getAccountID (sfDestination));
-    STAmount const saDstAmount (ctx_.tx.getFieldAmount (sfAmount));
+
+    // "PartialPayment" transactions use a different field name for the amount:
+    STAmount const saDstAmount = ctx_.tx.getFieldAmount (
+        ctx_.tx.getTxnType() == ttPARTIAL_PAYMENT
+            ? sfRequestedAmount
+            : sfAmount);
+
     STAmount maxSourceAmount;
     if (sendMax)
         maxSourceAmount = *sendMax;

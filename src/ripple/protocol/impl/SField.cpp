@@ -192,6 +192,7 @@ SF_Amount const sfDeliverMin  = make::one<SF_Amount::type>(&sfDeliverMin,  STI_A
 SF_Amount const sfMinimumOffer    = make::one<SF_Amount::type>(&sfMinimumOffer,    STI_AMOUNT, 16, "MinimumOffer");
 SF_Amount const sfRippleEscrow    = make::one<SF_Amount::type>(&sfRippleEscrow,    STI_AMOUNT, 17, "RippleEscrow");
 SF_Amount const sfDeliveredAmount = make::one<SF_Amount::type>(&sfDeliveredAmount, STI_AMOUNT, 18, "DeliveredAmount");
+SF_Amount const sfRequestedAmount = make::one<SF_Amount::type>(&sfRequestedAmount, STI_AMOUNT, 19, "RequestedAmount");
 
 // variable length (common)
 SF_Blob const sfPublicKey       = make::one<SF_Blob::type>(&sfPublicKey,     STI_VL,  1, "PublicKey");

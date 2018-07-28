@@ -1652,6 +1652,7 @@ target_sources (rippled PRIVATE
     src/test/app/Path_test.cpp
     src/test/app/PayChan_test.cpp
     src/test/app/PayStrand_test.cpp
+    src/test/app/Payment_test.cpp
     src/test/app/PseudoTx_test.cpp
     src/test/app/RCLValidations_test.cpp
     src/test/app/Regression_test.cpp

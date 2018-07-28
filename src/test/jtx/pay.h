@@ -33,6 +33,10 @@ Json::Value
 pay (Account const& account,
     Account const& to, AnyAmount amount);
 
+Json::Value
+partial_pay (Account const& account,
+    Account const& to, AnyAmount amount);
+
 } // jtx
 } // test
 } // ripple

@@ -40,6 +40,21 @@ pay (Account const& account,
     return jv;
 }
 
+Json::Value
+partial_pay (Account const& account,
+    Account const& to,
+        AnyAmount amount)
+{
+    amount.to(to);
+    Json::Value jv;
+    jv[jss::Account] = account.human();
+    jv[jss::RequestedAmount] = amount.value.getJson(0);
+    jv[jss::Destination] = to.human();
+    jv[jss::TransactionType] = "PartialPayment";
+    jv[jss::Flags] = tfUniversal;
+    return jv;
+}
+
 } // jtx
 } // test
 } // ripple

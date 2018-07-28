@@ -58,6 +58,7 @@ invoke_preflight (PreflightContext const& ctx)
     case ttPAYCHAN_CREATE:  return PayChanCreate    ::preflight(ctx);
     case ttPAYCHAN_FUND:    return PayChanFund      ::preflight(ctx);
     case ttPAYMENT:         return Payment          ::preflight(ctx);
+    case ttPARTIAL_PAYMENT: return Payment          ::preflight(ctx);
     case ttREGULAR_KEY_SET: return SetRegularKey    ::preflight(ctx);
     case ttSIGNER_LIST_SET: return SetSignerList    ::preflight(ctx);
     case ttTICKET_CANCEL:   return CancelTicket     ::preflight(ctx);
@@ -127,6 +128,7 @@ invoke_preclaim (PreclaimContext const& ctx)
     case ttPAYCHAN_CREATE:  return invoke_preclaim<PayChanCreate>(ctx);
     case ttPAYCHAN_FUND:    return invoke_preclaim<PayChanFund>(ctx);
     case ttPAYMENT:         return invoke_preclaim<Payment>(ctx);
+    case ttPARTIAL_PAYMENT: return invoke_preclaim<Payment>(ctx);
     case ttREGULAR_KEY_SET: return invoke_preclaim<SetRegularKey>(ctx);
     case ttSIGNER_LIST_SET: return invoke_preclaim<SetSignerList>(ctx);
     case ttTICKET_CANCEL:   return invoke_preclaim<CancelTicket>(ctx);
@@ -162,6 +164,7 @@ invoke_calculateBaseFee(
     case ttPAYCHAN_CREATE:  return PayChanCreate::calculateBaseFee(view, tx);
     case ttPAYCHAN_FUND:    return PayChanFund::calculateBaseFee(view, tx);
     case ttPAYMENT:         return Payment::calculateBaseFee(view, tx);
+    case ttPARTIAL_PAYMENT: return Payment::calculateBaseFee(view, tx);
     case ttREGULAR_KEY_SET: return SetRegularKey::calculateBaseFee(view, tx);
     case ttSIGNER_LIST_SET: return SetSignerList::calculateBaseFee(view, tx);
     case ttTICKET_CANCEL:   return CancelTicket::calculateBaseFee(view, tx);
@@ -208,6 +211,7 @@ invoke_calculateConsequences(STTx const& tx)
     case ttPAYCHAN_CREATE:  return invoke_calculateConsequences<PayChanCreate>(tx);
     case ttPAYCHAN_FUND:    return invoke_calculateConsequences<PayChanFund>(tx);
     case ttPAYMENT:         return invoke_calculateConsequences<Payment>(tx);
+    case ttPARTIAL_PAYMENT: return invoke_calculateConsequences<Payment>(tx);
     case ttREGULAR_KEY_SET: return invoke_calculateConsequences<SetRegularKey>(tx);
     case ttSIGNER_LIST_SET: return invoke_calculateConsequences<SetSignerList>(tx);
     case ttTICKET_CANCEL:   return invoke_calculateConsequences<CancelTicket>(tx);
@@ -243,6 +247,7 @@ invoke_apply (ApplyContext& ctx)
     case ttPAYCHAN_CREATE:  { PayChanCreate  p(ctx); return p(); }
     case ttPAYCHAN_FUND:    { PayChanFund    p(ctx); return p(); }
     case ttPAYMENT:         { Payment        p(ctx); return p(); }
+    case ttPARTIAL_PAYMENT: { Payment        p(ctx); return p(); }
     case ttREGULAR_KEY_SET: { SetRegularKey  p(ctx); return p(); }
     case ttSIGNER_LIST_SET: { SetSignerList  p(ctx); return p(); }
     case ttTICKET_CANCEL:   { CancelTicket   p(ctx); return p(); }

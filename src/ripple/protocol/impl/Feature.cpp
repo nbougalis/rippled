@@ -113,7 +113,8 @@ detail::supportedAmendments ()
         { "58BE9B5968C4DA7C59BA900961828B113E5490699B21877DEF9A31E9D0FE5D5F fix1623" },
         { "3CBC5C4E630A1B82380295CDA84B32B49DD066602E74E39B85EF64137FA65194 DepositPreauth"},
         // Use liquidity from strands that consume max offers, but mark as dry
-        { "5D08145F0A4983F23AFFFF514E83FAD355C5ABFBB6CAB76FB5BC8519FF5F33BE fix1515"}
+        { "5D08145F0A4983F23AFFFF514E83FAD355C5ABFBB6CAB76FB5BC8519FF5F33BE fix1515"},
+        { "A9AA9C5220A8DAF3EFB3528EE0FEEEE0D6472FEB073CF88E7426247E6C59ACAE PartialPayments" },
     };
     return supported;
 }
@@ -168,5 +169,6 @@ uint256 const fix1543 = *getRegisteredFeature("fix1543");
 uint256 const fix1623 = *getRegisteredFeature("fix1623");
 uint256 const featureDepositPreauth = *getRegisteredFeature("DepositPreauth");
 uint256 const fix1515 = *getRegisteredFeature("fix1515");
+uint256 const featurePartialPayments = *getRegisteredFeature("PartialPayments");
 
 } // ripple

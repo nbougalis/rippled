@@ -149,8 +149,8 @@ public:
 
         PathSet paths (Path (XRP, USD), Path (USD));
 
-        env (pay (alice, bob, USD (100)), json (paths.json ()),
-            sendmax (BTC (1000)), txflags (tfPartialPayment));
+        env (partial_pay (alice, bob, USD (100)), json (paths.json ()),
+            sendmax (BTC (1000)));
 
         env.require (balance (bob, USD (100)));
         BEAST_EXPECT(!isOffer (env, carol, BTC (1), USD (100)) &&
@@ -370,9 +370,8 @@ public:
             env (offer (erin, drops (1), USD (1)));
 
             {
-                env (pay (alice, bob, USD (1)), path (~USD),
-                    sendmax (XRP (102)),
-                    txflags (tfNoRippleDirect | tfPartialPayment));
+                env (partial_pay (alice, bob, USD (1)), path (~USD),
+                    sendmax (XRP (102)), txflags (tfNoRippleDirect));
 
                 env.require (
                     offers (carol, 0),
@@ -1608,8 +1607,7 @@ public:
 
         // Alice converts USD to XRP, should succeed because
         // we permit partial payment
-        env (pay (alice, alice, XRP (600)), sendmax (USD (100)),
-            txflags (tfPartialPayment));
+        env (partial_pay (alice, alice, XRP (600)), sendmax (USD (100)));
 
         // Verify the offer was consumed
         jro = ledgerEntryOffer (env, bob, bobOfferSeq);

@@ -33,8 +33,14 @@ paths::operator()(Env& env, JTx& jt) const
         jv[jss::Account].asString());
     auto const to = env.lookup(
         jv[jss::Destination].asString());
-    auto const amount = amountFromJson(
-        sfAmount, jv[jss::Amount]);
+    auto const amount = [&jv]()
+    {
+        if (jv[jss::TransactionType] == "PartialPayment")
+            return amountFromJson(sfRequestedAmount, jv[jss::RequestedAmount]);
+
+        return amountFromJson(sfAmount, jv[jss::Amount]);
+    }();
+
     Pathfinder pf (
         std::make_shared<RippleLineCache>(env.current()),
             from, to, in_.currency, in_.account,

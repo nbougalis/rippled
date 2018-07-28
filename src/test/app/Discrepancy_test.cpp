@@ -91,9 +91,8 @@ class Discrepancy_test : public beast::unit_test::suite
             test::Path {XRP, A2["JPY"], A2},
             test::Path {A6, XRP, A2["JPY"], A2} };
 
-        env(pay(A1, A1, A2["JPY"](1000)),
+        env(partial_pay(A1, A1, A2["JPY"](1000)),
             json(payPaths.json()),
-            txflags(tfPartialPayment),
             sendmax(A3["CNY"](56)));
         env.close();
 

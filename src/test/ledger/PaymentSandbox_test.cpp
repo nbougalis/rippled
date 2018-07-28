@@ -87,9 +87,8 @@ class PaymentSandbox_test : public beast::unit_test::suite
             Path (gw1, USD_gw2, gw2),
             Path (gw2, USD_gw1, gw1));
 
-        env (pay (snd, rcv, any (USD_gw1 (4))),
-            json (paths.json ()),
-            txflags (tfNoRippleDirect | tfPartialPayment));
+        env (partial_pay (snd, rcv, any (USD_gw1 (4))),
+            json (paths.json ()), txflags (tfNoRippleDirect));
 
         env.require (balance ("rcv", USD_gw1 (0)));
         env.require (balance ("rcv", USD_gw2 (2)));

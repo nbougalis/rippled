@@ -38,6 +38,7 @@ JSS ( Account );                    // in: TransactionSign; field.
 JSS ( Amount );                     // in: TransactionSign; field.
 JSS ( ClearFlag );                  // field.
 JSS ( Destination );                // in: TransactionSign; field.
+JSS ( DeliveredAmount );            // field.
 JSS ( DeliverMin );                 // in: TransactionSign
 JSS ( Fee );                        // in/out: TransactionSign; field.
 JSS ( Flags );                      // in/out: TransactionSign; field.
@@ -46,6 +47,7 @@ JSS ( LastLedgerSequence );         // in: TransactionSign; field
 JSS ( LimitAmount );                // field.
 JSS ( OfferSequence );              // field.
 JSS ( Paths );                      // in/out: TransactionSign
+JSS ( RequestedAmount );            // in: TransactionSign
 JSS ( TransferRate );               // in: TransferRate
 JSS ( historical_perminute );       // historical_perminute
 JSS ( SLE_hit_rate );               // out: GetCounts

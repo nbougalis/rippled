@@ -66,6 +66,16 @@ TxFormats::TxFormats ()
         << SOElement (sfDeliverMin,          SOE_OPTIONAL)
         ;
 
+    add ("PartialPayment", ttPARTIAL_PAYMENT)
+        << SOElement (sfDestination,         SOE_REQUIRED)
+        << SOElement (sfRequestedAmount,     SOE_REQUIRED)
+        << SOElement (sfSendMax,             SOE_OPTIONAL)
+        << SOElement (sfPaths,               SOE_DEFAULT)
+        << SOElement (sfInvoiceID,           SOE_OPTIONAL)
+        << SOElement (sfDestinationTag,      SOE_OPTIONAL)
+        << SOElement (sfDeliverMin,          SOE_OPTIONAL)
+        ;
+
     add ("EscrowCreate", ttESCROW_CREATE)
         << SOElement (sfDestination,         SOE_REQUIRED)
         << SOElement (sfAmount,              SOE_REQUIRED)

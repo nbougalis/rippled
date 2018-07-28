@@ -102,8 +102,7 @@ struct Flow_test : public beast::unit_test::suite
             env (pay (alice, bob, USD (110)), paths (USD),
                 ter (tecPATH_PARTIAL));
             env.require (balance (bob, USD (0)));
-            env (pay (alice, bob, USD (110)), paths (USD),
-                txflags (tfPartialPayment));
+            env (partial_pay (alice, bob, USD (110)), paths (USD));
             env.require (balance (bob, USD (100)));
         }
         {
@@ -184,12 +183,11 @@ struct Flow_test : public beast::unit_test::suite
             env.trust (USDA (10), bob);
             env.trust (USDB (10), carol);
 
-            env (pay (alice, carol, USDB (5)), sendmax (USDA (4)),
-                txflags (tfLimitQuality | tfPartialPayment), ter (tecPATH_DRY));
+            env (partial_pay (alice, carol, USDB (5)), sendmax (USDA (4)),
+                txflags (tfLimitQuality), ter (tecPATH_DRY));
             env.require (balance (carol, USDB (0)));
 
-            env (pay (alice, carol, USDB (5)), sendmax (USDA (4)),
-                txflags (tfPartialPayment));
+            env (partial_pay (alice, carol, USDB (5)), sendmax (USDA (4)));
             env.require (balance (carol, USDB (4)));
         }
     }
@@ -507,8 +505,8 @@ struct Flow_test : public beast::unit_test::suite
             env (offer (bob, USD (1), drops (2)), txflags (tfPassive));
             env (offer (bob, drops (1), EUR (1000)), txflags (tfPassive));
 
-            env (pay (alice, carol, EUR (1)), path (~XRP, ~EUR),
-                sendmax (USD (0.4)), txflags (tfNoRippleDirect|tfPartialPayment));
+            env (partial_pay (alice, carol, EUR (1)), path (~XRP, ~EUR),
+                sendmax (USD (0.4)), txflags (tfNoRippleDirect));
 
             env.require (balance (carol, EUR (1)));
             env.require (balance (bob, USD (0.4)));
@@ -714,9 +712,9 @@ struct Flow_test : public beast::unit_test::suite
         env (offer (bob, EUR (50), XRP (50)));
         env (offer (bob, XRP (50), USD (50)));
 
-        env (pay (alice, carol, USD (1000000)), path (~XRP, ~USD),
+        env (partial_pay (alice, carol, USD (1000000)), path (~XRP, ~USD),
             sendmax (EUR (500)),
-            txflags (tfNoRippleDirect | tfPartialPayment));
+            txflags (tfNoRippleDirect));
 
         auto const carolUSD = env.balance(carol, USD).value();
         BEAST_EXPECT(carolUSD > USD (0) && carolUSD < USD (50));
@@ -743,7 +741,7 @@ struct Flow_test : public beast::unit_test::suite
         for (auto const& d : {-100 * timeDelta, +100 * timeDelta})
         {
             auto const closeTime = fix1141Time () + d ;
-            Env env (*this, FeatureBitset{});
+            Env env (*this, FeatureBitset{featurePartialPayments});
             env.close (closeTime);
 
             env.fund (XRP(10000), alice, bob, carol, gw);
@@ -756,8 +754,8 @@ struct Flow_test : public beast::unit_test::suite
             TER const expectedResult = closeTime < fix1141Time ()
                 ? TER {tecPATH_DRY}
                 : TER {tesSUCCESS};
-            env (pay (alice, carol, USD (100)), path (~USD), sendmax (XRP (100)),
-                txflags (tfNoRippleDirect | tfPartialPayment | tfLimitQuality),
+            env (partial_pay (alice, carol, USD (100)), path (~USD), sendmax (XRP (100)),
+                txflags (tfNoRippleDirect | tfLimitQuality),
                 ter (expectedResult));
 
             if (expectedResult == tesSUCCESS)
@@ -844,8 +842,7 @@ struct Flow_test : public beast::unit_test::suite
             BEAST_EXPECT(offer[sfTakerPays] == USD (500));
         }
 
-        env (pay (alice, alice, EUR (600)), sendmax (USD (500)),
-            txflags (tfPartialPayment));
+        env (partial_pay (alice, alice, EUR (600)), sendmax (USD (500)));
         env.close ();
 
         env.require (owners (alice, 3));
@@ -918,8 +915,7 @@ struct Flow_test : public beast::unit_test::suite
             BEAST_EXPECT(offer[sfTakerPays] == USD (500));
         }
 
-        env (pay (alice, alice, EUR (60)), sendmax (USD (50)),
-            txflags (tfPartialPayment));
+        env (partial_pay (alice, alice, EUR (60)), sendmax (USD (50)));
         env.close ();
 
         env.require (owners (alice, 3));
@@ -965,8 +961,8 @@ struct Flow_test : public beast::unit_test::suite
         // Consuming the offer changes the owner count, which could also cause
         // liquidity to decrease in the forward pass
         auto const toSend = consumeOffer ? USD(10) : USD(9);
-        env(pay(alice, alice, toSend), path(~USD), sendmax(XRP(20000)),
-            txflags(tfPartialPayment | tfNoRippleDirect));
+        env(partial_pay(alice, alice, toSend), path(~USD), sendmax(XRP(20000)),
+            txflags(tfNoRippleDirect));
     }
 
     void testUnfundedOffer (bool withFix, FeatureBitset features)
@@ -1095,8 +1091,8 @@ struct Flow_test : public beast::unit_test::suite
                 USD.issue(), std::uint64_t(1700000000000000ull), -14, false},
             XRP(.001)));
 
-        env(pay(alice, bob, XRP(10000)), path(~XRP), sendmax(USD(100)),
-            txflags(tfPartialPayment | tfNoRippleDirect));
+        env(partial_pay(alice, bob, XRP(10000)), path(~XRP), sendmax(USD(100)),
+            txflags(tfNoRippleDirect));
     }
 
     void
@@ -1226,8 +1222,8 @@ struct Flow_test : public beast::unit_test::suite
         env.close();
 
         // This payment caused the assert.
-        env (pay(ann, ann, CTB(0.687)),
-             sendmax (drops(20000000000)), txflags (tfPartialPayment));
+        env (partial_pay(ann, ann, CTB(0.687)),
+             sendmax (drops(20000000000)));
     }
 
     void
