@@ -388,6 +388,14 @@ SetAccount::doApply ()
         }
     }
 
+    if (view().rules().enabled(featureBlockPartialPayments))
+    {
+        if (uSetFlag == asfPartialPayments)
+            uFlagsOut &= ~lsfNoPartialPayment;
+        else if (uClearFlag == asfPartialPayments)
+            uFlagsOut |= lsfNoPartialPayment;
+    }
+
     //
     // EmailHash
     //

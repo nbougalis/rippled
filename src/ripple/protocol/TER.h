@@ -263,6 +263,7 @@ enum TECcodes : TERUnderlyingType
     tecINVARIANT_FAILED         = 147,
     tecEXPIRED                  = 148,
     tecDUPLICATE                = 149,
+    tecNO_PARTIAL_PAYMENTS      = 150,
 };
 
 //------------------------------------------------------------------------------

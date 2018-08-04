@@ -1650,6 +1650,7 @@ target_sources (rippled PRIVATE
     src/test/app/Offer_test.cpp
     src/test/app/OversizeMeta_test.cpp
     src/test/app/Path_test.cpp
+    src/test/app/Payment_test.cpp
     src/test/app/PayChan_test.cpp
     src/test/app/PayStrand_test.cpp
     src/test/app/PseudoTx_test.cpp

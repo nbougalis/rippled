@@ -19,6 +19,7 @@
 //==============================================================================
 
 #include <test/app/Path_test.cpp>
+#include <test/app/Payment_test.cpp>
 #include <test/app/PayChan_test.cpp>
 #include <test/app/PayStrand_test.cpp>
 #include <test/app/PseudoTx_test.cpp>

@@ -228,8 +228,7 @@ Payment::preclaim(PreclaimContext const& ctx)
             // transaction would succeed.
             return tecNO_DST;
         }
-        else if (ctx.view.open()
-            && partialPaymentAllowed)
+        else if (ctx.view.open() && partialPaymentAllowed)
         {
             // You cannot fund an account with a partial payment.
             // Make retry work smaller, by rejecting this.
@@ -255,17 +254,20 @@ Payment::preclaim(PreclaimContext const& ctx)
             return tecNO_DST_INSUF_XRP;
         }
     }
-    else if ((sleDst->getFlags() & lsfRequireDestTag) &&
-        !ctx.tx.isFieldPresent(sfDestinationTag))
+    else
     {
-        // The tag is basically account-specific information we don't
-        // understand, but we can require someone to fill it in.
+        auto const flags = sleDst->getFlags();
 
-        // We didn't make this test for a newly-formed account because there's
-        // no way for this field to be set.
-        JLOG(ctx.j.trace()) << "Malformed transaction: DestinationTag required.";
+        if ((flags & lsfRequireDestTag) && !ctx.tx.isFieldPresent(sfDestinationTag))
+            return tecDST_TAG_NEEDED;
 
-        return tecDST_TAG_NEEDED;
+        // Even if an account disables incoming partial payments, we still
+        // always allow such payments to self. This makes it possible to,
+        // inter alia, completely convert an asset.
+        if (partialPaymentAllowed && (flags & lsfNoPartialPayment) &&
+                ctx.view.rules().enabled(featureBlockPartialPayments) &&
+                    (ctx.tx.getAccountID(sfAccount) != uDstAccountID))
+            return tecNO_PARTIAL_PAYMENTS;
     }
 
     if (paths || sendMax || !saDstAmount.native())
@@ -336,6 +338,15 @@ Payment::doApply ()
         sleDst = std::make_shared<SLE>(k);
         sleDst->setAccountID(sfAccount, uDstAccountID);
         sleDst->setFieldU32(sfSequence, 1);
+
+        std::uint32_t defaultFlags = 0;
+
+        if (view().rules().enabled(featureBlockPartialPayments))
+            defaultFlags |= lsfNoPartialPayment;
+
+        if (defaultFlags != 0)
+            sleDst->setFieldU32(sfFlags, defaultFlags);
+
         view().insert(sleDst);
     }
     else

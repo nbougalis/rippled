@@ -230,6 +230,7 @@ Env::fund (bool setDefaultRipple,
         Account const& account)
 {
     memoize(account);
+
     if (setDefaultRipple)
     {
         // VFALCO NOTE Is the fee formula correct?
@@ -252,6 +253,15 @@ Env::fund (bool setDefaultRipple,
                     sig(jtx::autofill));
         require(nflags(account, asfDefaultRipple));
     }
+
+    // Ensure that partial payments are enabled on the new account in the test
+    // environment. This is safe even if the relevant amendment is off.
+    apply(pay(master, account, drops(current()->fees().base)),
+          jtx::seq(jtx::autofill), fee(jtx::autofill), sig(jtx::autofill));
+    apply(fset(account, asfPartialPayments),
+          jtx::seq(jtx::autofill), fee(jtx::autofill), sig(jtx::autofill));
+    require(nflags(account, asfPartialPayments));
+
     require(jtx::balance(account, amount));
 }
 

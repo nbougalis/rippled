@@ -73,6 +73,7 @@ transResults()
         { tecINVARIANT_FAILED,       { "tecINVARIANT_FAILED",      "One or more invariants for the transaction were not satisfied."                } },
         { tecEXPIRED,                { "tecEXPIRED",               "Expiration time is passed."                                                    } },
         { tecDUPLICATE,              { "tecDUPLICATE",             "Ledger object already exists."                                                 } },
+        { tecNO_PARTIAL_PAYMENTS,    { "tecNO_PARTIAL_PAYMENTS",   "The destination does not accept partial payments."                             } },
 
         { tefALREADY,                { "tefALREADY",               "The exact transaction was already in this ledger."                             } },
         { tefBAD_ADD_AUTH,           { "tefBAD_ADD_AUTH",          "Not authorized to add account."                                                } },

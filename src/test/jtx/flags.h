@@ -64,18 +64,18 @@ private:
     {
         switch(flag)
         {
-        case asfRequireDest:    mask_ |= lsfRequireDestTag; break;
-        case asfRequireAuth:    mask_ |= lsfRequireAuth;    break;
-        case asfDisallowXRP:    mask_ |= lsfDisallowXRP;    break;
-        case asfDisableMaster:  mask_ |= lsfDisableMaster;  break;
-        //case asfAccountTxnID: // ???
-        case asfNoFreeze:       mask_ |= lsfNoFreeze;       break;
-        case asfGlobalFreeze:   mask_ |= lsfGlobalFreeze;   break;
-        case asfDefaultRipple:  mask_ |= lsfDefaultRipple;  break;
-        case asfDepositAuth:    mask_ |= lsfDepositAuth;    break;
+        case asfRequireDest:     mask_ |= lsfRequireDestTag; break;
+        case asfRequireAuth:     mask_ |= lsfRequireAuth;    break;
+        case asfDisallowXRP:     mask_ |= lsfDisallowXRP;    break;
+        case asfDisableMaster:   mask_ |= lsfDisableMaster;  break;
+        //case asfAccountTxnID:  // ???
+        case asfNoFreeze:        mask_ |= lsfNoFreeze;       break;
+        case asfGlobalFreeze:    mask_ |= lsfGlobalFreeze;   break;
+        case asfDefaultRipple:   mask_ |= lsfDefaultRipple;  break;
+        case asfDepositAuth:     mask_ |= lsfDepositAuth;    break;
+        case asfPartialPayments: mask_ |= lsfNoPartialPayment; break;
         default:
-        Throw<std::runtime_error> (
-            "unknown flag");
+        Throw<std::runtime_error> ("unknown flag");
         }
     }
 
