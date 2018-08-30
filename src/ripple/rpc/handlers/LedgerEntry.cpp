@@ -18,7 +18,7 @@
 //==============================================================================
 
 #include <ripple/app/main/Application.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <ripple/basics/StringUtilities.h>
 #include <ripple/ledger/ReadView.h>
 #include <ripple/net/RPCErr.h>
@@ -288,7 +288,7 @@ Json::Value doLedgerEntry (RPC::Context& context)
 
             sleNode->add (s);
 
-            jvResult[jss::node_binary] = strHex (s.peekData ());
+            jvResult[jss::node_binary] = to_hex(s.peekData ());
             jvResult[jss::index]       = to_string (uNodeIndex);
         }
         else

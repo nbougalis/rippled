@@ -1137,13 +1137,13 @@ loadLedgerHelper(std::string const& sqlSuffix,
 
     uint256 prevHash{}, accountHash{}, transHash{};
     if (sLedgerHash)
-        ledgerHash.SetHexExact (*sLedgerHash);
+        ledgerHash._Set_Hex_Exact_ (*sLedgerHash);
     if (sPrevHash)
-        prevHash.SetHexExact (*sPrevHash);
+        prevHash._Set_Hex_Exact_ (*sPrevHash);
     if (sAccountHash)
-        accountHash.SetHexExact (*sAccountHash);
+        accountHash._Set_Hex_Exact_ (*sAccountHash);
     if (sTransHash)
-        transHash.SetHexExact (*sTransHash);
+        transHash._Set_Hex_Exact_ (*sTransHash);
 
     using time_point = NetClock::time_point;
     using duration = NetClock::duration;
@@ -1254,7 +1254,7 @@ getHashByIndex (std::uint32_t ledgerIndex, Application& app)
             return ret;
     }
 
-    ret.SetHexExact (hash);
+    ret._Set_Hex_Exact_ (hash);
     return ret;
 }
 
@@ -1281,8 +1281,8 @@ getHashesByIndex(std::uint32_t ledgerIndex,
         return false;
     }
 
-    ledgerHash.SetHexExact (*lhO);
-    parentHash.SetHexExact (*phO);
+    ledgerHash._Set_Hex_Exact_ (*lhO);
+    parentHash._Set_Hex_Exact_ (*phO);
 
     return true;
 }
@@ -1316,9 +1316,9 @@ getHashesByIndex (std::uint32_t minSeq, std::uint32_t maxSeq,
     {
         std::pair<uint256, uint256>& hashes =
                 ret[rangeCheckedCast<std::uint32_t>(ls)];
-        hashes.first.SetHexExact (lh);
+        hashes.first._Set_Hex_Exact_ (lh);
         if (ph)
-            hashes.second.SetHexExact (*ph);
+            hashes.second._Set_Hex_Exact_ (*ph);
         else
             hashes.second.zero ();
         if (!ph)

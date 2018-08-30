@@ -20,7 +20,7 @@
 #include <ripple/app/misc/ValidatorSite.h>
 #include <ripple/basics/base64.h>
 #include <ripple/basics/Slice.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <ripple/protocol/digest.h>
 #include <ripple/protocol/HashPrefix.h>
 #include <ripple/protocol/PublicKey.h>
@@ -155,8 +155,8 @@ private:
             pubSigningKeys2.first, pubSigningKeys2.second, 1);
 
         std::vector<std::string> cfgPublishers({
-            strHex(publisherPublic1),
-            strHex(publisherPublic2)});
+                                                   to_hex(publisherPublic1),
+                                                   to_hex(publisherPublic2)});
 
         BEAST_EXPECT(trustedKeys.load (
             emptyLocalKey, emptyCfgKeys, cfgPublishers));

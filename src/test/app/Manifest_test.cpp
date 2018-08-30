@@ -353,10 +353,10 @@ public:
         ss.add32(HashPrefix::manifest);
         st.addWithoutSigningFields(ss);
         auto const sig = sign(KeyType::secp256k1, kp.second, ss.slice());
-        BEAST_EXPECT(strHex(sig) == strHex(m.getSignature()));
+        BEAST_EXPECT(to_hex(sig) == to_hex(m.getSignature()));
 
         auto const masterSig = sign(KeyType::ed25519, sk, ss.slice());
-        BEAST_EXPECT(strHex(masterSig) == strHex(m.getMasterSignature()));
+        BEAST_EXPECT(to_hex(masterSig) == to_hex(m.getMasterSignature()));
     }
 
     void testGetKeys()
@@ -472,12 +472,14 @@ public:
         std::uint32_t sequence = 0;
 
         // public key with invalid type
-        auto const ret = strUnHex("9930E7FC9D56BB25D6893BA3F317AE5BCF33B3291BD63DB32654A313222F7FD020");
-        auto const badKey = Slice{ret.first.data(), ret.first.size()};
+        auto const badKey = from_hex<Buffer>(
+            "9930E7FC9D56BB25D6893BA3F317AE5BCF33B3291BD63DB32654A313222F7FD020");
 
         // short public key
-        auto const retShort = strUnHex("0330");
-        auto const shortKey = Slice{retShort.first.data(), retShort.first.size()};
+        auto const shortKey = from_hex<Buffer>("0330");
+
+        BEAST_EXPECT(badKey);
+        BEAST_EXPECT(shortKey);
 
         auto toString = [](STObject const& st)
         {
@@ -563,13 +565,13 @@ public:
                 {
                     // reject invalid public key type
                     auto badSt = st;
-                    badSt[sfPublicKey] = badKey;
+                    badSt[sfPublicKey] = *badKey;
                     BEAST_EXPECT(! Manifest::make_Manifest (toString(badSt)));
                 }
                 {
                     // reject short public key
                     auto badSt = st;
-                    badSt[sfPublicKey] = shortKey;
+                    badSt[sfPublicKey] = *shortKey;
                     BEAST_EXPECT(! Manifest::make_Manifest (toString(badSt)));
                 }
                 {
@@ -581,13 +583,13 @@ public:
                 {
                     // reject invalid signing public key type
                     auto badSt = st;
-                    badSt[sfSigningPubKey] = badKey;
+                    badSt[sfSigningPubKey] = *badKey;
                     BEAST_EXPECT(! Manifest::make_Manifest (toString(badSt)));
                 }
                 {
                     // reject short signing public key
                     auto badSt = st;
-                    badSt[sfSigningPubKey] = shortKey;
+                    badSt[sfSigningPubKey] = *shortKey;
                     BEAST_EXPECT(! Manifest::make_Manifest (toString(badSt)));
                 }
                 {

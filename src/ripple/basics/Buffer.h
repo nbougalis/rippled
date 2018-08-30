@@ -192,6 +192,11 @@ public:
         return alloc(n);
     }
 };
+//
+//std::string to_hex(Buffer const& b)
+//{
+//    return to_hex(static_cast<Slice>(b));
+//}
 
 inline bool operator==(Buffer const& lhs, Buffer const& rhs) noexcept
 {

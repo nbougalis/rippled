@@ -76,7 +76,7 @@ class AmendmentBlocked_test : public beast::unit_test::suite
         auto jt = env.jt (noop (alice));
         Serializer s;
         jt.stx->add (s);
-        jr = env.rpc ("submit", strHex (s.slice ())) [jss::result];
+        jr = env.rpc ("submit", to_hex(s.slice())) [jss::result];
         BEAST_EXPECT (jr.isMember (jss::engine_result) &&
             jr[jss::engine_result] == "tesSUCCESS");
 
@@ -142,7 +142,7 @@ class AmendmentBlocked_test : public beast::unit_test::suite
         BEAST_EXPECT(jr[jss::status] == "error");
 
         // submit
-        jr = env.rpc("submit", strHex(s.slice())) [jss::result];
+        jr = env.rpc("submit", to_hex(s.slice())) [jss::result];
         BEAST_EXPECT(
             jr.isMember (jss::error) &&
             jr[jss::error] == "amendmentBlocked");

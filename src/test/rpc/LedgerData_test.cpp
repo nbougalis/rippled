@@ -240,11 +240,11 @@ public:
                 boost::lexical_cast<std::string>(jvParams))[jss::result];
             if (BEAST_EXPECT(jrr.isMember(jss::ledger)))
             {
-                auto data = strUnHex(
+                auto data = from_hex<std::vector<std::uint8_t>>(
                     jrr[jss::ledger][jss::ledger_data].asString());
-                if (BEAST_EXPECT(data.second))
+                if (BEAST_EXPECT(data))
                 {
-                    Serializer s(data.first.data(), data.first.size());
+                    Serializer s (data->data(), data->size());
                     std::uint32_t seq = 0;
                     BEAST_EXPECT(s.getInteger<std::uint32_t>(seq, 0));
                     BEAST_EXPECT(seq == 3);
@@ -318,7 +318,7 @@ public:
             jv[jss::Destination] = Account{"bob7"}.human ();
             jv[jss::Amount] = XRP(100).value().getJson (0);
             jv[jss::SettleDelay] = NetClock::duration{10s}.count();
-            jv[sfPublicKey.fieldName] = strHex (Account{"bob6"}.pk().slice ());
+            jv[sfPublicKey.fieldName] = to_hex(Account{"bob6"}.pk().slice());
             jv[sfCancelAfter.fieldName] =
                 NetClock::time_point{env.now() + 300s}
                     .time_since_epoch().count();

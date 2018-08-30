@@ -18,7 +18,7 @@
 //==============================================================================
 
 #include <ripple/basics/Buffer.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <ripple/basics/Slice.h>
 #include <ripple/beast/unit_test.h>
 #include <ripple/conditions/Condition.h>
@@ -38,29 +38,9 @@ class PreimageSha256_test : public beast::unit_test::suite
     Buffer
     hexblob(std::string const& s)
     {
-        std::vector<std::uint8_t> x;
-        x.reserve(s.size() / 2);
-
-        auto iter = s.cbegin();
-
-        while (iter != s.cend())
-        {
-            int cHigh = charUnHex(*iter++);
-
-            if (cHigh < 0)
-                return {};
-
-            int cLow = charUnHex(*iter++);
-
-            if (cLow < 0)
-                return {};
-
-            x.push_back(
-                static_cast<std::uint8_t>(cHigh << 4) |
-                static_cast<std::uint8_t>(cLow));
-        }
-
-        return { x.data(), x.size() };
+        auto const x = from_hex<std::vector<std::uint8_t>>(s);
+        BEAST_EXPECT(x);
+        return { x->data(), x->size() };
     }
 
     void

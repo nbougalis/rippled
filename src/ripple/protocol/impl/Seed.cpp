@@ -110,7 +110,7 @@ parseGenericSeed (std::string const& str)
     {
         uint128 seed;
 
-        if (seed.SetHexExact (str))
+        if (seed._Set_Hex_Exact_ (str))
             return Seed { Slice(seed.data(), seed.size()) };
     }
 

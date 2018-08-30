@@ -93,7 +93,7 @@ void fillJsonBinary(Object& json, bool closed, LedgerInfo const& info)
 
         Serializer s;
         addRaw (info, s);
-        json[jss::ledger_data] = strHex (s.peekData ());
+        json[jss::ledger_data] = to_hex(s.peekData ());
     }
 }
 
@@ -111,9 +111,9 @@ Json::Value fillJsonTx (LedgerFill const& fill,
         Json::Value txJson{ Json::objectValue };
         if (bBinary)
         {
-            txJson[jss::tx_blob] = serializeHex(*i.first);
+            txJson[jss::tx_blob] = to_hex(*i.first);
             if (i.second)
-                txJson[jss::meta] = serializeHex(*i.second);
+                txJson[jss::meta] = to_hex(*i.second);
         }
         else
         {
@@ -177,7 +177,7 @@ void fillJsonState(Object& json, LedgerFill const& fill)
             {
                 auto&& obj = appendObject(array);
                 obj[jss::hash] = to_string(sle->key());
-                obj[jss::tx_blob] = serializeHex(*sle);
+                obj[jss::tx_blob] = to_hex(*sle);
             }
             else if (expanded)
                 array.append(sle->getJson(0));

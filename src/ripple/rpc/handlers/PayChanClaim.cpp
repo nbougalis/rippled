@@ -52,7 +52,7 @@ Json::Value doChannelAuthorize (RPC::Context& context)
         return result;
 
     uint256 channelId;
-    if (!channelId.SetHexExact (params[jss::channel_id].asString ()))
+    if (!channelId._Set_Hex_Exact_ (params[jss::channel_id].asString ()))
         return rpcError (rpcCHANNEL_MALFORMED);
 
     boost::optional<std::uint64_t> const optDrops =
@@ -71,7 +71,7 @@ Json::Value doChannelAuthorize (RPC::Context& context)
     try
     {
         auto const buf = sign (keypair.first, keypair.second, msg.slice ());
-        result[jss::signature] = strHex (buf);
+        result[jss::signature] = to_hex(buf);
     }
     catch (std::exception&)
     {
@@ -102,18 +102,17 @@ Json::Value doChannelVerify (RPC::Context& context)
 
         if (!pk)
         {
-            std::pair<Blob, bool> pkHex(strUnHex (strPk));
-            if (!pkHex.second)
+            auto const pkx = from_hex<std::vector<std::uint8_t>>(strPk);
+            if (!pkx)
                 return rpcError(rpcPUBLIC_MALFORMED);
-            auto const pkType = publicKeyType(makeSlice(pkHex.first));
-            if (!pkType)
+            if (!publicKeyType(makeSlice(*pkx)))
                 return rpcError(rpcPUBLIC_MALFORMED);
-            pk.emplace(makeSlice(pkHex.first));
+            pk.emplace(makeSlice(*pkx));
         }
     }
 
     uint256 channelId;
-    if (!channelId.SetHexExact (params[jss::channel_id].asString ()))
+    if (!channelId._Set_Hex_Exact_ (params[jss::channel_id].asString ()))
         return rpcError (rpcCHANNEL_MALFORMED);
 
     boost::optional<std::uint64_t> const optDrops =
@@ -126,8 +125,10 @@ Json::Value doChannelVerify (RPC::Context& context)
 
     std::uint64_t const drops = *optDrops;
 
-    std::pair<Blob, bool> sig(strUnHex (params[jss::signature].asString ()));
-    if (!sig.second || !sig.first.size ())
+    auto const sig = from_hex<std::vector<std::uint8_t>>(
+        params[jss::signature].asString ());
+
+    if (!sig || !sig->size())
         return rpcError (rpcINVALID_PARAMS);
 
     Serializer msg;
@@ -135,7 +136,7 @@ Json::Value doChannelVerify (RPC::Context& context)
 
     Json::Value result;
     result[jss::signature_verified] =
-        verify (*pk, msg.slice (), makeSlice (sig.first), /*canonical*/ true);
+        verify (*pk, msg.slice (), makeSlice (*sig), /*canonical*/ true);
     return result;
 }
 

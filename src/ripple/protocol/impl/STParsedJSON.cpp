@@ -367,8 +367,22 @@ static boost::optional<detail::STVar> parseLeaf (
         {
             if (value.isString ())
             {
-                ret = detail::make_stvar <STUInt64> (field,
-                    uintFromHex (value.asString ()));
+                auto const src = value.asString();
+
+                if (src.size () > 16)
+                    Throw<std::invalid_argument> ("overlong 64-bit value");
+
+                auto const bytes = from_hex<std::vector<std::uint8_t>>(src);
+
+                if (!bytes)
+                    Throw<std::invalid_argument> ("invalid hex digit");
+
+                std::uint64_t result = 0;
+
+                for (auto b : *bytes)
+                    result = (result << 4) | b;
+
+                ret = detail::make_stvar <STUInt64> (field, result);
             }
             else if (value.isInt ())
             {
@@ -466,13 +480,12 @@ static boost::optional<detail::STVar> parseLeaf (
 
         try
         {
-            std::pair<Blob, bool> vBlob (strUnHex (value.asString ()));
+            auto const b = from_hex<std::vector<uint8_t>(value.asString());
 
-            if (! vBlob.second)
-                Throw<std::invalid_argument> ("invalid data");
+            if (!b)
+                Throw<std::invalid_argument>("invalid data");
 
-            ret = detail::make_stvar <STBlob> (field, vBlob.first.data (),
-                                             vBlob.first.size ());
+            ret = detail::make_stvar<STBlob>(field, b->data(), b->size());
         }
         catch (std::exception const&)
         {
@@ -580,7 +593,7 @@ static boost::optional<detail::STVar> parseLeaf (
 
                         // If we have what looks like a 160-bit hex value, we
                         // set it, otherwise, we assume it's an AccountID
-                        if (!uAccount.SetHexExact (account.asString ()))
+                        if (!uAccount._Set_Hex_Exact_ (account.asString ()))
                         {
                             auto const a = parseBase58<AccountID>(
                                 account.asString());
@@ -604,7 +617,7 @@ static boost::optional<detail::STVar> parseLeaf (
 
                         hasCurrency = true;
 
-                        if (!uCurrency.SetHexExact (currency.asString ()))
+                        if (!uCurrency._Set_Hex_Exact_ (currency.asString ()))
                         {
                             if (!to_currency (uCurrency, currency.asString ()))
                             {
@@ -623,7 +636,7 @@ static boost::optional<detail::STVar> parseLeaf (
                             return ret;
                         }
 
-                        if (!uIssuer.SetHexExact (issuer.asString ()))
+                        if (!uIssuer._Set_Hex_Exact_ (issuer.asString ()))
                         {
                             auto const a = parseBase58<AccountID>(
                                 issuer.asString());

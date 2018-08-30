@@ -65,20 +65,13 @@ void addJson(Json::Value&, LedgerFill const&);
 /** Return a new Json::Value representing the ledger with given options.*/
 Json::Value getJson (LedgerFill const&);
 
-/** Serialize an object to a blob. */
-template <class Object>
-Blob serializeBlob(Object const& o)
+/** Serialize an object to a hex string. */
+inline
+std::string to_hex(STObject const& o)
 {
     Serializer s;
     o.add(s);
-    return s.peekData();
-}
-
-/** Serialize an object to a hex string. */
-inline
-std::string serializeHex(STObject const& o)
-{
-    return strHex(serializeBlob(o));
+    return to_hex(s.peekData());
 }
 } // ripple
 

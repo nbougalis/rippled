@@ -20,7 +20,7 @@
 #ifndef RIPPLE_CONDITIONS_UTILS_H
 #define RIPPLE_CONDITIONS_UTILS_H
 
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <ripple/conditions/impl/error.h>
 #include <boost/dynamic_bitset.hpp>
 #include <limits>

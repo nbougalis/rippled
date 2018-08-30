@@ -295,7 +295,7 @@ Env::submit (JTx const& jt)
         txid_ = jt.stx->getTransactionID();
         Serializer s;
         jt.stx->add(s);
-        auto const jr = rpc("submit", strHex(s.slice()));
+        auto const jr = rpc("submit", to_hex(s.slice()));
 
         std::tie(ter_, didApply) = parseResult(jr);
     }
@@ -399,8 +399,7 @@ Env::autofill_sig (JTx& jt)
         lookup(jv[jss::Account].asString());
     if (!app().checkSigs())
     {
-        jv[jss::SigningPubKey] =
-            strHex(account.pk().slice());
+        jv[jss::SigningPubKey] = to_hex(account.pk().slice());
         // dummy sig otherwise STTx is invalid
         jv[jss::TxnSignature] = "00";
         return;

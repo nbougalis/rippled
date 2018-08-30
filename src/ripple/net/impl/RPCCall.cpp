@@ -722,7 +722,7 @@ private:
         {
             // verify the channel id is a valid 256 bit number
             uint256 channelId;
-            if (!channelId.SetHexExact (jvParams[1u].asString ()))
+            if (!channelId._Set_Hex_Exact_ (jvParams[1u].asString ()))
                 return rpcError (rpcCHANNEL_MALFORMED);
         }
         jvRequest[jss::channel_id] = jvParams[1u].asString ();
@@ -743,11 +743,12 @@ private:
             if (parseBase58<PublicKey> (TokenType::AccountPublic, strPk))
                 return true;
 
-            std::pair<Blob, bool> pkHex(strUnHex (strPk));
-            if (!pkHex.second)
+            auto const pk = from_hex<std::vector<std::uint8_t>>(strPk);
+
+            if (!pk)
                 return false;
 
-            if (!publicKeyType(makeSlice(pkHex.first)))
+            if (!publicKeyType(makeSlice(*pk)))
                 return false;
 
             return true;
@@ -762,7 +763,7 @@ private:
         {
             // verify the channel id is a valid 256 bit number
             uint256 channelId;
-            if (!channelId.SetHexExact (jvParams[1u].asString ()))
+            if (!channelId._Set_Hex_Exact_ (jvParams[1u].asString ()))
                 return rpcError (rpcCHANNEL_MALFORMED);
         }
         jvRequest[jss::channel_id] = jvParams[1u].asString ();

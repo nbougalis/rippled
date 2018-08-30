@@ -1086,7 +1086,7 @@ add_library (xrpl_core
     src/ripple/basics/impl/contract.cpp
     src/ripple/basics/impl/CountedObject.cpp
     src/ripple/basics/impl/Log.cpp
-    src/ripple/basics/impl/strHex.cpp
+        src/ripple/basics/impl/HexUtils.cpp
     src/ripple/basics/impl/StringUtilities.cpp
     #[===============================[
        nounity, main sources:
@@ -1195,7 +1195,7 @@ install (
     src/ripple/basics/contract.h
     src/ripple/basics/date.h
     src/ripple/basics/hardened_hash.h
-    src/ripple/basics/strHex.h
+        src/ripple/basics/HexUtils.h
   DESTINATION include/ripple/basics)
 install (
   FILES

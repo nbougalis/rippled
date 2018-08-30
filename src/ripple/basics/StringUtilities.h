@@ -21,7 +21,7 @@
 #define RIPPLE_BASICS_STRINGUTILITIES_H_INCLUDED
 
 #include <ripple/basics/Blob.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <boost/endian/conversion.hpp>
 #include <boost/format.hpp>
 #include <boost/optional.hpp>
@@ -30,59 +30,22 @@
 
 namespace ripple {
 
-// NIKB TODO Remove the need for all these overloads. Move them out of here.
-inline const std::string strHex (std::string const& strSrc)
+inline std::string strHex (std::uint64_t v)
 {
-    return strHex (strSrc.begin (), strSrc.size ());
+    v = boost::endian::native_to_big(v);
+    auto const ptr = reinterpret_cast<const unsigned char*>(&v);
+    return to_hex(ptr, ptr + sizeof(std::uint64_t));
 }
 
-inline std::string strHex (Blob const& vucData)
+inline static std::string sqlEscape (std::string const& s)
 {
-    return strHex (vucData.begin (), vucData.size ());
+    return "X'" + to_hex(s) + "'";
 }
 
-inline std::string strHex (const std::uint64_t uiHost)
+inline static std::string sqlEscape (Blob const& b)
 {
-    uint64_t    uBig    = boost::endian::native_to_big (uiHost);
-
-    return strHex ((unsigned char*) &uBig, sizeof (uBig));
+    return "X'" + to_hex(b.begin(), b.end()) + "'";
 }
-
-inline static std::string sqlEscape (std::string const& strSrc)
-{
-    static boost::format f ("X'%s'");
-    return str (boost::format (f) % strHex (strSrc));
-}
-
-inline static std::string sqlEscape (Blob const& vecSrc)
-{
-    size_t size = vecSrc.size ();
-
-    if (size == 0)
-        return "X''";
-
-    std::string j (size * 2 + 3, 0);
-
-    unsigned char* oPtr = reinterpret_cast<unsigned char*> (&*j.begin ());
-    const unsigned char* iPtr = &vecSrc[0];
-
-    *oPtr++ = 'X';
-    *oPtr++ = '\'';
-
-    for (int i = size; i != 0; --i)
-    {
-        unsigned char c = *iPtr++;
-        *oPtr++ = charHex (c >> 4);
-        *oPtr++ = charHex (c & 15);
-    }
-
-    *oPtr++ = '\'';
-    return j;
-}
-
-uint64_t uintFromHex (std::string const& strSrc);
-
-std::pair<Blob, bool> strUnHex (std::string const& strSrc);
 
 struct parsedURL
 {

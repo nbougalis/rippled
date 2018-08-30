@@ -63,7 +63,7 @@ Json::Value doFeature (RPC::Context& context)
         context.params[jss::feature].asString());
 
     if (!feature &&
-        !feature.SetHexExact (context.params[jss::feature].asString ()))
+        !feature._Set_Hex_Exact_ (context.params[jss::feature].asString ()))
         return rpcError (rpcBAD_FEATURE);
 
     if (context.params.isMember (jss::vetoed))

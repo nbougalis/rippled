@@ -21,6 +21,8 @@
 #include <ripple/basics/StringUtilities.h>
 #include <ripple/basics/ToString.h>
 #include <ripple/beast/unit_test.h>
+#include <ripple/beast/utility/rngfill.h>
+#include <ripple/beast/xor_shift_engine.h>
 
 namespace ripple {
 
@@ -29,34 +31,50 @@ class StringUtilities_test : public beast::unit_test::suite
 public:
     void testUnHexSuccess (std::string const& strIn, std::string const& strExpected)
     {
-        auto rv = strUnHex (strIn);
-        BEAST_EXPECT(rv.second);
-        BEAST_EXPECT(makeSlice(rv.first) == makeSlice(strExpected));
+        auto rv = from_hex<std::string>(strIn);
+        BEAST_EXPECT(rv);
+        BEAST_EXPECT(*rv == strExpected);
     }
 
     void testUnHexFailure (std::string const& strIn)
     {
-        auto rv = strUnHex (strIn);
-        BEAST_EXPECT(! rv.second);
-        BEAST_EXPECT(rv.first.empty());
+        BEAST_EXPECT(!from_hex<std::string>(strIn));
     }
 
     void testUnHex ()
     {
-        testcase ("strUnHex");
+        testcase ("Hex Codec");
 
         testUnHexSuccess ("526970706c6544", "RippleD");
-        testUnHexSuccess ("A", "\n");
         testUnHexSuccess ("0A", "\n");
-        testUnHexSuccess ("D0A", "\r\n");
         testUnHexSuccess ("0D0A", "\r\n");
         testUnHexSuccess ("200D0A", " \r\n");
         testUnHexSuccess ("282A2B2C2D2E2F29", "(*+,-./)");
 
         // Check for things which contain some or only invalid characters
+        testUnHexFailure ("A");
+        testUnHexFailure ("D0A");
         testUnHexFailure ("123X");
         testUnHexFailure ("V");
         testUnHexFailure ("XRP");
+
+        beast::xor_shift_engine rng (0x54494646414e59);
+
+        for (std::size_t i = 0; i != 512; ++i)
+        {
+            std::vector<std::uint8_t> buf;
+            buf.reserve(32 + i);
+
+            beast::rngfill(buf, sizeof(buf), rng);
+
+            auto const enc = to_hex(makeSlice(buf));
+            BEAST_EXPECT(!enc.empty());
+            BEAST_EXPECT(enc.size() == 2 * buf.size());
+
+            auto const dec = from_hex<std::vector<std::uint8_t>(enc);
+            BEAST_EPXECT(dec);
+            BEAST_EXPECT(*dec == buf);
+        }
     }
 
     void testParseUrl ()

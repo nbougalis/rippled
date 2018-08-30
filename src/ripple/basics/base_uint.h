@@ -26,7 +26,7 @@
 #define RIPPLE_BASICS_BASE_UINT_H_INCLUDED
 
 #include <ripple/basics/Blob.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <ripple/basics/hardened_hash.h>
 #include <ripple/beast/utility/Zero.h>
 #include <boost/endian/conversion.hpp>
@@ -294,26 +294,17 @@ public:
         The string must contain exactly bytes * 2 hex characters and must not
         have any leading or trailing whitespace.
     */
-    bool SetHexExact (const char* psz)
+    bool _Set_Hex_Exact_ (std::string const& str)
     {
-        unsigned char* pOut  = begin ();
+        if (str.size() != bytes)
+            return false;
 
-        for (int i = 0; i < sizeof (pn); ++i)
-        {
-            auto hi = charUnHex(*psz++);
-            if (hi == -1)
-                return false;
+        return from_hex(str, data());
+    }
 
-            auto lo = charUnHex (*psz++);
-            if (lo == -1)
-                return false;
-
-            *pOut++ = (hi << 4) | lo;
-        }
-
-        // We've consumed exactly as many bytes as we needed at this point
-        // so we should be at the end of the string.
-        return (*psz == 0);
+    bool _Set_Hex_Exact_ (const char* psz)
+    {
+        return _Set_Hex_Exact_(std::string(psz));
     }
 
     /** Parse a hex string into a base_uint
@@ -329,59 +320,37 @@ public:
         When bStrict is false, the parsing is done in non-strict mode, and, if
         present, leading whitespace and the 0x prefix will be skipped.
     */
-    bool SetHex (const char* psz, bool bStrict = false)
-    {
-        // Find beginning.
-        auto pBegin = reinterpret_cast<const unsigned char*>(psz);
-        // skip leading spaces
-        if (!bStrict)
-            while (isspace(*pBegin))
-                pBegin++;
-
-        // skip 0x
-        if (!bStrict && pBegin[0] == '0' && tolower(pBegin[1]) == 'x')
-            pBegin += 2;
-
-        // Find end.
-        auto pEnd = pBegin;
-        while (charUnHex(*pEnd) != -1)
-            pEnd++;
-
-        // Take only last digits of over long string.
-        if ((unsigned int) (pEnd - pBegin) > 2 * size ())
-            pBegin = pEnd - 2 * size ();
-
-        unsigned char* pOut = end () - ((pEnd - pBegin + 1) / 2);
-
-        *this = beast::zero;
-
-        if ((pEnd - pBegin) & 1)
-            *pOut++ = charUnHex(*pBegin++);
-
-        while (pBegin != pEnd)
-        {
-            auto cHigh = charUnHex(*pBegin++);
-            auto cLow  = pBegin == pEnd
-                            ? 0
-                            : charUnHex(*pBegin++);
-
-            if (cHigh == -1 || cLow == -1)
-                return false;
-
-            *pOut++ = (cHigh << 4) | cLow;
-        }
-
-        return !*pEnd;
-    }
-
     bool SetHex (std::string const& str, bool bStrict = false)
     {
-        return SetHex (str.c_str (), bStrict);
+        auto first = str.begin();
+        auto last = str.end();
+
+        if (!bStrict)
+        {
+            while (isspace(*first) && first != last)
+                first++;
+
+            // skip 0x
+            if (std::distance(first, last) >= 2 &&
+                    first[0] == '0' && (first[1] == 'x' || first[1] == 'X'))
+                first++;
+        }
+
+        // If more bytes than required are specified, we discard leading bytes:
+        if (std::distance(first, last) >= 2 * bytes)
+            first = last - (2 * size ());
+
+        std::string x;
+        x.reserve(bytes * 2);
+        x.append((2 * bytes) - std::distance(first, last), '0');
+        x.append(first, last);
+
+        return _Set_Hex_Exact_(x);
     }
 
-    bool SetHexExact (std::string const& str)
+    bool SetHex (const char* psz, bool bStrict = false)
     {
-        return SetHexExact (str.c_str ());
+        return SetHex(std::string(psz), bStrict);
     }
 
     constexpr static std::size_t size ()
@@ -510,7 +479,7 @@ inline const base_uint<Bits, Tag> operator+ (
 template <std::size_t Bits, class Tag>
 inline std::string to_string (base_uint<Bits, Tag> const& a)
 {
-    return strHex (a.begin (), a.size ());
+    return to_hex(a.begin(), a.end());
 }
 
 // Function templates that return a base_uint given text in hexadecimal.

@@ -23,7 +23,7 @@
 #include <ripple/protocol/SecretKey.h>
 #include <ripple/protocol/Sign.h>
 #include <ripple/basics/base64.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <test/jtx/envconfig.h>
 #include <boost/asio.hpp>
 #include <boost/beast/http.hpp>
@@ -75,7 +75,7 @@ public:
 
         for (auto const& val : validators)
         {
-            data += "{\"validation_public_key\":\"" + strHex(val.masterPublic) +
+            data += "{\"validation_public_key\":\"" + to_hex(val.masterPublic) +
                 "\",\"manifest\":\"" + val.manifest + "\"},";
         }
         data.pop_back();
@@ -86,7 +86,7 @@ public:
 
         auto const sig = sign(keys.first, keys.second, makeSlice(data));
 
-        list_ += ",\"signature\":\"" + strHex(sig) + "\"";
+        list_ += ",\"signature\":\"" + to_hex(sig) + "\"";
         list_ += ",\"manifest\":\"" + manifest + "\"";
         list_ += ",\"version\":" + std::to_string(version) + '}';
 

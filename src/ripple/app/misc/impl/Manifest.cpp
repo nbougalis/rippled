@@ -193,13 +193,13 @@ ValidatorToken::make_ValidatorToken(std::vector<std::string> const& tokenBlob)
             token.isMember("validation_secret_key") &&
             token["validation_secret_key"].isString())
         {
-            auto const ret = strUnHex (token["validation_secret_key"].asString());
-            if (! ret.second || ! ret.first.size ())
+            auto const ret = from_hex<std::vector<uint8_t>>(
+                token["validation_secret_key"].asString());
+
+            if (!ret || !ret->size())
                 return boost::none;
 
-            return ValidatorToken(
-                token["manifest"].asString(),
-                SecretKey(Slice{ret.first.data(), ret.first.size()}));
+            return ValidatorToken(token["manifest"].asString(), SecretKey(makeSlice(*ret)));
         }
         else
         {

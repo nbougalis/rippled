@@ -17,7 +17,7 @@
 */
 //==============================================================================
 
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <ripple/protocol/SecretKey.h>
 #include <ripple/protocol/digest.h>
 #include <ripple/protocol/impl/secp256k1.h>
@@ -51,7 +51,7 @@ SecretKey::SecretKey (Slice const& slice)
 std::string
 SecretKey::to_string() const
 {
-    return strHex(data(), size());
+    return to_hex(data(), data() + size());
 }
 
 //------------------------------------------------------------------------------

@@ -67,12 +67,13 @@ Json::Value doSubmit (RPC::Context& context)
 
     Json::Value jvResult;
 
-    std::pair<Blob, bool> ret(strUnHex (context.params[jss::tx_blob].asString ()));
+    auto const blob = from_hex<std::vector<std::uint8_t>>(
+        context.params[jss::tx_blob].asString ());
 
-    if (!ret.second || !ret.first.size ())
+    if (!blob || !blob->size())
         return rpcError (rpcINVALID_PARAMS);
 
-    SerialIter sitTrans (makeSlice(ret.first));
+    SerialIter sitTrans (makeSlice(*blob));
 
     std::shared_ptr<STTx const> stpTrans;
 
@@ -135,7 +136,7 @@ Json::Value doSubmit (RPC::Context& context)
     try
     {
         jvResult[jss::tx_json] = tpTrans->getJson (0);
-        jvResult[jss::tx_blob] = strHex (
+        jvResult[jss::tx_blob] = to_hex(
             tpTrans->getSTransaction ()->getSerializer ().peekData ());
 
         if (temUNCERTAIN != tpTrans->getResult ())
