@@ -865,7 +865,7 @@ class LedgerRPC_test : public beast::unit_test::suite
             jv[jss::Destination] = to.human();
             jv[jss::Amount] = amount.getJson (0);
             jv[sfSettleDelay.jsonName] = settleDelay.count();
-            jv[sfPublicKey.jsonName] = strHex (pk.slice());
+            jv[sfPublicKey.jsonName] = to_hex(pk.slice());
             return jv;
         };
 

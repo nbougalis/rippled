@@ -21,7 +21,7 @@
 #include <ripple/protocol/digest.h>
 #include <ripple/protocol/impl/secp256k1.h>
 #include <ripple/basics/contract.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <ed25519-donna/ed25519.h>
 #include <type_traits>
@@ -31,7 +31,7 @@ namespace ripple {
 std::ostream&
 operator<<(std::ostream& os, PublicKey const& pk)
 {
-    os << strHex(pk.data(), pk.size());
+    os << to_hex(pk);
     return os;
 }
 

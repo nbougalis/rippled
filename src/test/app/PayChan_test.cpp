@@ -115,7 +115,7 @@ struct PayChan_test : public beast::unit_test::suite
         jv[jss::Destination] = to.human ();
         jv[jss::Amount] = amount.getJson (0);
         jv["SettleDelay"] = settleDelay.count ();
-        jv["PublicKey"] = strHex (pk.slice ());
+        jv["PublicKey"] = to_hex(pk.slice());
         if (cancelAfter)
             jv["CancelAfter"] = cancelAfter->time_since_epoch ().count ();
         if (dstTag)
@@ -162,9 +162,9 @@ struct PayChan_test : public beast::unit_test::suite
         if (balance)
             jv["Balance"] = balance->getJson (0);
         if (signature)
-            jv["Signature"] = strHex (*signature);
+            jv["Signature"] = to_hex(*signature);
         if (pk)
-            jv["PublicKey"] = strHex (pk->slice ());
+            jv["PublicKey"] = to_hex(pk->slice());
         return jv;
     }
 
@@ -1087,7 +1087,7 @@ struct PayChan_test : public beast::unit_test::suite
         auto const settleDelay = 100s;
 
         auto jv = create (alice, bob, XRP (1000), settleDelay, pk);
-        auto const pkHex = strHex (pk.slice ());
+        auto const pkHex = to_hex(pk.slice());
         jv["PublicKey"] = pkHex.substr(2, pkHex.size()-2);
         env (jv, ter(temMALFORMED));
         jv["PublicKey"] = pkHex.substr(0, pkHex.size()-2);

@@ -1181,7 +1181,7 @@ PeerImp::onMessage (std::shared_ptr <protocol::TMTransaction> const& m)
     catch (std::exception const&)
     {
         JLOG(p_journal_.warn()) << "Transaction invalid: " <<
-            strHex(m->rawtransaction ());
+                                                           to_hex(m->rawtransaction());
     }
 }
 

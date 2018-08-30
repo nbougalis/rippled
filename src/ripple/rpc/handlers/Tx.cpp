@@ -79,7 +79,7 @@ getMetaHex (Ledger const& ledger,
 
     SerialIter it (item->slice());
     it.getVL (); // skip transaction
-    hex = strHex (makeSlice(it.getVL ()));
+    hex = to_hex(it.getVL());
     return true;
 }
 

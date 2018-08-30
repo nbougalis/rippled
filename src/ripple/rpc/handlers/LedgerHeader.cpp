@@ -18,7 +18,7 @@
 //==============================================================================
 
 #include <ripple/app/ledger/LedgerToJson.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <ripple/ledger/ReadView.h>
 #include <ripple/protocol/JsonFields.h>
 #include <ripple/rpc/impl/RPCHelpers.h>
@@ -39,7 +39,7 @@ Json::Value doLedgerHeader (RPC::Context& context)
 
     Serializer  s;
     addRaw (lpLedger->info(), s);
-    jvResult[jss::ledger_data] = strHex (s.peekData ());
+    jvResult[jss::ledger_data] = to_hex(s.peekData ());
 
     // This information isn't verified: they should only use it if they trust
     // us.

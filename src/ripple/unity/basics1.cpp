@@ -22,7 +22,7 @@
 #include <ripple/basics/impl/contract.cpp>
 #include <ripple/basics/impl/CountedObject.cpp>
 #include <ripple/basics/impl/Log.cpp>
-#include <ripple/basics/impl/strHex.cpp>
+#include <ripple/basics/impl/HexUtils.cpp>
 #include <ripple/basics/impl/StringUtilities.cpp>
 
 #if DOXYGEN

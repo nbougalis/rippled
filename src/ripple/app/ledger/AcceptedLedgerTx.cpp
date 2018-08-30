@@ -82,7 +82,7 @@ void AcceptedLedgerTx::buildJson ()
     if (mMeta)
     {
         mJson[jss::meta] = mMeta->getJson (0);
-        mJson[jss::raw_meta] = strHex (mRawMeta);
+        mJson[jss::raw_meta] = to_hex(mRawMeta);
     }
 
     mJson[jss::result] = transHuman (mResult);

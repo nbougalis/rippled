@@ -18,7 +18,7 @@
 //==============================================================================
 
 #include <ripple/basics/Buffer.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <ripple/basics/Slice.h>
 #include <ripple/beast/unit_test.h>
 #include <ripple/conditions/Condition.h>

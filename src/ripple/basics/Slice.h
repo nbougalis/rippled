@@ -21,7 +21,7 @@
 #define RIPPLE_BASICS_SLICE_H_INCLUDED
 
 #include <ripple/basics/contract.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -159,7 +159,7 @@ operator< (Slice const& lhs, Slice const& rhs) noexcept
 template <class Stream>
 Stream& operator<<(Stream& s, Slice const& v)
 {
-    s << strHex(v.data(), v.size());
+    s << to_hex(v);
     return s;
 }
 
@@ -191,9 +191,6 @@ makeSlice (std::basic_string<char, Traits, Alloc> const& s)
 {
     return Slice(s.data(), s.size());
 }
-
-std::string
-strHex (Slice const& slice);
 
 } // ripple
 

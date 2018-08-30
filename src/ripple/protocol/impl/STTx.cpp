@@ -218,7 +218,7 @@ Json::Value STTx::getJson (int options, bool binary) const
     {
         Json::Value ret;
         Serializer s = STObject::getSerializer ();
-        ret[jss::tx] = strHex (s.peekData ());
+        ret[jss::tx] = to_hex(s.peekData());
         ret[jss::hash] = to_string (getTransactionID ());
         return ret;
     }
@@ -429,47 +429,41 @@ isMemoOkay (STObject const& st, std::string& reason)
                 return false;
             }
 
-            // The raw data is stored as hex-octets, which we want to decode.
-            auto data = strUnHex (memoElement.getText ());
-
-            if (!data.second)
+            if (name == sfMemoData && !is_hex(memoElement.getText()))
             {
-                reason = "The MemoType, MemoData and MemoFormat fields may "
-                         "only contain hex-encoded data.";
+                reason = "The MemoData field may only contain hex-encoded data.";
                 return false;
             }
 
-            if (name == sfMemoData)
-                continue;
-
-            // The only allowed characters for MemoType and MemoFormat are the
-            // characters allowed in URLs per RFC 3986: alphanumerics and the
-            // following symbols: -._~:/?#[]@!$&'()*+,;=%
-            static std::array<char, 256> const allowedSymbols = []
-            {
-                std::array<char, 256> a;
-                a.fill(0);
-
-                std::string symbols (
-                    "0123456789"
-                    "-._~:/?#[]@!$&'()*+,;=%"
-                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                    "abcdefghijklmnopqrstuvwxyz");
-
-                for(char c : symbols)
-                    a[c] = 1;
-                return a;
-            }();
-
-            for (auto c : data.first)
-            {
-                if (!allowedSymbols[c])
+            // In addition to being encoded as hex hex strings, the MemoType and
+            // MemoFormat fields have the additional restriction that they must
+            // only encode characters that are allowed in URLs per RFC 3986:
+            if (!is_hex(memoElement.getText(),
+                [](uint8_t c)
                 {
-                    reason = "The MemoType and MemoFormat fields may only "
-                             "contain characters that are allowed in URLs "
-                             "under RFC 3986.";
-                    return false;
-                }
+                    static std::array<uint8_t, 256> const allowedSymbols = []
+                    {
+                        std::array<uint8_t, 256> a;
+                        a.fill(0);
+
+                        std::string symbols (
+                            "0123456789"
+                            "-._~:/?#[]@!$&'()*+,;=%"
+                            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                            "abcdefghijklmnopqrstuvwxyz");
+
+                        for(char b : symbols)
+                            a[static_cast<uint8_t>(b)] = 1;
+                        return a;
+                    }();
+
+                    return allowedSymbols[c];
+                }))
+            {
+                reason = "The MemoType and MemoFormat fields may only contain "
+                         "characters allowed in URLs under RFC 3986 encoded"
+                         "as hex.";
+                return false;
             }
         }
     }

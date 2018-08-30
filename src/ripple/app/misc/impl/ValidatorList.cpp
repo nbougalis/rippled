@@ -96,16 +96,16 @@ ValidatorList::load (
         JLOG (j_.trace()) <<
             "Processing '" << key << "'";
 
-        auto const ret = strUnHex (key);
+        auto const ret = from_hex<std::vector<std::uint8_t>>(key);
 
-        if (! ret.second || ! publicKeyType(makeSlice(ret.first)))
+        if (!ret || !publicKeyType(makeSlice(*ret)))
         {
             JLOG (j_.error()) <<
                 "Invalid validator list publisher key: " << key;
             return false;
         }
 
-        auto id = PublicKey(makeSlice(ret.first));
+        auto id = PublicKey(makeSlice(*ret));
 
         if (validatorManifests_.revoked (id))
         {
@@ -227,7 +227,7 @@ ValidatorList::applyList (
             val.isMember ("validation_public_key") &&
             val["validation_public_key"].isString ())
         {
-            std::pair<Blob, bool> ret (strUnHex (
+            std::pair<Blob, bool> ret (from_hex<Blob>(
                 val["validation_public_key"].asString ()));
 
             if (! ret.second || ! publicKeyType(makeSlice(ret.first)))
@@ -296,7 +296,7 @@ ValidatorList::applyList (
         if (! m || ! keyListings_.count (m->masterKey))
         {
             JLOG (j_.warn()) <<
-                "List for " << strHex(pubKey) <<
+                "List for " << to_hex(pubKey) <<
                 " contained untrusted validator manifest";
             continue;
         }
@@ -305,7 +305,7 @@ ValidatorList::applyList (
         if (result == ManifestDisposition::invalid)
         {
             JLOG (j_.warn()) <<
-                "List for " << strHex(pubKey) <<
+                "List for " << to_hex(pubKey) <<
                 " contained invalid validator manifest";
         }
     }
@@ -439,7 +439,7 @@ ValidatorList::removePublisherList (PublicKey const& publisherKey)
         return false;
 
     JLOG (j_.debug()) <<
-        "Removing validator list for publisher " << strHex(publisherKey);
+        "Removing validator list for publisher " << to_hex(publisherKey);
 
     for (auto const& val : iList->second.list)
     {
@@ -520,7 +520,7 @@ ValidatorList::getJson() const
         if(local == p.first)
             continue;
         Json::Value& curr = jPublisherLists.append(Json::objectValue);
-        curr[jss::pubkey_publisher] = strHex(p.first);
+        curr[jss::pubkey_publisher] = to_hex(p.first);
         curr[jss::available] = p.second.available;
         if(p.second.expiration != TimeKeeper::time_point{})
         {

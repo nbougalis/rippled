@@ -26,7 +26,7 @@
 #define RIPPLE_BASICS_BASE_UINT_H_INCLUDED
 
 #include <ripple/basics/Blob.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <ripple/basics/hardened_hash.h>
 #include <ripple/beast/utility/Zero.h>
 #include <boost/endian/conversion.hpp>
@@ -510,7 +510,7 @@ inline const base_uint<Bits, Tag> operator+ (
 template <std::size_t Bits, class Tag>
 inline std::string to_string (base_uint<Bits, Tag> const& a)
 {
-    return strHex (a.begin (), a.size ());
+    return to_hex(a.begin(), a.end());
 }
 
 // Function templates that return a base_uint given text in hexadecimal.

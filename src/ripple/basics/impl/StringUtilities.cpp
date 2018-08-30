@@ -30,43 +30,44 @@
 
 namespace ripple {
 
-std::pair<Blob, bool> strUnHex (std::string const& strSrc)
+template <typename InputIterator, typename OutputIterator>
+bool from_hex(InputIterator first, InputIterator last, OutputIterator out)
 {
-    Blob out;
-
-    out.reserve ((strSrc.size () + 1) / 2);
-
-    auto iter = strSrc.cbegin ();
-
-    if (strSrc.size () & 1)
+    try
     {
-        int c = charUnHex (*iter);
-
-        if (c < 0)
-            return std::make_pair (Blob (), false);
-
-        out.push_back(c);
-        ++iter;
+        boost::algorithm::unhex(first, last, out);
+        return true;
     }
-
-    while (iter != strSrc.cend ())
+    catch (boost::algorithm::hex_decode_error const&)
     {
-        int cHigh = charUnHex (*iter);
-        ++iter;
-
-        if (cHigh < 0)
-            return std::make_pair (Blob (), false);
-
-        int cLow = charUnHex (*iter);
-        ++iter;
-
-        if (cLow < 0)
-            return std::make_pair (Blob (), false);
-
-        out.push_back (static_cast<unsigned char>((cHigh << 4) | cLow));
+        return false;
     }
+}
 
-    return std::make_pair(std::move(out), true);
+template <typename OutputIterator>
+bool from_hex(std::string x, OutputIterator out)
+{
+    try
+    {
+        boost::algorithm::unhex(x.begin(), x.end(), out);
+        return true;
+    }
+    catch (boost::algorithm::hex_decode_error const&)
+    {
+        return false;
+    }
+}
+
+boost::optional<std::string> from_hex(std::string s)
+{
+    try
+    {
+        return boost::algorithm::unhex(s);
+    }
+    catch (boost::algorithm::hex_decode_error const&)
+    {
+        return boost::none;
+    }
 }
 
 uint64_t uintFromHex (std::string const& strSrc)

@@ -215,7 +215,7 @@ public:
                 envconfig([&](std::unique_ptr<Config> cfg) {
                     cfg->section(SECTION_VALIDATOR_LIST_SITES).append(siteURI);
                     cfg->section(SECTION_VALIDATOR_LIST_KEYS)
-                        .append(strHex(publisherPublic));
+                        .append(to_hex(publisherPublic));
                     return cfg;
                 }),
             };
@@ -250,7 +250,7 @@ public:
                     BEAST_EXPECT(!jp.isMember(jss::expiration));
                     BEAST_EXPECT(!jp.isMember(jss::version));
                     BEAST_EXPECT(
-                        jp[jss::pubkey_publisher] == strHex(publisherPublic));
+                        jp[jss::pubkey_publisher] == to_hex(publisherPublic));
                 }
                 BEAST_EXPECT(jrr[jss::signing_keys].size() == 0);
             }
@@ -297,7 +297,7 @@ public:
                 envconfig([&](std::unique_ptr<Config> cfg) {
                     cfg->section(SECTION_VALIDATOR_LIST_SITES).append(siteURI);
                     cfg->section(SECTION_VALIDATOR_LIST_KEYS)
-                        .append(strHex(publisherPublic));
+                        .append(to_hex(publisherPublic));
                     return cfg;
                 }),
             };
@@ -351,7 +351,7 @@ public:
                     }
                     BEAST_EXPECT(jp[jss::seq].asUInt() == 1);
                     BEAST_EXPECT(
-                        jp[jss::pubkey_publisher] == strHex(publisherPublic));
+                        jp[jss::pubkey_publisher] == to_hex(publisherPublic));
                     BEAST_EXPECT(jp[jss::expiration] == to_string(expiration));
                     BEAST_EXPECT(jp[jss::version] == 1);
                 }

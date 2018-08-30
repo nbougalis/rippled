@@ -20,7 +20,7 @@
 #include <ripple/app/misc/ValidatorList.h>
 #include <ripple/basics/base64.h>
 #include <ripple/basics/Slice.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <test/jtx.h>
 #include <ripple/protocol/digest.h>
 #include <ripple/protocol/HashPrefix.h>
@@ -106,7 +106,7 @@ private:
 
         for (auto const& val : validators)
         {
-            data += "{\"validation_public_key\":\"" + strHex(val.masterPublic) +
+            data += "{\"validation_public_key\":\"" + to_hex(val.masterPublic) +
                 "\",\"manifest\":\"" + val.manifest + "\"},";
         }
 
@@ -121,7 +121,7 @@ private:
         std::pair<PublicKey, SecretKey> const& keys)
     {
         auto const data = base64_decode (blob);
-        return strHex(sign(
+        return to_hex(sign(
             keys.first, keys.second, makeSlice(data)));
     }
 
@@ -350,7 +350,7 @@ private:
             // load should accept valid validator list publisher keys
             std::vector<std::string> cfgPublishers;
             for (auto const& key : keys)
-                cfgPublishers.push_back (strHex(key));
+                cfgPublishers.push_back (to_hex(key));
 
             BEAST_EXPECT(trustedKeys->load (
                 emptyLocalKey, emptyCfgKeys, cfgPublishers));
@@ -378,8 +378,7 @@ private:
             publisherPublic, publisherSecret,
             pubSigningKeys1.first, pubSigningKeys1.second, 1));
 
-        std::vector<std::string> cfgKeys1({
-            strHex(publisherPublic)});
+        std::vector<std::string> cfgKeys1({to_hex(publisherPublic)});
         PublicKey emptyLocalKey;
         std::vector<std::string> emptyCfgKeys;
 
@@ -682,8 +681,7 @@ private:
             auto const publisherPublic =
                 derivePublicKey(KeyType::ed25519, publisherSecret);
 
-            std::vector<std::string> cfgPublishers({
-                strHex(publisherPublic)});
+            std::vector<std::string> cfgPublishers({to_hex(publisherPublic)});
             std::vector<std::string> emptyCfgKeys;
 
             BEAST_EXPECT(trustedKeys->load (
@@ -752,8 +750,7 @@ private:
                     publisherKeys.first, publisherKeys.second,
                     pubSigningKeys.first, pubSigningKeys.second, 1));
 
-            std::vector<std::string> cfgKeys ({
-                strHex(publisherKeys.first)});
+            std::vector<std::string> cfgKeys ({to_hex(publisherKeys.first)});
 
             BEAST_EXPECT(trustedKeys->load (
                 emptyLocalKey, emptyCfgKeys, cfgKeys));
@@ -921,8 +918,7 @@ private:
                     publisherPublic, publisherSecret,
                     pubSigningKeys.first, pubSigningKeys.second, 1));
 
-                std::vector<std::string> cfgPublishers({
-                    strHex(publisherPublic)});
+                std::vector<std::string> cfgPublishers({to_hex(publisherPublic)});
                 PublicKey emptyLocalKey;
                 std::vector<std::string> emptyCfgKeys;
 
@@ -1025,8 +1021,7 @@ private:
                     publisherPublic, publisherSecret,
                     pubSigningKeys.first, pubSigningKeys.second, 1));
 
-                std::vector<std::string> cfgPublishers({
-                    strHex(publisherPublic)});
+                std::vector<std::string> cfgPublishers({to_hex(publisherPublic)});
                 PublicKey emptyLocalKey;
                 std::vector<std::string> emptyCfgKeys;
 

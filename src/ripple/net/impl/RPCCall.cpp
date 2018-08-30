@@ -743,6 +743,8 @@ private:
             if (parseBase58<PublicKey> (TokenType::AccountPublic, strPk))
                 return true;
 
+            std::vector<std::uint8_t> pk;
+            if (!from_hex()
             std::pair<Blob, bool> pkHex(strUnHex (strPk));
             if (!pkHex.second)
                 return false;

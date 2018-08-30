@@ -458,7 +458,7 @@ public:
             jvPayChan[jss::Destination] = alice.human ();
             jvPayChan[jss::Amount] = XRP (300).value().getJson (0);
             jvPayChan[sfSettleDelay.jsonName] = 24 * 60 * 60;
-            jvPayChan[sfPublicKey.jsonName] = strHex (gw.pk().slice ());
+            jvPayChan[sfPublicKey.jsonName] = to_hex(gw.pk().slice());
             env (jvPayChan);
             env.close();
         }

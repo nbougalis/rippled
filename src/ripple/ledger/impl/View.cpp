@@ -906,7 +906,7 @@ dirAdd (ApplyView& view,
     JLOG (j.trace()) <<
         "dirAdd:  appending: Entry: " << to_string (uLedgerIndex);
     JLOG (j.trace()) <<
-        "dirAdd:  appending: Node: " << strHex (uNodeDir);
+        "dirAdd:  appending: Node: " << to_hex(uNodeDir);
 
     return uNodeDir;
 }

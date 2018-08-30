@@ -32,9 +32,9 @@ memo::operator()(Env&, JTx& jt) const
     auto& ma = jv["Memos"];
     auto& mi = ma[ma.size()];
     auto& m = mi["Memo"];
-    m["MemoData"] = strHex(data_);
-    m["MemoFormat"] = strHex(format_);
-    m["MemoType"] = strHex(type_);
+    m["MemoData"] = to_hex(data_);
+    m["MemoFormat"] = to_hex(format_);
+    m["MemoType"] = to_hex(type_);
 }
 
 void
@@ -44,7 +44,7 @@ memodata::operator()(Env&, JTx& jt) const
     auto& ma = jv["Memos"];
     auto& mi = ma[ma.size()];
     auto& m = mi["Memo"];
-    m["MemoData"] = strHex(s_);
+    m["MemoData"] = to_hex(s_);
 }
 
 void
@@ -54,7 +54,7 @@ memoformat::operator()(Env&, JTx& jt) const
     auto& ma = jv["Memos"];
     auto& mi = ma[ma.size()];
     auto& m = mi["Memo"];
-    m["MemoFormat"] = strHex(s_);
+    m["MemoFormat"] = to_hex(s_);
 }
 
 void
@@ -64,7 +64,7 @@ memotype::operator()(Env&, JTx& jt) const
     auto& ma = jv["Memos"];
     auto& mi = ma[ma.size()];
     auto& m = mi["Memo"];
-    m["MemoType"] = strHex(s_);
+    m["MemoType"] = to_hex(s_);
 }
 
 void
@@ -74,8 +74,8 @@ memondata::operator()(Env&, JTx& jt) const
     auto& ma = jv["Memos"];
     auto& mi = ma[ma.size()];
     auto& m = mi["Memo"];
-    m["MemoFormat"] = strHex(format_);
-    m["MemoType"] = strHex(type_);
+    m["MemoFormat"] = to_hex(format_);
+    m["MemoType"] = to_hex(type_);
 }
 
 void
@@ -85,8 +85,8 @@ memonformat::operator()(Env&, JTx& jt) const
     auto& ma = jv["Memos"];
     auto& mi = ma[ma.size()];
     auto& m = mi["Memo"];
-    m["MemoData"] = strHex(data_);
-    m["MemoType"] = strHex(type_);
+    m["MemoData"] = to_hex(data_);
+    m["MemoType"] = to_hex(type_);
 }
 
 void
@@ -96,8 +96,8 @@ memontype::operator()(Env&, JTx& jt) const
     auto& ma = jv["Memos"];
     auto& mi = ma[ma.size()];
     auto& m = mi["Memo"];
-    m["MemoData"] = strHex(data_);
-    m["MemoFormat"] = strHex(format_);
+    m["MemoData"] = to_hex(data_);
+    m["MemoFormat"] = to_hex(format_);
 }
 
 

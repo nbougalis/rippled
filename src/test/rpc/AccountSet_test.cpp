@@ -162,7 +162,7 @@ public:
         // To remove the Domain field from an account, send an AccountSet with
         // the Domain set to an empty string.
         std::string const domain = "example.com";
-        jt[sfDomain.fieldName] = strHex(domain);
+        jt[sfDomain.fieldName] = to_hex(domain);
         env(jt);
         BEAST_EXPECT((*env.le(alice))[ sfDomain ] == makeSlice(domain));
 
@@ -181,7 +181,7 @@ public:
 
             BEAST_EXPECT (domain2.length() == len);
 
-            jt[sfDomain.fieldName] = strHex(domain2);
+            jt[sfDomain.fieldName] = to_hex(domain2);
 
             if (len <= maxLength)
             {
@@ -204,15 +204,15 @@ public:
         auto jt = noop(alice);
 
         auto const rkp = randomKeyPair(KeyType::ed25519);
-        jt[sfMessageKey.fieldName] = strHex(rkp.first.slice());
+        jt[sfMessageKey.fieldName] = to_hex(rkp.first.slice());
         env(jt);
-        BEAST_EXPECT(strHex((*env.le(alice))[ sfMessageKey ]) == strHex(rkp.first.slice()));
+        BEAST_EXPECT(to_hex((*env.le(alice))[sfMessageKey]) == to_hex(rkp.first.slice()));
 
         jt[sfMessageKey.fieldName] = "";
         env(jt);
         BEAST_EXPECT(! env.le(alice)->isFieldPresent(sfMessageKey));
 
-        jt[sfMessageKey.fieldName] = strHex("NOT_REALLY_A_PUBKEY");
+        jt[sfMessageKey.fieldName] = to_hex("NOT_REALLY_A_PUBKEY");
         env(jt, ter(telBAD_PUBLIC_KEY));
     }
 

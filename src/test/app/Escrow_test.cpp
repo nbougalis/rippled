@@ -122,7 +122,7 @@ struct Escrow_test : public beast::unit_test::suite
     public:
         explicit
         condition (Slice condition)
-            : value_ (strHex(condition))
+            : value_ (to_hex(condition))
         {
         }
 
@@ -147,7 +147,7 @@ struct Escrow_test : public beast::unit_test::suite
     public:
         explicit
         fulfillment (Slice condition)
-            : value_ (strHex(condition))
+            : value_ (to_hex(condition))
         {
         }
 

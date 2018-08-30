@@ -71,7 +71,7 @@ Json::Value doChannelAuthorize (RPC::Context& context)
     try
     {
         auto const buf = sign (keypair.first, keypair.second, msg.slice ());
-        result[jss::signature] = strHex (buf);
+        result[jss::signature] = to_hex(buf);
     }
     catch (std::exception&)
     {

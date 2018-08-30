@@ -497,7 +497,7 @@ public:
             //failure case -- SigningPubKey not empty
             aliceSeq = env.seq (alice);
             Json::Value jv_one = setup_tx();
-            jv_one[jss::tx_json][jss::SigningPubKey]   = strHex(alice.pk().slice());
+            jv_one[jss::tx_json][jss::SigningPubKey] = to_hex(alice.pk().slice());
             cheri_sign(jv_one);
             auto jrr = env.rpc("json", "sign_for", to_string(jv_one))[jss::result];
             BEAST_EXPECT(jrr[jss::status] == "error");
@@ -939,7 +939,7 @@ public:
         auto submitSTTx = [&env] (STTx const& stx)
         {
             Json::Value jvResult;
-            jvResult[jss::tx_blob] = strHex (stx.getSerializer().slice());
+            jvResult[jss::tx_blob] = to_hex(stx.getSerializer().slice());
             return env.rpc ("json", "submit", to_string(jvResult));
         };
 

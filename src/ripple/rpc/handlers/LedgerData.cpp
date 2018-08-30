@@ -111,7 +111,7 @@ Json::Value doLedgerData (RPC::Context& context)
             if (isBinary)
             {
                 Json::Value& entry = nodes.append (Json::objectValue);
-                entry[jss::data] = serializeHex(*sle);
+                entry[jss::data] = to_hex(*sle);
                 entry[jss::index] = to_string(sle->key());
             }
             else

@@ -21,7 +21,7 @@
 #include <ripple/protocol/JsonFields.h>
 #include <ripple/basics/contract.h>
 #include <ripple/basics/Log.h>
-#include <ripple/basics/strHex.h>
+#include <ripple/basics/HexUtils.h>
 #include <ripple/basics/StringUtilities.h>
 #include <cstddef>
 

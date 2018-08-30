@@ -1566,8 +1566,8 @@ void NetworkOPsImp::pubManifest (Manifest const& mo)
         jvObj [jss::signing_key]      = toBase58(
             TokenType::NodePublic, mo.signingKey);
         jvObj [jss::seq]              = Json::UInt (mo.sequence);
-        jvObj [jss::signature]        = strHex (mo.getSignature ());
-        jvObj [jss::master_signature] = strHex (mo.getMasterSignature ());
+        jvObj [jss::signature]        = to_hex(mo.getSignature ());
+        jvObj [jss::master_signature] = to_hex(mo.getMasterSignature ());
 
         for (auto i = mStreamMaps[sManifests].begin ();
             i != mStreamMaps[sManifests].end (); )
@@ -1704,7 +1704,7 @@ void NetworkOPsImp::pubValidation (STValidation::ref val)
             TokenType::NodePublic,
             val->getSignerPublic());
         jvObj [jss::ledger_hash]           = to_string (val->getLedgerHash ());
-        jvObj [jss::signature]             = strHex (val->getSignature ());
+        jvObj [jss::signature]             = to_hex(val->getSignature ());
         jvObj [jss::full]                  = val->isFull();
         jvObj [jss::flags]                 = val->getFlags();
         jvObj [jss::signing_time]          = *(*val)[~sfSigningTime];
@@ -2001,8 +2001,7 @@ std::vector<NetworkOPsImp::txnMetaLedgerType> NetworkOPsImp::getAccountTxsB (
             auto const seq =
                 rangeCheckedCast<std::uint32_t>(ledgerSeq.value_or (0));
 
-            ret.emplace_back (
-                strHex (rawTxn), strHex (txnMeta), seq);
+            ret.emplace_back (to_hex(rawTxn), to_hex(txnMeta), seq);
         }
     }
 
@@ -2055,7 +2054,7 @@ NetworkOPsImp::getTxsAccountB (
         Blob const& rawTxn,
         Blob const& rawMeta)
     {
-        ret.emplace_back (strHex(rawTxn), strHex (rawMeta), ledgerIndex);
+        ret.emplace_back (to_hex(rawTxn), to_hex(rawMeta), ledgerIndex);
     };
 
     accountTxPage(app_.getTxnDB (), app_.accountIDCache(),
