@@ -136,6 +136,24 @@ CreateOffer::preflight (PreflightContext const& ctx)
 }
 
 TER
+CreateOffer::canTradeAsset(ReadView const& view, AccountID const& issuer)
+{
+    if (isXRP(issuer))
+        return tesSUCCESS;
+
+    if (auto const sle = view.read(keylet::account(issuer)))
+    {
+        if (sle->isFlag(lsfGlobalFreeze))
+            return tecFROZEN;
+
+        if (sle->isFlag(lsfNotAnIssuer))
+            return tecNO_AUTH;
+    }
+
+    return tesSUCCESS;
+}
+
+TER
 CreateOffer::preclaim(PreclaimContext const& ctx)
 {
     auto const id = ctx.tx[sfAccount];
@@ -156,25 +174,35 @@ CreateOffer::preclaim(PreclaimContext const& ctx)
 
     auto viewJ = ctx.app.journal("View");
 
-    if (isGlobalFrozen(ctx.view, uPaysIssuerID) ||
-        isGlobalFrozen(ctx.view, uGetsIssuerID))
+    if (ctx.view.rules().enabled(featureDeletableAccounts))
     {
-        JLOG(ctx.j.info()) <<
-            "Offer involves frozen asset";
+        if (auto ret = canTradeAsset(ctx.view, uPaysIssuerID))
+            return ret;
 
-        return tecFROZEN;
+        if (auto ret = canTradeAsset(ctx.view, uGetsIssuerID))
+            return ret;
     }
-    else if (accountFunds(ctx.view, id, saTakerGets,
-        fhZERO_IF_FROZEN, viewJ) <= beast::zero)
+    else
+    {
+        if (isGlobalFrozen(ctx.view, uPaysIssuerID) ||
+            isGlobalFrozen(ctx.view, uGetsIssuerID))
+        {
+            JLOG(ctx.j.info()) << "Offer involves frozen asset";
+            return tecFROZEN;
+        }
+    }
+
+    if (accountFunds(ctx.view, id, saTakerGets, fhZERO_IF_FROZEN, viewJ) <= beast::zero)
     {
         JLOG(ctx.j.debug()) <<
             "delay: Offers must be at least partially funded.";
 
         return tecUNFUNDED_OFFER;
     }
+
     // This can probably be simplified to make sure that you cancel sequences
     // before the transaction sequence number.
-    else if (cancelSequence && (uAccountSequence <= *cancelSequence))
+    if (cancelSequence && (uAccountSequence <= *cancelSequence))
     {
         JLOG(ctx.j.debug()) <<
             "uAccountSequenceNext=" << uAccountSequence <<
@@ -244,7 +272,21 @@ CreateOffer::checkAcceptAsset(ReadView const& view,
         // An account can always accept its own issuance.
         return tesSUCCESS;
 
-    if ((*issuerAccount)[sfFlags] & lsfRequireAuth)
+    auto const acctFlags = (*issuerAccount)[sfFlags];
+
+    // If the account is flagged as "not an issuer" and a trustline does not
+    // already exist, prevent the offer as it would require the creation of
+    // a trustline.
+    if (acctFlags & lsfNotAnIssuer)
+    {
+        auto const trustLine = view.read(
+            keylet::line(id, issue.account, issue.currency));
+
+        if (!trustLine)
+            return (flags & tapRETRY) ? TER {terNO_LINE} : TER {tecNO_LINE};
+    }
+
+    if (acctFlags & lsfRequireAuth)
     {
         auto const trustLine = view.read(
             keylet::line(id, issue.account, issue.currency));

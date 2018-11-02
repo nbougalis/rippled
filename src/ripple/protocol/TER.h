@@ -265,6 +265,8 @@ enum TECcodes : TERUnderlyingType
     tecEXPIRED                  = 148,
     tecDUPLICATE                = 149,
     tecKILLED                   = 150,
+    tecDIR_NOT_EMPTY            = 151,
+    tecTOO_SOON                 = 152,
 };
 
 //------------------------------------------------------------------------------

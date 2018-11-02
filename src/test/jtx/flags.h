@@ -73,6 +73,7 @@ private:
         case asfGlobalFreeze:   mask_ |= lsfGlobalFreeze;   break;
         case asfDefaultRipple:  mask_ |= lsfDefaultRipple;  break;
         case asfDepositAuth:    mask_ |= lsfDepositAuth;    break;
+        case asfNotAnIssuer:    mask_ |= lsfNotAnIssuer;    break;
         default:
         Throw<std::runtime_error> (
             "unknown flag");

@@ -1007,7 +1007,7 @@ public:
         BEAST_EXPECT(jrOffer[jss::Flags] == 0);
         BEAST_EXPECT(jrOffer[sfLedgerEntryType.fieldName] == "Offer");
         BEAST_EXPECT(jrOffer[sfOwnerNode.fieldName] == "0000000000000000");
-        BEAST_EXPECT(jrOffer[sfSequence.fieldName] == 3);
+        BEAST_EXPECT(jrOffer[sfSequence.fieldName] == 6);
         BEAST_EXPECT(jrOffer[jss::TakerGets] == USD(10).value().getJson(0));
         BEAST_EXPECT(jrOffer[jss::TakerPays] == XRP(4000).value().getJson(0));
         BEAST_EXPECT(jrOffer[jss::owner_funds] == "100");
@@ -1056,7 +1056,7 @@ public:
         BEAST_EXPECT(jrNextOffer[jss::Flags] == 0);
         BEAST_EXPECT(jrNextOffer[sfLedgerEntryType.fieldName] == "Offer");
         BEAST_EXPECT(jrNextOffer[sfOwnerNode.fieldName] == "0000000000000000");
-        BEAST_EXPECT(jrNextOffer[sfSequence.fieldName] == 3);
+        BEAST_EXPECT(jrNextOffer[sfSequence.fieldName] == 6);
         BEAST_EXPECT(jrNextOffer[jss::TakerGets] == USD(5).value().getJson(0));
         BEAST_EXPECT(jrNextOffer[jss::TakerPays] == XRP(2000).value().getJson(0));
         BEAST_EXPECT(jrNextOffer[jss::owner_funds] == "50");

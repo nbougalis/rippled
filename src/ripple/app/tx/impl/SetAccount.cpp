@@ -356,6 +356,15 @@ SetAccount::doApply ()
         uFlagsOut &= ~lsfGlobalFreeze;
     }
 
+    // The "not an issuer" flag is automatically set on account creation if
+    // the "deletable accounts" amendment is enabled. It can only be cleared.
+    if (uClearFlag == asfNotAnIssuer &&
+        view().rules().enabled(featureDeletableAccounts))
+    {
+        JLOG(j_.trace()) << "Clear the 'Not An Issuer' flag";
+        uFlagsOut &= ~lsfNotAnIssuer;
+    }
+
     //
     // Track transaction IDs signed by this account in its root
     //
@@ -363,7 +372,7 @@ SetAccount::doApply ()
     {
         JLOG(j_.trace()) << "Set AccountTxnID.";
         sle->makeFieldPresent (sfAccountTxnID);
-        }
+    }
 
     if ((uClearFlag == asfAccountTxnID) && sle->isFieldPresent (sfAccountTxnID))
     {

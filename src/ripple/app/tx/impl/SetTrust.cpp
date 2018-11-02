@@ -91,8 +91,7 @@ SetTrust::preclaim(PreclaimContext const& ctx)
 {
     auto const id = ctx.tx[sfAccount];
 
-    auto const sle = ctx.view.read(
-        keylet::account(id));
+    auto const sle = ctx.view.read(keylet::account(id));
 
     std::uint32_t const uTxFlags = ctx.tx.getFlags();
 
@@ -211,6 +210,13 @@ SetTrust::doApply ()
         JLOG(j_.trace()) <<
             "Delay transaction: Destination account does not exist.";
         return tecNO_DST;
+    }
+
+    if (sleDst->getFieldU32(sfFlags) & lsfNotAnIssuer)
+    {
+        JLOG(j_.trace()) <<
+            "Request to create trust line to account that isn't an issuer.";
+        return tecNO_ISSUER;
     }
 
     STAmount saLimitAllow = saLimitAmount;
@@ -456,6 +462,9 @@ SetTrust::doApply ()
     }
     else
     {
+        if (sle->getFieldU32(sfFlags) & lsfNotAnIssuer)
+            return tecNO_AUTH;
+
         // Zero balance in currency.
         STAmount saBalance ({currency, noAccount()});
 

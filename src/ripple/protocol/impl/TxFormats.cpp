@@ -161,6 +161,11 @@ TxFormats::TxFormats ()
         << SOElement (sfAuthorize,           SOE_OPTIONAL)
         << SOElement (sfUnauthorize,         SOE_OPTIONAL)
         ;
+
+    add ("DeleteAccount", ttDELETE_ACCOUNT)
+        << SOElement (sfDestination,         SOE_REQUIRED)
+        << SOElement (sfDestinationTag,      SOE_OPTIONAL)
+        ;
 }
 
 void TxFormats::addCommonFields (Item& item)

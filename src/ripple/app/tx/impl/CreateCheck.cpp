@@ -105,11 +105,27 @@ CreateCheck::preclaim (PreclaimContext const& ctx)
         {
             // The currency may not be globally frozen
             AccountID const& issuerId {sendMax.getIssuer()};
-            if (isGlobalFrozen (ctx.view, issuerId))
+
+            if (ctx.view.rules().enabled(featureDeletableAccounts))
             {
-                JLOG(ctx.j.warn()) << "Creating a check for frozen asset";
-                return tecFROZEN;
+                if (auto const sle = ctx.view.read(keylet::account(issuerId)))
+                {
+                    if (sle->isFlag(lsfGlobalFreeze))
+                        return tecFROZEN;
+
+                    if (sle->isFlag(lsfNotAnIssuer))
+                        return tecNO_AUTH;
+                }
             }
+            else
+            {
+                if (isGlobalFrozen(ctx.view, issuerId))
+                {
+                    JLOG(ctx.j.warn()) << "Creating a check for frozen asset";
+                    return tecFROZEN;
+                }
+            }
+
             // If this account has a trustline for the currency, that
             // trustline may not be frozen.
             //

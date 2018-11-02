@@ -49,6 +49,24 @@ namespace ripple {
 //
 //------------------------------------------------------------------------------
 
+/** Determines if the destination account allows XRP transfers from the source
+
+    If the destination account has deposit authorization enabled, we check
+    whether the source is preauthorized or whether the destination account is
+    below the reserve and the transfer is at most equal to the reserve.
+
+    @param view
+    @param src the account sending the XRP
+    @param dst the account receiving the XRP
+    @param amount the amount being transferred
+    @return true if the transfer is authorized, false otherwise.
+ */
+bool isTransferAuthorized(
+    ReadView const& view,
+    AccountID const& src,
+    AccountID const& dst,
+    XRPAmount amount);
+
 /** Controls the treatment of frozen account balances */
 enum FreezeHandling
 {

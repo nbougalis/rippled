@@ -2046,6 +2046,7 @@ else ()
     src/ripple/app/tx/impl/CreateCheck.cpp
     src/ripple/app/tx/impl/CreateOffer.cpp
     src/ripple/app/tx/impl/CreateTicket.cpp
+    src/ripple/app/tx/impl/DeleteAccount.cpp
     src/ripple/app/tx/impl/DepositPreauth.cpp
     src/ripple/app/tx/impl/Escrow.cpp
     src/ripple/app/tx/impl/InvariantCheck.cpp

@@ -211,28 +211,30 @@ Env::fund (bool setDefaultRipple,
         Account const& account)
 {
     memoize(account);
+
+    auto fees = drops((setDefaultRipple ? 2 : 1) * current()->fees().base);
+
+    apply(pay(master, account, amount + fees),
+        jtx::seq(jtx::autofill),
+            jtx::fee(jtx::autofill),
+                jtx::sig(jtx::autofill));
+
+    apply(fclear(account, asfNotAnIssuer),
+        jtx::seq(jtx::autofill),
+            fee(jtx::autofill),
+                sig(jtx::autofill));
+
+    require(nflags(account, asfNotAnIssuer));
+
     if (setDefaultRipple)
     {
-        // VFALCO NOTE Is the fee formula correct?
-        apply(pay(master, account, amount +
-            drops(current()->fees().base)),
-                jtx::seq(jtx::autofill),
-                    fee(jtx::autofill),
-                        sig(jtx::autofill));
         apply(fset(account, asfDefaultRipple),
             jtx::seq(jtx::autofill),
                 fee(jtx::autofill),
                     sig(jtx::autofill));
         require(flags(account, asfDefaultRipple));
     }
-    else
-    {
-        apply(pay(master, account, amount),
-            jtx::seq(jtx::autofill),
-                fee(jtx::autofill),
-                    sig(jtx::autofill));
-        require(nflags(account, asfDefaultRipple));
-    }
+
     require(jtx::balance(account, amount));
 }
 

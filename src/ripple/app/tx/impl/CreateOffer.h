@@ -76,6 +76,10 @@ private:
         ApplyFlags const flags, AccountID const id,
             beast::Journal const j, Issue const& issue);
 
+    static
+    TER
+    canTradeAsset(ReadView const& view, AccountID const& issuer);
+
     bool
     dry_offer (ApplyView& view, Offer const& offer);
 
