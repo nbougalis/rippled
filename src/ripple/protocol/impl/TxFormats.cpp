@@ -181,6 +181,13 @@ void TxFormats::addCommonFields (Item& item)
         << SOElement(sfTxnSignature,         SOE_OPTIONAL)
         << SOElement(sfSigners,              SOE_OPTIONAL) // submit_multisigned
         ;
+
+    // These are special transactions which don't get certain fields
+    if (item.getType() != ttFEE || item.getType() != ttAMENDMENT)
+    {
+        item << SOElement(sfNotValidBefore, SOE_OPTIONAL);
+        item << SOElement(sfNotValidAfter, SOE_OPTIONAL);
+    }
 }
 
 TxFormats const&

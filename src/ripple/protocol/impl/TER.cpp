@@ -93,6 +93,8 @@ transResults()
         { tefWRONG_PRIOR,            { "tefWRONG_PRIOR",           "This previous transaction does not match."                                     } },
         { tefBAD_AUTH_MASTER,        { "tefBAD_AUTH_MASTER",       "Auth for unclaimed account needs correct master key."                          } },
         { tefINVARIANT_FAILED,       { "tefINVARIANT_FAILED",      "Fee claim violated invariants for the transaction."                            } },
+        { tefNOT_VALID_TOO_EARLY,    { "tefNOT_VALID_TOO_EARLY",   "The transaction is not valid yet."                                             } },
+        { tefNOT_VALID_TOO_LATE,     { "tefNOT_VALID_TOO_LATE",    "The transaction is no longer valid."                                           } },
 
         { telLOCAL_ERROR,            { "telLOCAL_ERROR",           "Local failure."                                                                } },
         { telBAD_DOMAIN,             { "telBAD_DOMAIN",            "Domain too long."                                                              } },
@@ -142,6 +144,8 @@ transResults()
         { temBAD_TICK_SIZE,          { "temBAD_TICK_SIZE",         "Malformed: Tick size out of range."                                            } },
         { temINVALID_ACCOUNT_ID,     { "temINVALID_ACCOUNT_ID",    "Malformed: A field contains an invalid account ID."                            } },
         { temCANNOT_PREAUTH_SELF,    { "temCANNOT_PREAUTH_SELF",   "Malformed: An account may not preauthorize itself."                            } },
+        { temBAD_NOT_VALID_BEFORE,   { "temBAD_NOT_VALID_BEFORE",  "Malformed: The earliest transaction validity period may not be 0."             } },
+        { temBAD_NOT_VALID_AFTER,    { "temBAD_NOT_VALID_AFTER",   "Malformed: The latest transaction validity period may not be 0."               } },
 
         { terRETRY,                  { "terRETRY",                 "Retry transaction."                                                            } },
         { terFUNDS_SPENT,            { "terFUNDS_SPENT",           "Can't set password, password set funds already spent."                         } },

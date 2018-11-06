@@ -126,6 +126,10 @@ public:
 
     static
     NotTEC
+    checkTemporalTxValidity (PreclaimContext const& ctx);
+
+    static
+    NotTEC
     checkSign (PreclaimContext const& ctx);
 
     // Returns the fee in fee units, not scaled for load.

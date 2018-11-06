@@ -109,7 +109,9 @@ enum TEMcodes : TERUnderlyingType
     temBAD_TICK_SIZE,
     temINVALID_ACCOUNT_ID,
     temCANNOT_PREAUTH_SELF,
-
+    temBAD_NOT_VALID_BEFORE,
+    temBAD_NOT_VALID_AFTER,
+    
     // An intermediate result used internally, should never be returned.
     temUNCERTAIN,
     temUNKNOWN
@@ -151,6 +153,8 @@ enum TEFcodes : TERUnderlyingType
     tefNOT_MULTI_SIGNING,
     tefBAD_AUTH_MASTER,
     tefINVARIANT_FAILED,
+    tefNOT_VALID_TOO_EARLY,
+    tefNOT_VALID_TOO_LATE,
 };
 
 //------------------------------------------------------------------------------

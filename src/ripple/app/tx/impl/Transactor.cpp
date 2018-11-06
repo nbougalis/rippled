@@ -47,6 +47,21 @@ preflight0(PreflightContext const& ctx)
         return temINVALID;
     }
 
+    if (ctx.rules.enabled(featureTemporalTxValidity))
+    {
+        auto const notBefore = ctx.tx[~sfNotValidBefore];
+        auto const notAfter = ctx.tx[~sfNotValidAfter];
+
+        if (notBefore && *notBefore == 0)
+            return temBAD_NOT_VALID_BEFORE;
+
+        if (notAfter && *notAfter == 0)
+            return temBAD_NOT_VALID_AFTER;
+
+        if (notBefore >= notAfter)
+            return temBAD_NOT_VALID_BEFORE;
+    }
+
     return tesSUCCESS;
 }
 
@@ -321,6 +336,32 @@ TER Transactor::apply ()
     }
 
     return doApply ();
+}
+
+NotTEC
+Transactor::checkTemporalTxValidity (PreclaimContext const& ctx)
+{
+    using d = NetClock::duration;
+    using tp = NetClock::time_point;
+
+    if (ctx.view.rules().enabled(featureTemporalTxValidity))
+    {
+        // We check time against the close time of the parent ledger, because
+        // that is the time that the network, as a whole, agrees on.
+        if (auto notBefore = ctx.tx[~sfNotValidBefore])
+        {
+            if (ctx.view.parentCloseTime() < tp{d{*notBefore}})
+                return tefNOT_VALID_TOO_EARLY;
+        }
+
+        if (auto notAfter = ctx.tx[~sfNotValidAfter])
+        {
+            if (ctx.view.parentCloseTime() > tp{d{*notAfter}})
+                return tefNOT_VALID_TOO_LATE;
+        }
+    }
+
+    return tesSUCCESS;
 }
 
 NotTEC

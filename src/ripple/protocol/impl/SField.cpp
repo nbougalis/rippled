@@ -135,6 +135,8 @@ SF_U32 const sfCancelAfter         = make::one<SF_U32::type>(&sfCancelAfter,    
 SF_U32 const sfFinishAfter         = make::one<SF_U32::type>(&sfFinishAfter,         STI_UINT32, 37, "FinishAfter");
 SF_U32 const sfSignerListID        = make::one<SF_U32::type>(&sfSignerListID,        STI_UINT32, 38, "SignerListID");
 SF_U32 const sfSettleDelay         = make::one<SF_U32::type>(&sfSettleDelay,         STI_UINT32, 39, "SettleDelay");
+SF_U32 const sfNotValidBefore      = make::one<SF_U32::type>(&sfNotValidBefore,      STI_UINT32, 40, "NotValidBefore");
+SF_U32 const sfNotValidAfter       = make::one<SF_U32::type>(&sfNotValidAfter,       STI_UINT32, 41, "NotValidAfter");
 
 // 64-bit integers
 SF_U64 const sfIndexNext        = make::one<SF_U64::type>(&sfIndexNext,        STI_UINT64, 1, "IndexNext");
