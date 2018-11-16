@@ -308,7 +308,8 @@ public:
         std::shared_ptr<protocol::TMProposeSet> set) override;
 
     bool recvValidation (
-        STValidation::ref val, std::string const& source) override;
+        std::shared_ptr<STValidation> const& val,
+        std::string const& source) override;
 
     std::shared_ptr<SHAMap> getTXMap (uint256 const& hash);
     bool hasTXSet (
@@ -428,7 +429,7 @@ public:
         std::shared_ptr<ReadView const> const& lpCurrent,
         std::shared_ptr<STTx const> const& stTxn, TER terResult) override;
     void pubValidation (
-        STValidation::ref val) override;
+        std::shared_ptr<STValidation> const& val) override;
 
     //--------------------------------------------------------------------------
     //
@@ -1702,7 +1703,7 @@ void NetworkOPsImp::pubServer ()
 }
 
 
-void NetworkOPsImp::pubValidation (STValidation::ref val)
+void NetworkOPsImp::pubValidation (std::shared_ptr<STValidation> const& val)
 {
     // VFALCO consider std::shared_mutex
     ScopedLockType sl (mSubLock);
@@ -2052,7 +2053,7 @@ NetworkOPsImp::getTxsAccount (
 }
 
 NetworkOPsImp::MetaTxsList
-NetworkOPsImp::getTxsAccountB (
+    NetworkOPsImp::getTxsAccountB (
     AccountID const& account, std::int32_t minLedger,
     std::int32_t maxLedger,  bool forward, Json::Value& token,
     int limit, bool bUnlimited)
@@ -2079,7 +2080,7 @@ NetworkOPsImp::getTxsAccountB (
 }
 
 bool NetworkOPsImp::recvValidation (
-    STValidation::ref val, std::string const& source)
+    std::shared_ptr<STValidation> const& val, std::string const& source)
 {
     JLOG(m_journal.debug()) << "recvValidation " << val->getLedgerHash ()
                           << " from " << source;

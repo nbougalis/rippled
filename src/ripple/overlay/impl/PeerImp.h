@@ -471,7 +471,7 @@ private:
             RCLCxPeerPos peerPos);
 
     void
-    checkValidation (STValidation::pointer val,
+    checkValidation (std::shared_ptr<STValidation> val,
         bool isTrusted, std::shared_ptr<protocol::TMValidation> const& packet);
 
     void

@@ -156,7 +156,11 @@ enum class ValStatus {
     /// Not current or was older than current from this node
     stale,
     /// A validation violates the increasing seq requirement
-    badSeq
+    badSeq,
+    /// Multiple validations for the same sequence for same from multiple validators
+    multiple,
+    /// Multiple validations for the same sequence
+    conflicting
 };
 
 inline std::string
@@ -170,6 +174,10 @@ to_string(ValStatus m)
             return "stale";
         case ValStatus::badSeq:
             return "badSeq";
+        case ValStatus::multiple:
+            return "multiple";
+        case ValStatus::conflicting:
+            return "conflicting";
         default:
             return "unknown";
     }
@@ -303,6 +311,14 @@ class Validations
         std::chrono::steady_clock,
         beast::uhash<>>
         byLedger_;
+
+    // Partial and full validations indexed by seqence
+    beast::aged_unordered_map<
+        Seq,
+        hash_map<NodeID, Validation>,
+        std::chrono::steady_clock,
+        beast::uhash<>>
+        bySequence_;
 
     // Represents the ancestry of validated ledgers
     LedgerTrie<Ledger> trie_;
@@ -532,7 +548,7 @@ public:
         ValidationParms const& p,
         beast::abstract_clock<std::chrono::steady_clock>& c,
         Ts&&... ts)
-        : byLedger_(c), parms_(p), adaptor_(std::forward<Ts>(ts)...)
+        : byLedger_(c), bySequence_(c), parms_(p), adaptor_(std::forward<Ts>(ts)...)
     {
     }
 
@@ -583,10 +599,35 @@ public:
         {
             ScopedLock lock{mutex_};
 
+            {
+                auto const valit = bySequence_[val.seq()].emplace(nodeID, val);
+
+                if (!valit.second)
+                {
+                    // We are already tracking a validation signed by this
+                    // validator's public key for this sequence number. If the
+                    // ledger hash matches, it must be for the same ledger:
+                    bool const same =
+                        (valit.first->second.ledgerID() == val.ledgerID());
+
+                    // Two validations for the same ledger but with different
+                    // cookies. This is probably accidental misconfiguration.
+                    if (same && valit.first->second.cookie() != val.cookie())
+                        return ValStatus::multiple;
+
+                    // Two validations for the same sequence but for different
+                    // ledgers. This can be the result of misconfiguration but
+                    // it can also mean a Byzantine validator.
+                    if (!same)
+                        return ValStatus::conflicting;
+                }
+            }
+
             // Check that validation sequence is greater than any non-expired
             // validations sequence from that validator
             auto const now = byLedger_.clock().now();
             SeqEnforcer<Seq>& enforcer = seqEnforcers_[nodeID];
+
             if (!enforcer(now, val.seq(), parms_))
                 return ValStatus::badSeq;
 
@@ -598,24 +639,23 @@ public:
             auto const ins = current_.emplace(nodeID, val);
             if (!ins.second)
             {
-                // Replace existing only if this one is newer
-                Validation& oldVal = ins.first->second;
-                if (val.signTime() > oldVal.signTime())
-                {
-                    std::pair<Seq,ID> old(oldVal.seq(),oldVal.ledgerID());
-                    adaptor_.onStale(std::move(oldVal));
-                    ins.first->second = val;
-                    if (val.trusted())
-                        updateTrie(lock, nodeID, val, old);
-                }
-                else
+                auto& oldVal = ins.first->second;
+
+                if (val.signTime() <= oldVal.signTime())
                     return ValStatus::stale;
+
+                std::pair<Seq,ID> old(oldVal.seq(),oldVal.ledgerID());
+                adaptor_.onStale(std::move(oldVal));
+                ins.first->second = val;
+                if (val.trusted())
+                    updateTrie(lock, nodeID, val, old);
             }
             else if (val.trusted())
             {
                 updateTrie(lock, nodeID, val, boost::none);
             }
         }
+
         return ValStatus::current;
     }
 

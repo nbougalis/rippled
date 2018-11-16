@@ -54,7 +54,7 @@ class Validations_test : public beast::unit_test::suite
         clock_type const& c_;
         PeerID nodeID_;
         bool trusted_ = true;
-        std::size_t signIdx_ = 1;
+        std::size_t signIdx_{1};
         boost::optional<std::uint32_t> loadFee_;
 
     public:
@@ -1141,6 +1141,14 @@ class Validations_test : public beast::unit_test::suite
             BEAST_EXPECT(
                 vals.getNodesAfter(genesisLedger, genesisLedger.id()) == 0);
         }
+    }
+
+    void
+    testDifferentCookies()
+    {
+        testcase("Multiple Validations");
+
+
     }
 
     void

@@ -1836,7 +1836,7 @@ PeerImp::onMessage (std::shared_ptr <protocol::TMValidation> const& m)
 
     try
     {
-        STValidation::pointer val;
+        std::shared_ptr<STValidation> val;
         {
             SerialIter sit (makeSlice(m->validation()));
             val = std::make_shared<STValidation>(
@@ -1884,10 +1884,7 @@ PeerImp::onMessage (std::shared_ptr <protocol::TMValidation> const& m)
                 [weak, val, isTrusted, m] (Job&)
                 {
                     if (auto peer = weak.lock())
-                        peer->checkValidation(
-                            val,
-                            isTrusted,
-                            m);
+                        peer->checkValidation(val, isTrusted, m);
                 });
         }
         else
@@ -2211,7 +2208,7 @@ PeerImp::checkPropose (Job& job,
 }
 
 void
-PeerImp::checkValidation (STValidation::pointer val,
+PeerImp::checkValidation (std::shared_ptr<STValidation> val,
     bool isTrusted, std::shared_ptr<protocol::TMValidation> const& packet)
 {
     try
