@@ -155,7 +155,7 @@ public:
     virtual void processTrustedProposal (RCLCxPeerPos peerPos,
         std::shared_ptr<protocol::TMProposeSet> set) = 0;
 
-    virtual bool recvValidation (STValidation::ref val,
+    virtual bool recvValidation (std::shared_ptr<STValidation> const& val,
         std::string const& source) = 0;
 
     virtual void mapComplete (std::shared_ptr<SHAMap> const& map,
@@ -231,7 +231,7 @@ public:
     virtual void pubProposedTransaction (
         std::shared_ptr<ReadView const> const& lpCurrent,
         std::shared_ptr<STTx const> const& stTxn, TER terResult) = 0;
-    virtual void pubValidation (STValidation::ref val) = 0;
+    virtual void pubValidation (std::shared_ptr<STValidation> const& val) = 0;
 };
 
 //------------------------------------------------------------------------------

@@ -238,7 +238,7 @@ RCLValidationsAdaptor::doStaleWrite(ScopedLockType&)
                     if(!wValidation.full())
                         continue;
                     s.erase();
-                    STValidation::pointer const& val = wValidation.unwrap();
+                    auto const& val = wValidation.unwrap();
                     val->add(s);
 
                     auto const ledgerHash = to_string(val->getLedgerHash());
@@ -275,15 +275,14 @@ RCLValidationsAdaptor::doStaleWrite(ScopedLockType&)
 
 bool
 handleNewValidation(Application& app,
-    STValidation::ref val,
+    std::shared_ptr<STValidation> const& val,
     std::string const& source)
 {
     PublicKey const& signingKey = val->getSignerPublic();
     uint256 const& hash = val->getLedgerHash();
 
     // Ensure validation is marked as trusted if signer currently trusted
-    boost::optional<PublicKey> masterKey =
-        app.validators().getTrustedKey(signingKey);
+    auto masterKey = app.validators().getTrustedKey(signingKey);
     if (!val->isTrusted() && masterKey)
         val->setTrusted();
 
@@ -295,15 +294,17 @@ handleNewValidation(Application& app,
     RCLValidations& validations = app.getValidations();
     beast::Journal j = validations.adaptor().journal();
 
-    auto dmp = [&](beast::Journal::Stream s, std::string const& msg) {
-        s << "Val for " << hash
-          << (val->isTrusted() ? " trusted/" : " UNtrusted/")
-          << (val->isFull() ? "full" : "partial") << " from "
-          << (masterKey ? toBase58(TokenType::NodePublic, *masterKey)
-                        : "unknown")
-          << " signing key "
-          << toBase58(TokenType::NodePublic, signingKey) << " " << msg
-          << " src=" << source;
+    auto dmp = [&](beast::Journal::Stream s, std::string const& msg)
+    {
+        std::string id = toBase58(TokenType::NodePublic, signingKey);
+
+        if (masterKey)
+            id += ":" + toBase58(TokenType::NodePublic, *masterKey);
+
+        s << (val->isTrusted() ? "trusted" : "untrusted") << " "
+          << (val->isFull() ? "full" : "partial")
+          << " validation: " << hash
+          << " from " << id << " via " << source << ": " << msg;
     };
 
     if(!val->isFieldPresent(sfLedgerSequence))
@@ -319,6 +320,20 @@ handleNewValidation(Application& app,
         ValStatus const outcome = validations.add(calcNodeID(*masterKey), val);
         if(j.debug())
             dmp(j.debug(), to_string(outcome));
+
+        if (outcome == ValStatus::conflicting && j.fatal())
+        {
+            auto const seq = val->getFieldU32(sfLedgerSequence);
+            dmp(j.fatal(),
+                "multiple conflicting validations issued for " + to_string(seq));
+        }
+
+        if (outcome == ValStatus::multiple && j.fatal())
+        {
+            auto const seq = val->getFieldU32(sfLedgerSequence);
+            dmp(j.fatal(),
+                "multiple distinct validations issued for " + to_string(seq));
+        }
 
         if (outcome == ValStatus::badSeq && j.warn())
         {

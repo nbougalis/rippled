@@ -33,6 +33,7 @@
 #include <ripple/app/misc/ValidatorKeys.h>
 #include <ripple/app/misc/ValidatorList.h>
 #include <ripple/basics/make_lock.h>
+#include <ripple/basics/random.h>
 #include <ripple/beast/core/LexicalCast.h>
 #include <ripple/consensus/LedgerTiming.h>
 #include <ripple/nodestore/DatabaseShard.h>
@@ -84,7 +85,13 @@ RCLConsensus::Adaptor::Adaptor(
         , nodeID_{validatorKeys.nodeID}
         , valPublic_{validatorKeys.publicKey}
         , valSecret_{validatorKeys.secretKey}
+        , valCookie_{1 + rand_int<std::uint64_t>(std::numeric_limits<std::uint64_t>::max() - 1)}
 {
+    assert (valCookie_ != 0);
+
+    JLOG (j_.info()) << "Consensus engine started" <<
+        " (Node: " << to_string(nodeID_) <<
+        ", Cookie: " << valCookie_ << ")";
 }
 
 boost::optional<RCLCxLedger>
@@ -744,40 +751,60 @@ RCLConsensus::Adaptor::validate(RCLCxLedger const& ledger,
     bool proposing)
 {
     using namespace std::chrono_literals;
+
     auto validationTime = app_.timeKeeper().closeTime();
     if (validationTime <= lastValidationTime_)
         validationTime = lastValidationTime_ + 1s;
     lastValidationTime_ = validationTime;
 
-    STValidation::FeeSettings fees;
-    std::vector<uint256> amendments;
-
-    auto const& feeTrack = app_.getFeeTrack();
-    std::uint32_t fee =
-        std::max(feeTrack.getLocalFee(), feeTrack.getClusterFee());
-
-    if (fee > feeTrack.getLoadBase())
-        fees.loadFee = fee;
-
-    // next ledger is flag ledger
-    if (((ledger.seq() + 1) % 256) == 0)
-    {
-        // Suggest fee changes and new features
-        feeVote_->doValidation(ledger.ledger_, fees);
-        amendments = app_.getAmendmentTable().doValidation (getEnabledAmendments(*ledger.ledger_));
-    }
-
     auto v = std::make_shared<STValidation>(
-        ledger.id(),
-        ledger.seq(),
-        txns.id(),
-        validationTime,
-        valPublic_,
-        valSecret_,
-        nodeID_,
-        proposing /* full if proposed */,
-        fees,
-        amendments);
+        lastValidationTime_, valPublic_, valSecret_, nodeID_,
+        [&](STValidation& v)
+        {
+            v.setFieldH256(sfLedgerHash, ledger.id());
+            v.setFieldH256(sfConsensusHash, txns.id());
+
+            v.setFieldU32(sfLedgerSequence, ledger.seq());
+            v.setFieldU32(sfSigningTime, lastValidationTime_.time_since_epoch().count());
+
+            if (proposing)
+                v.setFlag(STValidation::kFullFlag);
+
+            if (ledger.ledger_->rules().enabled(featureHardenedValidations))
+            {
+                // Attest to the hash of what we consider to be the last fully
+                // validated ledger:
+                if (auto const vl = ledgerMaster_.getValidatedLedger())
+                    v.setFieldH256(sfValidatedHash, vl->info().hash);
+
+                v.setFieldU64(sfCookie, valCookie_);
+            }
+
+            // Report our load
+            {
+                auto const& ft = app_.getFeeTrack();
+                auto const fee = std::max(ft.getLocalFee(), ft.getClusterFee());
+                if (fee > ft.getLoadBase())
+                    v.setFieldU32(sfLoadFee, fee);
+            }
+
+            // If the next ledger is a flag ledger, suggest fee changes and
+            // new features:
+            if ((ledger.seq() + 1) % 256 == 0)
+            {
+                // Fees:
+                feeVote_->doValidation(ledger.ledger_, v);
+
+                // Amendments
+                // FIXME: pass `v` and have the function insert the array directly?
+                auto const amendments = app_.getAmendmentTable().doValidation (
+                    getEnabledAmendments(*ledger.ledger_));
+
+                if (!amendments.empty())
+                    v.setFieldV256(sfAmendments,
+                        STVector256(sfAmendments, amendments));
+            }
+        });
 
     // suppress it if we receive it
     app_.getHashRouter().addSuppression(

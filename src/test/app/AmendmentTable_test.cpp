@@ -27,6 +27,7 @@
 #include <ripple/protocol/Feature.h>
 #include <ripple/protocol/PublicKey.h>
 #include <ripple/protocol/SecretKey.h>
+#include <ripple/protocol/STValidation.h>
 #include <ripple/protocol/digest.h>
 #include <ripple/protocol/TxFlags.h>
 #include <test/unit_test/SuiteJournal.h>
@@ -374,7 +375,7 @@ public:
         auto const roundTime = weekTime (week);
 
         // Build validations
-        std::vector<STValidation::pointer> validations;
+        std::vector<std::shared_ptr<STValidation>> validations;
         validations.reserve (validators.size ());
 
         int i = 0;
@@ -393,16 +394,13 @@ public:
             }
 
             auto v = std::make_shared<STValidation>(
-                uint256(),
-                i,
-                uint256(),
-                roundTime,
-                val.first,
-                val.second,
-                calcNodeID(val.first),
-                true,
-                STValidation::FeeSettings{},
-                field);
+                ripple::NetClock::time_point{},
+                val.first, val.second, calcNodeID(val.first),
+                [&field](STValidation& v)
+                {
+                    if (!field.empty())
+                        v.setFieldV256(sfAmendments, STVector256(sfAmendments, field));
+                });
 
             validations.emplace_back(v);
         }

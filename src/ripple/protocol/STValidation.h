@@ -22,8 +22,9 @@
 
 #include <ripple/basics/Log.h>
 #include <ripple/protocol/PublicKey.h>
-#include <ripple/protocol/STObject.h>
 #include <ripple/protocol/SecretKey.h>
+#include <ripple/protocol/STObject.h>
+#include <cassert>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -42,9 +43,6 @@ public:
     {
         return "STValidation";
     }
-
-    using pointer = std::shared_ptr<STValidation>;
-    using ref = const std::shared_ptr<STValidation>&;
 
     enum { kFullFlag = 0x1 };
 
@@ -87,52 +85,45 @@ public:
             Throw<std::runtime_error> ("Invalid signature in validation");
         }
 
-        mNodeID = lookupNodeID(PublicKey(makeSlice(spk)));
-        assert(mNodeID.isNonZero());
+        nodeID_ = lookupNodeID(PublicKey(makeSlice(spk)));
+        assert(nodeID_.isNonZero());
     }
-
-    /** Fees to set when issuing a new validation.
-
-        Optional fees to include when issuing a new validation
-    */
-    struct FeeSettings
-    {
-        boost::optional<std::uint32_t> loadFee;
-        boost::optional<std::uint64_t> baseFee;
-        boost::optional<std::uint32_t> reserveBase;
-        boost::optional<std::uint32_t> reserveIncrement;
-    };
 
     /** Construct, sign and trust a new STValidation
 
         Constructs, signs and trusts new STValidation issued by this node.
 
-        @param ledgerHash The hash of the validated ledger
-        @param ledgerSeq The sequence number (index) of the ledger
-        @param consensusHash The hash of the consensus transaction set
         @param signTime When the validation is signed
         @param publicKey The current signing public key
         @param secretKey The current signing secret key
         @param nodeID ID corresponding to node's public master key
-        @param isFull Whether the validation is full or partial
-        @param fee FeeSettings to include in the validation
-        @param amendments If not empty, the amendments to include in this validation
-
-        @note The fee and amendment settings are only set if not boost::none.
-              Typically, the amendments and fees are set for validations of flag
-              ledgers only.
+        @param f function to "fill" the validation with necessary data
     */
+    template <typename F>
     STValidation(
-        uint256 const& ledgerHash,
-        std::uint32_t ledgerSeq,
-        uint256 const& consensusHash,
-        NetClock::time_point signTime,
-        PublicKey const& publicKey,
-        SecretKey const& secretKey,
-        NodeID const& nodeID,
-        bool isFull,
-        FeeSettings const& fees,
-        std::vector<uint256> const& amendments);
+            NetClock::time_point signTime,
+            PublicKey const& pk,
+            SecretKey const& sk,
+            NodeID const& nodeID,
+            F&& f)
+        : STObject (getFormat(), sfValidation)
+        , nodeID_ (nodeID)
+        , seenTime_ (signTime)
+    {
+        // First, set our own public key:
+        if (publicKeyType(pk) != KeyType::secp256k1)
+            LogicError ("We can only use secp256k1 keys for signing validations");
+
+        setFieldVL(sfSigningPubKey, pk.slice());
+
+        // Perform additional initialization
+        f(*this);
+
+        // Finally, sign the validation and mark it as trusted:
+        setFlag(vfFullyCanonicalSig);
+        setFieldVL(sfSignature, signDigest(pk, sk, getSigningHash()));
+        setTrusted();
+    }
 
     STBase*
     copy(std::size_t n, void* buf) const override
@@ -166,7 +157,7 @@ public:
     NodeID
     getNodeID() const
     {
-        return mNodeID;
+        return nodeID_;
     }
 
     bool
@@ -199,7 +190,7 @@ public:
     void
     setSeen(NetClock::time_point s)
     {
-        mSeen = s;
+        seenTime_ = s;
     }
 
     Blob
@@ -213,9 +204,9 @@ private:
     static SOTemplate const&
     getFormat();
 
-    NodeID mNodeID;
+    NodeID nodeID_;
     bool mTrusted = false;
-    NetClock::time_point mSeen = {};
+    NetClock::time_point seenTime_ = {};
 };
 
 } // ripple

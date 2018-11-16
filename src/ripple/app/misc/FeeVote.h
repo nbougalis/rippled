@@ -62,7 +62,7 @@ public:
     virtual
     void
     doValidation (std::shared_ptr<ReadView const> const& lastClosedLedger,
-        STValidation::FeeSettings & fees) = 0;
+        STValidation& val) = 0;
 
     /** Cast our local vote on the fee.
 
@@ -72,7 +72,7 @@ public:
     virtual
     void
     doVoting (std::shared_ptr<ReadView const> const& lastClosedLedger,
-        std::vector<STValidation::pointer> const& parentValidations,
+        std::vector<std::shared_ptr<STValidation>> const& parentValidations,
             std::shared_ptr<SHAMap> const& initialPosition) = 0;
 };
 

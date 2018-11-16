@@ -97,12 +97,13 @@ public:
     FeeVoteImpl (Setup const& setup, beast::Journal journal);
 
     void
-    doValidation (std::shared_ptr<ReadView const> const& lastClosedLedger,
-        STValidation::FeeSettings& fees) override;
+    doValidation (
+        std::shared_ptr<ReadView const> const& lastClosedLedger,
+        STValidation& val) override;
 
     void
     doVoting (std::shared_ptr<ReadView const> const& lastClosedLedger,
-        std::vector<STValidation::pointer> const& parentValidations,
+        std::vector<std::shared_ptr<STValidation>> const& parentValidations,
         std::shared_ptr<SHAMap> const& initialPosition) override;
 };
 
@@ -114,17 +115,16 @@ FeeVoteImpl::FeeVoteImpl (Setup const& setup, beast::Journal journal)
 {
 }
 
-void
-FeeVoteImpl::doValidation(
+void FeeVoteImpl::doValidation(
     std::shared_ptr<ReadView const> const& lastClosedLedger,
-        STValidation::FeeSettings& fees)
+    STValidation& v)
 {
     if (lastClosedLedger->fees().base != target_.reference_fee)
     {
         JLOG(journal_.info()) <<
             "Voting for base fee of " << target_.reference_fee;
 
-        fees.baseFee = target_.reference_fee;
+        v.setFieldU64(sfBaseFee, target_.reference_fee);
     }
 
     if (lastClosedLedger->fees().accountReserve(0) != target_.account_reserve)
@@ -132,7 +132,7 @@ FeeVoteImpl::doValidation(
         JLOG(journal_.info()) <<
             "Voting for base reserve of " << target_.account_reserve;
 
-        fees.reserveBase = target_.account_reserve;
+        v.setFieldU32(sfReserveBase, target_.account_reserve);
     }
 
     if (lastClosedLedger->fees().increment != target_.owner_reserve)
@@ -140,14 +140,14 @@ FeeVoteImpl::doValidation(
         JLOG(journal_.info()) <<
             "Voting for reserve increment of " << target_.owner_reserve;
 
-        fees.reserveIncrement = target_.owner_reserve;
+        v.setFieldU32(sfReserveIncrement, target_.owner_reserve);
     }
 }
 
 void
 FeeVoteImpl::doVoting(
     std::shared_ptr<ReadView const> const& lastClosedLedger,
-    std::vector<STValidation::pointer> const& set,
+    std::vector<std::shared_ptr<STValidation>> const& set,
     std::shared_ptr<SHAMap> const& initialPosition)
 {
     // LCL must be flag ledger

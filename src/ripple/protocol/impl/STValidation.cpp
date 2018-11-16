@@ -25,57 +25,6 @@
 
 namespace ripple {
 
-STValidation::STValidation(
-    uint256 const& ledgerHash,
-    std::uint32_t ledgerSeq,
-    uint256 const& consensusHash,
-    NetClock::time_point signTime,
-    PublicKey const& publicKey,
-    SecretKey const& secretKey,
-    NodeID const& nodeID,
-    bool isFull,
-    FeeSettings const& fees,
-    std::vector<uint256> const& amendments)
-    : STObject(getFormat(), sfValidation), mNodeID(nodeID), mSeen(signTime)
-{
-    // This is our own public key and it should always be valid.
-    if (!publicKeyType(publicKey))
-        LogicError("Invalid validation public key");
-    assert(mNodeID.isNonZero());
-    setFieldH256(sfLedgerHash, ledgerHash);
-    setFieldH256(sfConsensusHash, consensusHash);
-    setFieldU32(sfSigningTime, signTime.time_since_epoch().count());
-
-    setFieldVL(sfSigningPubKey, publicKey.slice());
-    if (isFull)
-        setFlag(kFullFlag);
-
-    setFieldU32(sfLedgerSequence, ledgerSeq);
-
-    if (fees.loadFee)
-        setFieldU32(sfLoadFee, *fees.loadFee);
-
-    if (fees.baseFee)
-        setFieldU64(sfBaseFee, *fees.baseFee);
-
-    if (fees.reserveBase)
-        setFieldU32(sfReserveBase, *fees.reserveBase);
-
-    if (fees.reserveIncrement)
-        setFieldU32(sfReserveIncrement, *fees.reserveIncrement);
-
-    if (!amendments.empty())
-        setFieldV256(sfAmendments, STVector256(sfAmendments, amendments));
-
-    setFlag(vfFullyCanonicalSig);
-
-    auto const signingHash = getSigningHash();
-    setFieldVL(
-        sfSignature, signDigest(getSignerPublic(), secretKey, signingHash));
-
-    setTrusted();
-}
-
 uint256 STValidation::getSigningHash () const
 {
     return STObject::getSigningHash (HashPrefix::validation);
@@ -99,7 +48,7 @@ STValidation::getSignTime () const
 
 NetClock::time_point STValidation::getSeenTime () const
 {
-    return mSeen;
+    return seenTime_;
 }
 
 bool STValidation::isValid () const
@@ -151,21 +100,21 @@ SOTemplate const& STValidation::getFormat ()
 
         FormatHolder ()
         {
-            format.push_back (SOElement (sfFlags,           SOE_REQUIRED));
-            format.push_back (SOElement (sfLedgerHash,      SOE_REQUIRED));
-            format.push_back (SOElement (sfLedgerSequence,  SOE_OPTIONAL));
-            format.push_back (SOElement (sfCloseTime,       SOE_OPTIONAL));
-            format.push_back (SOElement (sfLoadFee,         SOE_OPTIONAL));
-            format.push_back (SOElement (sfAmendments,      SOE_OPTIONAL));
-            format.push_back (SOElement (sfBaseFee,         SOE_OPTIONAL));
-            format.push_back (SOElement (sfReserveBase,     SOE_OPTIONAL));
+            format.push_back (SOElement (sfFlags,            SOE_REQUIRED));
+            format.push_back (SOElement (sfLedgerHash,       SOE_REQUIRED));
+            format.push_back (SOElement (sfLedgerSequence,   SOE_REQUIRED));
+            format.push_back (SOElement (sfCloseTime,        SOE_OPTIONAL));
+            format.push_back (SOElement (sfLoadFee,          SOE_OPTIONAL));
+            format.push_back (SOElement (sfAmendments,       SOE_OPTIONAL));
+            format.push_back (SOElement (sfBaseFee,          SOE_OPTIONAL));
+            format.push_back (SOElement (sfReserveBase,      SOE_OPTIONAL));
             format.push_back (SOElement (sfReserveIncrement, SOE_OPTIONAL));
-            format.push_back (SOElement (sfSigningTime,     SOE_REQUIRED));
-            format.push_back (SOElement (sfSigningPubKey,   SOE_REQUIRED));
-            format.push_back (SOElement (sfSignature,       SOE_OPTIONAL));
-            format.push_back (SOElement (sfConsensusHash,   SOE_OPTIONAL));
-            format.push_back (SOElement (sfCookie,          SOE_OPTIONAL));
-
+            format.push_back (SOElement (sfSigningTime,      SOE_REQUIRED));
+            format.push_back (SOElement (sfSigningPubKey,    SOE_REQUIRED));
+            format.push_back (SOElement (sfSignature,        SOE_OPTIONAL));
+            format.push_back (SOElement (sfConsensusHash,    SOE_OPTIONAL));
+            format.push_back (SOElement (sfCookie,           SOE_DEFAULT));
+            format.push_back (SOElement (sfValidatedHash,    SOE_OPTIONAL));
         }
     };
 

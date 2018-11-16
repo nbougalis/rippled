@@ -21,6 +21,7 @@
 #include <ripple/app/ledger/Ledger.h>
 #include <ripple/basics/Log.h>
 #include <ripple/ledger/View.h>
+#include <ripple/protocol/SecretKey.h>
 #include <ripple/beast/unit_test.h>
 #include <test/jtx.h>
 
@@ -36,16 +37,9 @@ class RCLValidations_test : public beast::unit_test::suite
         testcase("Change validation trusted status");
         auto keys = randomKeyPair(KeyType::secp256k1);
         auto v = std::make_shared<STValidation>(
-            uint256(),
-            1,
-            uint256(),
-            NetClock::time_point(),
-            keys.first,
-            keys.second,
-            calcNodeID(keys.first),
-            true,
-            STValidation::FeeSettings{},
-            std::vector<uint256>{});
+            ripple::NetClock::time_point{},
+            keys.first, keys.second, calcNodeID(keys.first),
+            [&](STValidation& v) { });
 
         BEAST_EXPECT(v->isTrusted());
         v->setUntrusted();

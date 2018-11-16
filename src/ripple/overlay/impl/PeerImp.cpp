@@ -1849,7 +1849,7 @@ PeerImp::onMessage (std::shared_ptr <protocol::TMValidation> const& m)
 
     try
     {
-        STValidation::pointer val;
+        std::shared_ptr<STValidation> val;
         {
             SerialIter sit (makeSlice(m->validation()));
             val = std::make_shared<STValidation>(
@@ -2221,13 +2221,13 @@ PeerImp::checkPropose (Job& job,
 }
 
 void
-PeerImp::checkValidation (STValidation::pointer val,
+PeerImp::checkValidation (std::shared_ptr<STValidation> const& val,
     std::shared_ptr<protocol::TMValidation> const& packet)
 {
     try
     {
         // VFALCO Which functions throw?
-        if (! cluster() && !val->isValid())
+        if (!cluster() && !val->isValid())
         {
             JLOG(p_journal_.warn()) <<
                 "Validation is invalid";
@@ -2235,11 +2235,9 @@ PeerImp::checkValidation (STValidation::pointer val,
             return;
         }
 
-        if (app_.getOPs ().recvValidation(val, std::to_string(id())) ||
-            cluster())
+        if (app_.getOPs().recvValidation(val, std::to_string(id())) || cluster())
         {
-            auto const suppression = sha512Half(
-                makeSlice(val->getSerialized()));
+            auto const suppression = sha512Half(makeSlice(val->getSerialized()));
             overlay_.relay(*packet, suppression);
         }
     }
