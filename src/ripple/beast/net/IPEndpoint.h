@@ -57,6 +57,7 @@ public:
         { return m_port; }
 
     /** Returns a new Endpoint with a different port. */
+    [[nodiscard]]
     Endpoint at_port (Port port) const
         { return Endpoint (m_addr, port); }
 
