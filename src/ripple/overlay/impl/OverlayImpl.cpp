@@ -1086,8 +1086,6 @@ OverlayImpl::findPeerByShortID (Peer::id_t const& id)
 void
 OverlayImpl::send (protocol::TMProposeSet& m)
 {
-    if (setup_.expire)
-        m.set_hops(0);
     auto const sm = std::make_shared<Message>(m, protocol::mtPROPOSE_LEDGER);
     for_each([&](std::shared_ptr<PeerImp>&& p)
     {
@@ -1097,8 +1095,6 @@ OverlayImpl::send (protocol::TMProposeSet& m)
 void
 OverlayImpl::send (protocol::TMValidation& m)
 {
-    if (setup_.expire)
-        m.set_hops(0);
     auto const sm = std::make_shared<Message>(m, protocol::mtVALIDATION);
     for_each([&](std::shared_ptr<PeerImp>&& p)
     {
@@ -1240,7 +1236,6 @@ setup_Overlay (BasicConfig const& config)
     {
         auto const& section = config.section("overlay");
         setup.context = make_SSLContext("");
-        setup.expire = get<bool>(section, "expire", false);
 
         set(setup.ipLimit, "ip_limit", section);
         if (setup.ipLimit < 0)
