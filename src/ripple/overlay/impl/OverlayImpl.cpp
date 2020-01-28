@@ -160,7 +160,24 @@ OverlayImpl::OverlayImpl (
     , m_resolver (resolver)
     , next_id_(1)
     , timer_count_(0)
-    , m_stats(std::bind (&OverlayImpl::collect_metrics, this),collector)
+    , m_stats (
+        std::bind(&OverlayImpl::collect_metrics, this),
+        collector,
+        [counts = m_traffic.getCounts(), collector]()
+        {
+            std::vector<beast::insight::Gauge> ret;
+            ret.reserve(counts.size() * 4);
+
+            for (auto const& i : counts)
+            {
+                ret.push_back(collector->make_gauge(i.name, "Bytes_In"));
+                ret.push_back(collector->make_gauge(i.name, "Bytes_Out"));
+                ret.push_back(collector->make_gauge(i.name, "Messages_In"));
+                ret.push_back(collector->make_gauge(i.name, "Messages_Out"));
+            }
+
+            return ret;
+        }())
 {
     beast::PropertyStream::Source::add (m_peerFinder.get());
 }

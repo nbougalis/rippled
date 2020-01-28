@@ -462,18 +462,21 @@ private:
     {
 
         template <class Handler>
-        Stats (Handler const& handler, beast::insight::Collector::ptr const& collector)
-            : hook (collector->make_hook (handler))
-            , peerDisconnects (collector->make_gauge("Overlay","Peer_Disconnects")) 
-            { 
-                mcollector=collector;
-            }
+        Stats (
+                Handler const& handler,
+                beast::insight::Collector::ptr const& collector_,
+                std::vector<beast::insight::Gauge>&& trafficGauges_)
+            : collector (collector_)
+            , peerDisconnects (collector->make_gauge("Overlay","Peer_Disconnects"))
+            , trafficGauges (trafficGauges_)
+            , hook (collector->make_hook(handler))
+        {
+        }
 
-        beast::insight::Hook hook;
+        beast::insight::Collector::ptr collector;
         beast::insight::Gauge peerDisconnects;
         std::vector<beast::insight::Gauge> trafficGauges;
-        beast::insight::Collector::ptr mcollector;
-        
+        beast::insight::Hook hook;
     };
     
     Stats m_stats;
@@ -483,34 +486,17 @@ private:
     {   
         std::lock_guard lock (mutex_);
 
-        auto const& stats = m_traffic.getCounts();
+        std::size_t i = 0;
 
-        if(m_stats.trafficGauges.empty())
+        for (auto const& c : m_traffic.getCounts())
         {
-            // We should do this in the constructor, not here.
-            for (auto const& i : stats)
-            {
-                m_stats.trafficGauges.push_back(
-                    m_stats.mcollector->make_gauge(i.name, "Bytes_In"));
-                m_stats.trafficGauges.push_back(
-                    m_stats.mcollector->make_gauge(i.name, "Bytes_Out"));
-                m_stats.trafficGauges.push_back(
-                    m_stats.mcollector->make_gauge(i.name, "Messages_In"));
-                m_stats.trafficGauges.push_back(
-                    m_stats.mcollector->make_gauge(i.name, "Messages_Out"));
-            }
+            m_stats.trafficGauges[i++] = c.bytesIn;
+            m_stats.trafficGauges[i++] = c.bytesOut;
+            m_stats.trafficGauges[i++] = c.messagesIn;
+            m_stats.trafficGauges[i++] = c.messagesOut;
         }
 
-        // This is not a good idea.
-        for (int i =0; i<4*(ripple::TrafficCount::category::unknown + 1); i+=4)
-        {
-            m_stats.trafficGauges[i] = stats[i/4].bytesIn;
-            m_stats.trafficGauges[i+1] = stats[i/4].bytesOut;
-            m_stats.trafficGauges[i+2] = stats[i/4].messagesIn;
-            m_stats.trafficGauges[i+3] = stats[i/4].messagesOut;
-        }
-
-        m_stats.peerDisconnects= getPeerDisconnect();
+        m_stats.peerDisconnects = getPeerDisconnect();
     }
 };
 

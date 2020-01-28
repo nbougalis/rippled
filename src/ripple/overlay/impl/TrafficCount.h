@@ -172,7 +172,7 @@ public:
 
         @return an object which satisfies the requirements of Container
      */
-    auto
+    auto const&
     getCounts () const
     {
         return counts_;
@@ -218,7 +218,7 @@ protected:
         "getobject_CAS_share",                             // category::share_cas_object
         "getobject_CAS_get",                               // category::get_cas_object
         "getobject_Fetch_Pack_share",                      // category::share_fetch_pack
-        "getobject_Fetch Pack_get",                        // category::get_fetch_pack
+        "getobject_Fetch_Pack_get",                        // category::get_fetch_pack
         "getobject_share",                                 // category::share_hash
         "getobject_get",                                   // category::get_hash
         "unknown"                                          // category::unknown
