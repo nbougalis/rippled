@@ -235,7 +235,7 @@ OverlayImpl::onHandoff (std::unique_ptr <stream_type>&& stream_ptr,
         return handoff;
     }
 
-    // TODO Validate HTTP request
+    // Validate HTTP request
 
     {
         auto const types = beast::rfc2616::split_commas(
