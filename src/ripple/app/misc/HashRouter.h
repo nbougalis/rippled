@@ -29,9 +29,7 @@
 
 namespace ripple {
 
-// VFALCO NOTE Are these the flags?? Why aren't we using a packed struct?
 // VFALCO TODO convert these macros to int constants
-// VFALCO NOTE How can both bad and good be set on a hash?
 #define SF_BAD          0x02    // Temporarily bad
 #define SF_SAVED        0x04
 #define SF_TRUSTED      0x10    // comes from trusted source

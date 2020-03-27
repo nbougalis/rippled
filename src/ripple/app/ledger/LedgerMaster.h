@@ -52,10 +52,6 @@ class Transaction;
 // Tracks the current ledger and any ledgers in the process of closing
 // Tracks ledger history
 // Tracks held transactions
-
-// VFALCO TODO Rename to Ledgers
-//        It sounds like this holds all the ledgers...
-//
 class LedgerMaster
     : public Stoppable
     , public AbstractFetchPackContainer

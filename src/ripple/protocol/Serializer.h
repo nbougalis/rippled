@@ -38,8 +38,6 @@
 
 namespace ripple {
 
-class CKey; // forward declaration
-
 class Serializer
 {
 private:

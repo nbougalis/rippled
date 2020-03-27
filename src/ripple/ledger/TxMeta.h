@@ -29,7 +29,6 @@
 
 namespace ripple {
 
-// VFALCO Move to ripple/app/ledger/detail, rename to TxMeta
 class TxMeta
 {
 public:
