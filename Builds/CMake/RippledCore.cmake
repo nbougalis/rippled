@@ -114,7 +114,8 @@ target_sources (xrpl_core PRIVATE
   src/ripple/crypto/impl/RFC1751.cpp
   src/ripple/crypto/impl/csprng.cpp
   src/ripple/crypto/impl/ec_key.cpp
-  src/ripple/crypto/impl/openssl.cpp)
+  src/ripple/crypto/impl/openssl.cpp
+  src/ripple/crypto/impl/secure_erase.cpp)
 
 add_library (Ripple::xrpl_core ALIAS xrpl_core)
 target_include_directories (xrpl_core
