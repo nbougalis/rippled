@@ -31,9 +31,6 @@
 
 namespace ripple {
 
-// VFALCO NOTE Deprecated
-struct TaggedCacheLog;
-
 /** Map/cache combination.
     This class implements a cache and a map. The cache keeps objects alive
     in the map. The map allows multiple code paths that reference objects
@@ -46,13 +43,11 @@ struct TaggedCacheLog;
     @note Callers must not modify data objects that are stored in the cache
           unless they hold their own lock over all cache operations.
 */
-// VFALCO TODO Figure out how to pass through the allocator
 template <
     class Key,
     class T,
     class Hash = hardened_hash <>,
     class KeyEqual = std::equal_to <Key>,
-    //class Allocator = std::allocator <std::pair <Key const, Entry>>,
     class Mutex = std::recursive_mutex
 >
 class TaggedCache
@@ -61,9 +56,6 @@ public:
     using mutex_type = Mutex;
     using key_type = Key;
     using mapped_type = T;
-    // VFALCO TODO Use std::shared_ptr, std::weak_ptr
-    using weak_mapped_ptr = std::weak_ptr <mapped_type>;
-    using mapped_ptr = std::shared_ptr <mapped_type>;
     using clock_type = beast::abstract_clock <std::chrono::steady_clock>;
 
 public:
@@ -167,7 +159,7 @@ public:
         // Keep references to all the stuff we sweep
         // so that we can destroy them outside the lock.
         //
-        std::vector <mapped_ptr> stuffToSweep;
+        std::vector<std::shared_ptr<mapped_type>> stuffToSweep;
 
         {
             clock_type::time_point const now (m_clock.now());
@@ -196,7 +188,7 @@ public:
 
             stuffToSweep.reserve (m_cache.size ());
 
-            cache_iterator cit = m_cache.begin ();
+            auto cit = m_cache.begin ();
 
             while (cit != m_cache.end ())
             {
@@ -256,7 +248,7 @@ public:
         // Remove from cache, if !valid, remove from map too. Returns true if removed from cache
         std::lock_guard lock (m_mutex);
 
-        cache_iterator cit = m_cache.find (key);
+        auto cit = m_cache.find (key);
 
         if (cit == m_cache.end ())
             return false;
@@ -297,7 +289,7 @@ public:
         // Return values: true=we had the data already
         std::lock_guard lock (m_mutex);
 
-        cache_iterator cit = m_cache.find (key);
+        auto cit = m_cache.find (key);
 
         if (cit == m_cache.end ())
         {
@@ -326,7 +318,7 @@ public:
             return true;
         }
 
-        mapped_ptr cachedData = entry.lock ();
+        auto cachedData = entry.lock ();
 
         if (cachedData)
         {
@@ -357,12 +349,12 @@ public:
         // fetch us a shared pointer to the stored data object
         std::lock_guard lock (m_mutex);
 
-        cache_iterator cit = m_cache.find (key);
+        auto cit = m_cache.find (key);
 
         if (cit == m_cache.end ())
         {
             ++m_misses;
-            return mapped_ptr ();
+            return {};
         }
 
         Entry& entry = cit->second;
@@ -385,7 +377,7 @@ public:
 
         m_cache.erase (cit);
         ++m_misses;
-        return mapped_ptr ();
+        return {};
     }
 
     /** Insert the element into the container.
@@ -394,8 +386,7 @@ public:
     */
     bool insert (key_type const& key, T const& value)
     {
-        mapped_ptr p (std::make_shared <T> (
-            std::cref (value)));
+        auto p = std::make_shared <T>(std::cref (value));
         return canonicalize (key, p);
     }
 
@@ -407,7 +398,7 @@ public:
     bool retrieve (const key_type& key, T& data)
     {
         // retrieve the value of the stored data
-        mapped_ptr entry = fetch (key);
+        auto entry = fetch (key);
 
         if (!entry)
             return false;
@@ -428,9 +419,7 @@ public:
         // If present, make current in cache
         std::lock_guard lock (m_mutex);
 
-        cache_iterator cit = m_cache.find (key);
-
-        if (cit != m_cache.end ())
+        if (auto cit = m_cache.find (key); cit != m_cache.end ())
         {
             Entry& entry = cit->second;
 
@@ -459,10 +448,6 @@ public:
                 entry.touch (m_clock.now());
                 found = true;
             }
-        }
-        else
-        {
-            // not present
         }
 
         return found;
@@ -523,12 +508,12 @@ private:
     class Entry
     {
     public:
-        mapped_ptr ptr;
-        weak_mapped_ptr weak_ptr;
+        std::shared_ptr<mapped_type> ptr;
+        std::weak_ptr<mapped_type> weak_ptr;
         clock_type::time_point last_access;
 
         Entry (clock_type::time_point const& last_access_,
-            mapped_ptr const& ptr_)
+            std::shared_ptr<mapped_type> const& ptr_)
             : ptr (ptr_)
             , weak_ptr (ptr_)
             , last_access (last_access_)
@@ -538,12 +523,11 @@ private:
         bool isWeak () const { return ptr == nullptr; }
         bool isCached () const { return ptr != nullptr; }
         bool isExpired () const { return weak_ptr.expired (); }
-        mapped_ptr lock () { return weak_ptr.lock (); }
+        std::shared_ptr<mapped_type> lock () { return weak_ptr.lock (); }
         void touch (clock_type::time_point const& now) { last_access = now; }
     };
 
     using cache_type = hardened_hash_map <key_type, Entry, Hash, KeyEqual>;
-    using cache_iterator = typename cache_type::iterator;
 
     beast::Journal m_journal;
     clock_type& m_clock;

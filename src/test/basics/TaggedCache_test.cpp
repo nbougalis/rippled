@@ -81,7 +81,7 @@ public:
             BEAST_EXPECT(c.getTrackSize() == 1);
 
             {
-                Cache::mapped_ptr p (c.fetch (2));
+                auto p = c.fetch (2);
                 BEAST_EXPECT(p != nullptr);
                 ++clock;
                 c.sweep ();
@@ -101,8 +101,8 @@ public:
             BEAST_EXPECT(! c.insert (3, "three"));
 
             {
-                Cache::mapped_ptr const p1 (c.fetch (3));
-                Cache::mapped_ptr p2 (std::make_shared <Value> ("three"));
+                auto p1 = c.fetch (3);
+                auto p2 = std::make_shared <Value> ("three");
                 c.canonicalize (3, p2);
                 BEAST_EXPECT(p1.get() == p2.get());
             }
@@ -123,7 +123,7 @@ public:
 
             {
                 // Keep a strong pointer to it
-                Cache::mapped_ptr p1 (c.fetch (4));
+                auto p1 = c.fetch (4);
                 BEAST_EXPECT(p1 != nullptr);
                 BEAST_EXPECT(c.getCacheSize() == 1);
                 BEAST_EXPECT(c.getTrackSize() == 1);
@@ -133,7 +133,7 @@ public:
                 BEAST_EXPECT(c.getCacheSize() == 0);
                 BEAST_EXPECT(c.getTrackSize() == 1);
                 // Canonicalize a new object with the same key
-                Cache::mapped_ptr p2 (std::make_shared <std::string> ("four"));
+                auto p2 = std::make_shared <std::string> ("four");
                 BEAST_EXPECT(c.canonicalize (4, p2, false));
                 BEAST_EXPECT(c.getCacheSize() == 1);
                 BEAST_EXPECT(c.getTrackSize() == 1);
