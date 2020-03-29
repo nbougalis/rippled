@@ -108,7 +108,6 @@ public:
     int addRaw (Blob const& vector);
     int addRaw (const void* ptr, int len);
     int addRaw (const Serializer& s);
-    int addZeros (size_t uBytes);
 
     int addVL (Blob const& vector);
     int addVL (Slice const& slice);

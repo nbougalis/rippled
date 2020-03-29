@@ -25,16 +25,6 @@
 
 namespace ripple {
 
-int Serializer::addZeros (size_t uBytes)
-{
-    int ret = mData.size ();
-
-    while (uBytes--)
-        mData.push_back (0);
-
-    return ret;
-}
-
 int Serializer::add16 (std::uint16_t i)
 {
     int ret = mData.size ();
