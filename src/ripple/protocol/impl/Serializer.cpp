@@ -165,24 +165,6 @@ bool Serializer::chop (int bytes)
     return true;
 }
 
-bool Serializer::getRaw (Blob& o, int offset, int length) const
-{
-    if ((offset + length) > mData.size ()) return false;
-
-    o.assign (mData.begin () + offset, mData.begin () + offset + length);
-    return true;
-}
-
-Blob Serializer::getRaw (int offset, int length) const
-{
-    Blob o;
-
-    if ((offset + length) > mData.size ()) return o;
-
-    o.assign (mData.begin () + offset, mData.begin () + offset + length);
-    return o;
-}
-
 uint256 Serializer::getSHA512Half () const
 {
     return sha512Half(makeSlice(mData));
@@ -212,87 +194,6 @@ int Serializer::addVL (const void* ptr, int len)
         addRaw (ptr, len);
 
     return ret;
-}
-
-bool Serializer::getVL (Blob& objectVL, int offset, int& length) const
-{
-    int b1;
-
-    if (!get8 (b1, offset++)) return false;
-
-    int datLen, lenLen = decodeLengthLength (b1);
-
-    try
-    {
-        if (lenLen == 1)
-            datLen = decodeVLLength (b1);
-        else if (lenLen == 2)
-        {
-            int b2;
-
-            if (!get8 (b2, offset++)) return false;
-
-            datLen = decodeVLLength (b1, b2);
-        }
-        else if (lenLen == 3)
-        {
-            int b2, b3;
-
-            if (!get8 (b2, offset++)) return false;
-
-            if (!get8 (b3, offset++)) return false;
-
-            datLen = decodeVLLength (b1, b2, b3);
-        }
-        else return false;
-    }
-    catch (std::exception const&)
-    {
-        return false;
-    }
-
-    length = lenLen + datLen;
-    return getRaw (objectVL, offset, datLen);
-}
-
-bool Serializer::getVLLength (int& length, int offset) const
-{
-    int b1;
-
-    if (!get8 (b1, offset++)) return false;
-
-    int lenLen = decodeLengthLength (b1);
-
-    try
-    {
-        if (lenLen == 1)
-            length = decodeVLLength (b1);
-        else if (lenLen == 2)
-        {
-            int b2;
-
-            if (!get8 (b2, offset++)) return false;
-
-            length = decodeVLLength (b1, b2);
-        }
-        else if (lenLen == 3)
-        {
-            int b2, b3;
-
-            if (!get8 (b2, offset++)) return false;
-
-            if (!get8 (b3, offset++)) return false;
-
-            length = decodeVLLength (b1, b2, b3);
-        }
-        else return false;
-    }
-    catch (std::exception const&)
-    {
-        return false;
-    }
-
-    return true;
 }
 
 int Serializer::addEncoded (int length)

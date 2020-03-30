@@ -153,12 +153,6 @@ public:
         return getBitString<160, Tag>(o, offset);
     }
 
-    bool getRaw (Blob&, int offset, int length) const;
-    Blob getRaw (int offset, int length) const;
-
-    bool getVL (Blob& objectVL, int offset, int& length) const;
-    bool getVLLength (int& length, int offset) const;
-
     int addFieldID (int type, int name);
     int addFieldID (SerializedTypeID type, int name)
     {
