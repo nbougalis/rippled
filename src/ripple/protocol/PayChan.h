@@ -35,7 +35,7 @@ serializePayChanAuthorization (
     XRPAmount const& amt)
 {
     msg.add32 (HashPrefix::paymentChannelClaim);
-    msg.add256 (key);
+    msg.addBitString (key);
     msg.add64 (amt.drops ());
 }
 

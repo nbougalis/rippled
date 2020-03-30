@@ -73,13 +73,6 @@ template <> int Serializer::addInteger(std::uint16_t i) { return add16(i); }
 template <> int Serializer::addInteger(std::uint32_t i) { return add32(i); }
 template <> int Serializer::addInteger(std::uint64_t i) { return add64(i); }
 
-int Serializer::add256 (uint256 const& i)
-{
-    int ret = mData.size ();
-    mData.insert (mData.end (), i.begin (), i.end ());
-    return ret;
-}
-
 int Serializer::addRaw (Blob const& vector)
 {
     int ret = mData.size ();

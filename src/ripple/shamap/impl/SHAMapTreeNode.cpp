@@ -343,7 +343,7 @@ SHAMapInnerNode::addRaw(Serializer& s, SHANodeFormat format) const
 
     if (format == snfHASH)
     {
-        s.add256 (mHash.as_uint256());
+        s.addBitString (mHash.as_uint256());
     }
     else if (mType == tnINNER)
     {
@@ -354,7 +354,7 @@ SHAMapInnerNode::addRaw(Serializer& s, SHANodeFormat format) const
             s.add32 (HashPrefix::innerNode);
 
             for (auto const& hh : mHashes)
-                s.add256 (hh.as_uint256());
+                s.addBitString (hh.as_uint256());
         }
         else  // format == snfWIRE
         {
@@ -364,7 +364,7 @@ SHAMapInnerNode::addRaw(Serializer& s, SHANodeFormat format) const
                 for (int i = 0; i < mHashes.size(); ++i)
                     if (!isEmptyBranch (i))
                     {
-                        s.add256 (mHashes[i].as_uint256());
+                        s.addBitString (mHashes[i].as_uint256());
                         s.add8 (i);
                     }
 
@@ -373,7 +373,7 @@ SHAMapInnerNode::addRaw(Serializer& s, SHANodeFormat format) const
             else
             {
                 for (auto const& hh : mHashes)
-                    s.add256 (hh.as_uint256());
+                    s.addBitString (hh.as_uint256());
 
                 s.add8 (2);
             }
@@ -393,7 +393,7 @@ SHAMapTreeNode::addRaw(Serializer& s, SHANodeFormat format) const
 
     if (format == snfHASH)
     {
-        s.add256 (mHash.as_uint256());
+        s.addBitString (mHash.as_uint256());
     }
     else if (mType == tnACCOUNT_STATE)
     {
@@ -401,12 +401,12 @@ SHAMapTreeNode::addRaw(Serializer& s, SHANodeFormat format) const
         {
             s.add32 (HashPrefix::leafNode);
             s.addRaw (mItem->peekData ());
-            s.add256 (mItem->key());
+            s.addBitString (mItem->key());
         }
         else
         {
             s.addRaw (mItem->peekData ());
-            s.add256 (mItem->key());
+            s.addBitString (mItem->key());
             s.add8 (1);
         }
     }
@@ -429,12 +429,12 @@ SHAMapTreeNode::addRaw(Serializer& s, SHANodeFormat format) const
         {
             s.add32 (HashPrefix::txNode);
             s.addRaw (mItem->peekData ());
-            s.add256 (mItem->key());
+            s.addBitString (mItem->key());
         }
         else
         {
             s.addRaw (mItem->peekData ());
-            s.add256 (mItem->key());
+            s.addBitString (mItem->key());
             s.add8 (4);
         }
     }

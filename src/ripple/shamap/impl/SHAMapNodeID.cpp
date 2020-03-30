@@ -86,7 +86,7 @@ std::string SHAMapNodeID::getString () const
 
 void SHAMapNodeID::addIDRaw (Serializer& s) const
 {
-    s.add256 (mNodeID);
+    s.addBitString (mNodeID);
     s.add8 (mDepth);
 }
 
