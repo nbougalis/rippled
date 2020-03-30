@@ -39,7 +39,7 @@ struct STAccount_test : public beast::unit_test::suite
                 Serializer s;
                 defaultAcct.add (s); // Asserts in debug build
                 BEAST_EXPECT(s.size() == 1);
-                BEAST_EXPECT(s.getHex() == "00");
+                BEAST_EXPECT(strHex(s) == "00");
                 SerialIter sit (s.slice ());
                 STAccount const deserializedDefault (sit, sfAccount);
                 BEAST_EXPECT(deserializedDefault.isEquivalent (defaultAcct));
@@ -65,7 +65,7 @@ struct STAccount_test : public beast::unit_test::suite
                 Serializer s;
                 sfAcct.add (s);
                 BEAST_EXPECT(s.size() == 1);
-                BEAST_EXPECT(s.getHex() == "00");
+                BEAST_EXPECT(strHex(s) == "00");
                 SerialIter sit (s.slice ());
                 STAccount const deserializedSf (sit, sfAccount);
                 BEAST_EXPECT(deserializedSf.isEquivalent(sfAcct));
@@ -82,7 +82,7 @@ struct STAccount_test : public beast::unit_test::suite
                 Serializer s;
                 zeroAcct.add (s);
                 BEAST_EXPECT(s.size() == 21);
-                BEAST_EXPECT(s.getHex() ==
+                BEAST_EXPECT(strHex(s) ==
                     "140000000000000000000000000000000000000000");
                 SerialIter sit (s.slice ());
                 STAccount const deserializedZero (sit, sfAccount);

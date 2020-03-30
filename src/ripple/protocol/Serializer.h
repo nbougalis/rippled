@@ -33,7 +33,6 @@
 #include <cstdint>
 #include <cstring>
 #include <iomanip>
-#include <sstream>
 #include <type_traits>
 
 namespace ripple {
@@ -235,21 +234,6 @@ public:
     bool operator!= (const Serializer& v)
     {
         return v.mData != mData;
-    }
-
-    std::string getHex () const
-    {
-        std::stringstream h;
-
-        for (unsigned char const& element : mData)
-        {
-            h <<
-                std::setw (2) <<
-                std::hex <<
-                std::setfill ('0') <<
-                safe_cast<unsigned int>(element);
-        }
-        return h.str ();
     }
 
     static int decodeLengthLength (int b1);
