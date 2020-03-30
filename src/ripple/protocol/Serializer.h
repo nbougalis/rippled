@@ -91,9 +91,7 @@ public:
     template <std::size_t Bits, class Tag>
     int addBitString(base_uint<Bits, Tag> const& v)
     {
-        int ret = mData.size ();
-        mData.insert (mData.end (), v.begin (), v.end ());
-        return ret;
+        return addRaw(v.data(), v.size());
     }
 
     int addRaw (Blob const& vector);
