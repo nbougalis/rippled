@@ -85,7 +85,7 @@ public:
     int add32 (std::uint32_t);      // ledger indexes, account sequence, timestamps
     int add32 (HashPrefix);
     int add64 (std::uint64_t);      // native currency amounts
-    int add128 (const uint128&);    // private key generators
+
     int add256 (uint256 const& );       // transaction and ledger hashes
 
     template <typename Integer>
