@@ -274,10 +274,6 @@ public:
     static int decodeVLLength (int b1, int b2);
     static int decodeVLLength (int b1, int b2, int b3);
 private:
-    static int lengthVL (int length)
-    {
-        return length + encodeLengthLength (length);
-    }
     static int encodeLengthLength (int length); // length to encode length
     int addEncoded (int length);
 };
