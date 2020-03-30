@@ -79,7 +79,7 @@ startMultiSigningData (STObject const& obj);
 inline void
 finishMultiSigningData (AccountID const& signingID, Serializer& s)
 {
-    s.add160 (signingID);
+    s.addBitString(signingID);
 }
 
 } // ripple

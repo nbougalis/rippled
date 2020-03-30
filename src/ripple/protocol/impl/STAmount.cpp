@@ -607,8 +607,8 @@ STAmount::add (Serializer& s) const
         else // 256 = positive
             s.add64 (mValue | (static_cast<std::uint64_t>(mOffset + 512 + 256 + 97) << (64 - 10)));
 
-        s.add160 (mIssue.currency);
-        s.add160 (mIssue.account);
+        s.addBitString(mIssue.currency);
+        s.addBitString(mIssue.account);
     }
 }
 

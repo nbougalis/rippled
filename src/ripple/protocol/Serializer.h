@@ -99,13 +99,6 @@ public:
         return ret;
     }
 
-    // TODO(tom): merge with add128 and add256.
-    template <class Tag>
-    int add160 (base_uint<160, Tag> const& i)
-    {
-        return addBitString<160, Tag>(i);
-    }
-
     int addRaw (Blob const& vector);
     int addRaw (const void* ptr, int len);
     int addRaw (const Serializer& s);
