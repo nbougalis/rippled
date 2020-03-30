@@ -109,7 +109,6 @@ public:
 
     // disassemble functions
     bool get8 (int&, int offset) const;
-    bool get256 (uint256&, int offset) const;
 
     template <typename Integer>
     bool getInteger(Integer& number, int offset) {

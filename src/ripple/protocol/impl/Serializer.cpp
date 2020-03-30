@@ -94,14 +94,6 @@ int Serializer::addRaw (const void* ptr, int len)
     return ret;
 }
 
-bool Serializer::get256 (uint256& o, int offset) const
-{
-    if ((offset + (256 / 8)) > mData.size ()) return false;
-
-    memcpy (o.begin (), & (mData.front ()) + offset, (256 / 8));
-    return true;
-}
-
 int Serializer::addFieldID (int type, int name)
 {
     int ret = mData.size ();
