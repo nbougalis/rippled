@@ -32,11 +32,6 @@ class STArray final
 private:
     using list_type = std::vector<STObject>;
 
-    enum
-    {
-        reserveSize = 8
-    };
-
     list_type v_;
 
 public:
