@@ -137,13 +137,6 @@ public:
         return success;
     }
 
-    // TODO(tom): merge with get128 and get256.
-    template <class Tag>
-    bool get160 (base_uint<160, Tag>& o, int offset) const
-    {
-        return getBitString<160, Tag>(o, offset);
-    }
-
     int addFieldID (int type, int name);
     int addFieldID (SerializedTypeID type, int name)
     {
