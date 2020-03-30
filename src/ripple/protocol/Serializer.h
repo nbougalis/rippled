@@ -91,8 +91,9 @@ public:
     template <typename Integer>
     int addInteger(Integer);
 
-    template <int Bits, class Tag>
-    int addBitString(base_uint<Bits, Tag> const& v) {
+    template <std::size_t Bits, class Tag>
+    int addBitString(base_uint<Bits, Tag> const& v)
+    {
         int ret = mData.size ();
         mData.insert (mData.end (), v.begin (), v.end ());
         return ret;
@@ -136,8 +137,9 @@ public:
         return true;
     }
 
-    template <int Bits, typename Tag = void>
-    bool getBitString(base_uint<Bits, Tag>& data, int offset) const {
+    template <std::size_t Bits, typename Tag = void>
+    bool getBitString(base_uint<Bits, Tag>& data, int offset) const
+    {
         auto success = (offset + (Bits / 8)) <= mData.size ();
         if (success)
             memcpy (data.begin (), & (mData.front ()) + offset, (Bits / 8));
@@ -357,7 +359,7 @@ public:
     std::uint64_t
     get64();
 
-    template <int Bits, class Tag = void>
+    template <std::size_t Bits, class Tag = void>
     base_uint<Bits, Tag>
     getBitString();
 
@@ -409,7 +411,7 @@ public:
     T getRawHelper (int size);
 };
 
-template <int Bits, class Tag>
+template <std::size_t Bits, class Tag>
 base_uint<Bits, Tag>
 SerialIter::getBitString()
 {
