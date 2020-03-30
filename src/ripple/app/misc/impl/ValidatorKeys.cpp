@@ -39,8 +39,8 @@ ValidatorKeys::ValidatorKeys(Config const& config, beast::Journal j)
 
     if (config.exists(SECTION_VALIDATOR_TOKEN))
     {
-        if (auto const token = ValidatorToken::make_ValidatorToken(
-                config.section(SECTION_VALIDATOR_TOKEN).lines()))
+        if (auto const token = loadValidatorToken(
+            config.section(SECTION_VALIDATOR_TOKEN).lines()))
         {
             auto const pk = derivePublicKey(
                 KeyType::secp256k1, token->validationSecret);
