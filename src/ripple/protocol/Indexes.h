@@ -32,10 +32,6 @@
 
 namespace ripple {
 
-
-uint256
-getGeneratorIndex (AccountID const& uGeneratorID);
-
 uint256
 getBookBase (Book const& book);
 

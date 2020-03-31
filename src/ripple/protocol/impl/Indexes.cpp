@@ -24,15 +24,6 @@
 
 namespace ripple {
 
-
-uint256
-getGeneratorIndex (AccountID const& uGeneratorID)
-{
-    return sha512Half(
-        std::uint16_t(spaceGenerator),
-        uGeneratorID);
-}
-
 uint256
 getBookBase (Book const& book)
 {
