@@ -32,10 +32,6 @@
 
 namespace ripple {
 
-// get the index of the node that holds the enabled amendments
-uint256
-getLedgerAmendmentIndex ();
-
 // get the index of the node that holds the fee schedule
 uint256
 getLedgerFeeIndex ();
@@ -105,14 +101,8 @@ struct account_t
 };
 static account_t const account {};
 
-/** The amendment table */
-struct amendments_t
-{
-    explicit amendments_t() = default;
-
-    Keylet operator()() const;
-};
-static amendments_t const amendments {};
+/** The index of the amendment table */
+Keylet const& amendments() noexcept;
 
 /** Any item that can be in an owner dir. */
 Keylet child (uint256 const& key);

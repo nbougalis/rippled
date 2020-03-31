@@ -24,13 +24,6 @@
 
 namespace ripple {
 
-// get the index of the node that holds the enabled amendments
-uint256
-getLedgerAmendmentIndex ()
-{
-    return sha512Half(std::uint16_t(spaceAmendment));
-}
-
 // get the index of the node that holds the fee schedule
 uint256
 getLedgerFeeIndex ()
@@ -213,11 +206,11 @@ Keylet skip(LedgerIndex ledger) noexcept
             std::uint32_t(static_cast<std::uint32_t>(ledger) >> 16)) };
 }
 
-
-Keylet amendments_t::operator()() const
+Keylet const& amendments() noexcept
 {
-    return { ltAMENDMENTS,
-        getLedgerAmendmentIndex() };
+    static Keylet const ret { ltAMENDMENTS,
+        sha512Half(std::uint16_t(spaceAmendment)) };
+    return ret;
 }
 
 Keylet fees_t::operator()() const
