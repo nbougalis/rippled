@@ -32,16 +32,6 @@
 
 namespace ripple {
 
-// get the index of the node that holds the last 256 ledgers
-uint256
-getLedgerHashIndex ();
-
-// Get the index of the node that holds the set of 256 ledgers that includes
-// this ledger's hash (or the first ledger after it if it's not a multiple
-// of 256).
-uint256
-getLedgerHashIndex (std::uint32_t desiredLedgerIndex);
-
 // get the index of the node that holds the enabled amendments
 uint256
 getLedgerAmendmentIndex ();
@@ -127,16 +117,24 @@ static amendments_t const amendments {};
 /** Any item that can be in an owner dir. */
 Keylet child (uint256 const& key);
 
-/** Skip list */
-struct skip_t
-{
-    explicit skip_t() = default;
+/** The index of the "short" skip list
 
-    Keylet operator()() const;
+    The "short" skip list is a node (at a fixed index) that holds the hashes
+    of ledgers since the last flag ledger. It will contain, at most, 256 hashes.
+*/
+Keylet const& skip() noexcept;
 
-    Keylet operator()(LedgerIndex ledger) const;
-};
-static skip_t const skip {};
+/** The index of "long" skip list for the given ledger.
+
+    The "long" skip list is a node that holds the hashes of (up to) 256 flag
+    ledgers.
+
+    It can be used to efficiently skip back to any ledger using only two hops:
+    the first hop gets the "long" skip list for the ledger it wants to retrieve
+    and uses it to get the hash of the flag ledger whose short skip list will
+    contain the hash of the requested ledger.
+*/
+Keylet skip(LedgerIndex ledger) noexcept;
 
 /** The ledger fees */
 struct fees_t

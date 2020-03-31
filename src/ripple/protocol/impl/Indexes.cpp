@@ -24,23 +24,6 @@
 
 namespace ripple {
 
-// get the index of the node that holds the last 256 ledgers
-uint256
-getLedgerHashIndex ()
-{
-    return sha512Half(std::uint16_t(spaceSkipList));
-}
-
-// Get the index of the node that holds the set of 256 ledgers that includes
-// this ledger's hash (or the first ledger after it if it's not a multiple
-// of 256).
-uint256
-getLedgerHashIndex (std::uint32_t desiredLedgerIndex)
-{
-    return sha512Half(
-        std::uint16_t(spaceSkipList),
-        std::uint32_t(desiredLedgerIndex >> 16));
-}
 // get the index of the node that holds the enabled amendments
 uint256
 getLedgerAmendmentIndex ()
@@ -215,17 +198,21 @@ Keylet child (uint256 const& key)
     return { ltCHILD, key };
 }
 
-Keylet skip_t::operator()() const
+Keylet const& skip() noexcept
 {
-    return { ltLEDGER_HASHES,
-        getLedgerHashIndex() };
+    static Keylet const ret { ltLEDGER_HASHES,
+        sha512Half(std::uint16_t(spaceSkipList)) };
+    return ret;
 }
 
-Keylet skip_t::operator()(LedgerIndex ledger) const
+Keylet skip(LedgerIndex ledger) noexcept
 {
     return { ltLEDGER_HASHES,
-        getLedgerHashIndex(ledger) };
+        sha512Half(
+            std::uint16_t(spaceSkipList),
+            std::uint32_t(static_cast<std::uint32_t>(ledger) >> 16)) };
 }
+
 
 Keylet amendments_t::operator()() const
 {
