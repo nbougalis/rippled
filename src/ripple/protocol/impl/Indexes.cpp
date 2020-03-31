@@ -24,12 +24,6 @@
 
 namespace ripple {
 
-// get the index of the node that holds the fee schedule
-uint256
-getLedgerFeeIndex ()
-{
-    return sha512Half(std::uint16_t(spaceFee));
-}
 
 uint256
 getGeneratorIndex (AccountID const& uGeneratorID)
@@ -213,10 +207,11 @@ Keylet const& amendments() noexcept
     return ret;
 }
 
-Keylet fees_t::operator()() const
+Keylet const& fees() noexcept
 {
-    return { ltFEE_SETTINGS,
-        getLedgerFeeIndex() };
+    static Keylet const ret { ltFEE_SETTINGS,
+        sha512Half(std::uint16_t(spaceFee)) };
+    return ret;
 }
 
 Keylet book_t::operator()(Book const& b) const

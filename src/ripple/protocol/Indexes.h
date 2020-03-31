@@ -32,9 +32,6 @@
 
 namespace ripple {
 
-// get the index of the node that holds the fee schedule
-uint256
-getLedgerFeeIndex ();
 
 uint256
 getGeneratorIndex (AccountID const& uGeneratorID);
@@ -126,15 +123,8 @@ Keylet const& skip() noexcept;
 */
 Keylet skip(LedgerIndex ledger) noexcept;
 
-/** The ledger fees */
-struct fees_t
-{
-    explicit fees_t() = default;
-
-    // VFALCO This could maybe be constexpr
-    Keylet operator()() const;
-};
-static fees_t const fees {};
+/** The (fixed) index of the object containing the ledger fees. */
+Keylet const& fees() noexcept;
 
 /** The beginning of an order book */
 struct book_t
