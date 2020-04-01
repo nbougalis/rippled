@@ -58,9 +58,6 @@ uint256
 getTicketIndex (AccountID const& account, std::uint32_t uSequence);
 
 uint256
-getSignerListIndex (AccountID const& account);
-
-uint256
 getCheckIndex (AccountID const& account, std::uint32_t uSequence);
 
 uint256
@@ -197,18 +194,8 @@ struct ticket_t
 static ticket_t const ticket {};
 
 /** A SignerList */
-struct signers_t
-{
-    explicit signers_t() = default;
-
-    Keylet operator()(AccountID const& id) const;
-
-    Keylet operator()(uint256 const& key) const
-    {
-        return { ltSIGNER_LIST, key };
-    }
-};
-static signers_t const signers {};
+Keylet signers(
+    AccountID const& account) noexcept;
 
 /** A Check */
 struct check_t

@@ -110,19 +110,6 @@ getTicketIndex (AccountID const& account, std::uint32_t uSequence)
 }
 
 uint256
-getSignerListIndex (AccountID const& account)
-{
-    // We are prepared for there to be multiple SignerLists in the future,
-    // but we don't have them yet.  In anticipation of multiple SignerLists
-    // We supply a 32-bit ID to locate the SignerList.  Until we actually
-    // *have* multiple signer lists, we can default that ID to zero.
-    return sha512Half(
-        std::uint16_t(spaceSignerList),
-        account,
-        std::uint32_t (0));  // 0 == default SignerList ID.
-}
-
-uint256
 getCheckIndex (AccountID const& account, std::uint32_t uSequence)
 {
     return sha512Half(
@@ -237,10 +224,22 @@ Keylet ticket_t::operator()(AccountID const& id,
         getTicketIndex(id, seq) };
 }
 
-Keylet signers_t::operator()(AccountID const& id) const
+// This function is presently static, since it's never accessed from anywhere
+// else. If we ever support multiple pages of signer lists, this would be the
+// keylet used to locate them.
+static
+Keylet signers(
+    AccountID const& account,
+    std::uint32_t page) noexcept
 {
     return { ltSIGNER_LIST,
-        getSignerListIndex(id) };
+        sha512Half(std::uint16_t(spaceSignerList), account, page) };
+}
+
+Keylet signers(
+    AccountID const& account) noexcept
+{
+    return signers (account, 0);
 }
 
 Keylet check_t::operator()(AccountID const& id,
