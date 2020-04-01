@@ -463,19 +463,18 @@ SetTrust::doApply ()
         // Zero balance in currency.
         STAmount saBalance ({currency, noAccount()});
 
-        uint256 index (getRippleStateIndex (
-            account_, uDstAccountID, currency));
+        auto const k = keylet::line(account_, uDstAccountID, currency);
 
         JLOG(j_.trace()) <<
             "doTrustSet: Creating ripple line: " <<
-            to_string (index);
+            to_string (k.key);
 
         // Create a new ripple line.
         terResult = trustCreate (view(),
             bHigh,
             account_,
             uDstAccountID,
-            index,
+            k.key,
             sle,
             bSetAuth,
             bSetNoRipple && !bClearNoRipple,

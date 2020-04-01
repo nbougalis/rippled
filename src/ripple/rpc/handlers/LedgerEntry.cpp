@@ -206,8 +206,8 @@ Json::Value doLedgerEntry (RPC::JsonContext& context)
             if (! id)
                 jvResult[jss::error] = "malformedAddress";
             else
-                uNodeIndex = getOfferIndex (*id,
-                    context.params[jss::offer][jss::seq].asUInt ());
+                uNodeIndex = keylet::offer (*id,
+                    context.params[jss::offer][jss::seq].asUInt ()).key;
         }
     }
     else if (context.params.isMember (jss::payment_channel))
@@ -251,8 +251,7 @@ Json::Value doLedgerEntry (RPC::JsonContext& context)
             }
             else
             {
-                uNodeIndex = getRippleStateIndex(
-                    *id1, *id2, uCurrency);
+                uNodeIndex = keylet::line(*id1, *id2, uCurrency).key;
             }
         }
     }

@@ -58,12 +58,6 @@ uint256
 getTicketIndex (AccountID const& account, std::uint32_t uSequence);
 
 uint256
-getRippleStateIndex (AccountID const& a, AccountID const& b, Currency const& currency);
-
-uint256
-getRippleStateIndex (AccountID const& a, Issue const& issue);
-
-uint256
 getSignerListIndex (AccountID const& account);
 
 uint256
@@ -131,23 +125,27 @@ struct book_t
 };
 static book_t const book {};
 
-/** A trust line */
-struct line_t
+/** The index of a trust line for a given currency
+
+    Note that a trustline is *shared* between two accounts (commonly referred
+    to as the issuer and the holder); if Alice sets up a trust line to Bob for
+    BTC, and Bob trusts Alice for BTC, here is only a single BTC trust line
+    between them.
+ * */
+/** @{ */
+Keylet line(
+    AccountID const& id0,
+    AccountID const& id1,
+    Currency const& currency) noexcept;
+
+inline
+Keylet line(
+    AccountID const& id,
+    Issue const& issue) noexcept
 {
-    explicit line_t() = default;
-
-    Keylet operator()(AccountID const& id0,
-        AccountID const& id1, Currency const& currency) const;
-
-    Keylet operator()(AccountID const& id,
-        Issue const& issue) const;
-
-    Keylet operator()(uint256 const& key) const
-    {
-        return { ltRIPPLE_STATE, key };
-    }
-};
-static line_t const line {};
+    return line(id, issue.account, issue.currency);
+}
+/** @} */
 
 /** An offer from an account */
 struct offer_t

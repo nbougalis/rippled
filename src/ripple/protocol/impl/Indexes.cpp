@@ -20,6 +20,7 @@
 #include <ripple/protocol/digest.h>
 #include <ripple/protocol/Indexes.h>
 #include <boost/endian/conversion.hpp>
+#include <algorithm>
 #include <cassert>
 
 namespace ripple {
@@ -109,28 +110,6 @@ getTicketIndex (AccountID const& account, std::uint32_t uSequence)
 }
 
 uint256
-getRippleStateIndex (AccountID const& a, AccountID const& b, Currency const& currency)
-{
-    if (a < b)
-        return sha512Half(
-            std::uint16_t(spaceRipple),
-            a,
-            b,
-            currency);
-    return sha512Half(
-        std::uint16_t(spaceRipple),
-        b,
-        a,
-        currency);
-}
-
-uint256
-getRippleStateIndex (AccountID const& a, Issue const& issue)
-{
-    return getRippleStateIndex (a, issue.account, issue.currency);
-}
-
-uint256
 getSignerListIndex (AccountID const& account)
 {
     // We are prepared for there to be multiple SignerLists in the future,
@@ -211,18 +190,22 @@ Keylet book_t::operator()(Book const& b) const
         getBookBase(b) };
 }
 
-Keylet line_t::operator()(AccountID const& id0,
-    AccountID const& id1, Currency const& currency) const
+Keylet line(
+    AccountID const& id0,
+    AccountID const& id1,
+    Currency const& currency) noexcept
 {
-    return { ltRIPPLE_STATE,
-        getRippleStateIndex(id0, id1, currency) };
-}
+    // A trust line is shared between two accounts; while we typically think
+    // of this as an "issuer" and a "holder" the relationship is actually fully
+    // bidirectional.
+    //
+    // We define a "canonical" order for the two accounts by sorting them, from
+    // smallest to largest and hashing them in that sorted order:
+    auto const accounts = std::minmax(id0, id1);
 
-Keylet line_t::operator()(AccountID const& id,
-    Issue const& issue) const
-{
     return { ltRIPPLE_STATE,
-        getRippleStateIndex(id, issue) };
+        sha512Half(std::uint16_t(spaceRipple),
+            accounts.first, accounts.second, currency) };
 }
 
 Keylet offer_t::operator()(AccountID const& id,

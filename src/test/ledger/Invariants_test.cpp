@@ -243,9 +243,8 @@ class Invariants_test : public beast::unit_test::suite
             [](Account const& A1, Account const& A2, ApplyContext& ac)
             {
                 // create simple trust SLE with xrp currency
-                auto index = getRippleStateIndex (A1, A2, xrpIssue().currency);
                 auto const sleNew = std::make_shared<SLE>(
-                    ltRIPPLE_STATE, index);
+                    keylet::line (A1, A2, xrpIssue().currency));
                 ac.view().insert (sleNew);
                 return true;
             });
