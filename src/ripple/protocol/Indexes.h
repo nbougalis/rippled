@@ -32,39 +32,6 @@
 
 namespace ripple {
 
-uint256
-getBookBase (Book const& book);
-
-uint256
-getOfferIndex (AccountID const& account, std::uint32_t uSequence);
-
-uint256
-getOwnerDirIndex (AccountID const& account);
-
-uint256
-getDirNodeIndex (uint256 const& uDirRoot, const std::uint64_t uNodeIndex);
-
-uint256
-getQualityIndex (uint256 const& uBase, const std::uint64_t uNodeDir = 0);
-
-uint256
-getQualityNext (uint256 const& uBase);
-
-// VFALCO This name could be better
-std::uint64_t
-getQuality (uint256 const& uBase);
-
-uint256
-getTicketIndex (AccountID const& account, std::uint32_t uSequence);
-
-uint256
-getCheckIndex (AccountID const& account, std::uint32_t uSequence);
-
-uint256
-getDepositPreauthIndex (AccountID const& owner, AccountID const& preauthorized);
-
-//------------------------------------------------------------------------------
-
 /** Keylet computation funclets.
 
     Entries in the ledger are located using 256-bit locators. The locators are
@@ -256,6 +223,39 @@ Keylet
 payChan (AccountID const& source, AccountID const& dst, std::uint32_t seq);
 
 } // keylet
+
+// Everything below is deprecated and should be removed in favor of keylets:
+
+uint256
+getBookBase (Book const& book);
+
+uint256
+getOfferIndex (AccountID const& account, std::uint32_t uSequence);
+
+uint256
+getOwnerDirIndex (AccountID const& account);
+
+uint256
+getDirNodeIndex (uint256 const& uDirRoot, const std::uint64_t uNodeIndex);
+
+uint256
+getQualityIndex (uint256 const& uBase, const std::uint64_t uNodeDir = 0);
+
+uint256
+getQualityNext (uint256 const& uBase);
+
+// VFALCO This name could be better
+std::uint64_t
+getQuality (uint256 const& uBase);
+
+uint256
+getTicketIndex (AccountID const& account, std::uint32_t uSequence);
+
+uint256
+getCheckIndex (AccountID const& account, std::uint32_t uSequence);
+
+uint256
+getDepositPreauthIndex (AccountID const& owner, AccountID const& preauthorized);
 
 }
 
