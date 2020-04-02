@@ -65,25 +65,24 @@ getDepositPreauthIndex (AccountID const& owner, AccountID const& preauthorized);
 
 //------------------------------------------------------------------------------
 
-/* VFALCO TODO
-    For each of these operators that take just the uin256 and
-    only attach the LedgerEntryType, we can comment out that
-    operator to see what breaks, and those call sites are
-    candidates for having the Keylet either passed in as a
-    parameter, or having a data member that stores the keylet.
-*/
+/** Keylet computation funclets.
 
-/** Keylet computation funclets. */
+    Entries in the ledger are located using 256-bit locators. The locators are
+    calculated using a wide range of parameters specific to the entry whose
+    locator we are calculating (e.g. an account's locator is derived from the
+    account's address, whereas the locator for an offer is derived from the
+    account and the offer sequence.)
+
+    To enhance type safety during lookup and make the code more robust, we use
+    keylets, which contain not only the locator of the object but also the type
+    of the object being referenced.
+
+    These functions each return a type-specific keylet.
+*/
 namespace keylet {
 
 /** AccountID root */
-struct account_t
-{
-    explicit account_t() = default;
-
-    Keylet operator()(AccountID const& id) const;
-};
-static account_t const account {};
+Keylet account(AccountID const& id) noexcept;
 
 /** The index of the amendment table */
 Keylet const& amendments() noexcept;

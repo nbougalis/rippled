@@ -131,10 +131,11 @@ getDepositPreauthIndex (AccountID const& owner, AccountID const& preauthorized)
 
 namespace keylet {
 
-Keylet account_t::operator()(
+Keylet account(
     AccountID const& id) const
 {
-    return { ltACCOUNT_ROOT, sha512Half(std::uint16_t(spaceAccount), id) };
+    return { ltACCOUNT_ROOT,
+        sha512Half(std::uint16_t(spaceAccount), id) };
 }
 
 Keylet child (uint256 const& key)
