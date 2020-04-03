@@ -353,9 +353,8 @@ class Invariants_test : public beast::unit_test::suite
                 auto const sle = ac.view().peek (keylet::account(A1.id()));
                 if(! sle)
                     return false;
-                auto const offer_index =
-                    getOfferIndex (A1.id(), (*sle)[sfSequence]);
-                auto sleNew = std::make_shared<SLE> (ltOFFER, offer_index);
+                auto sleNew = std::make_shared<SLE> (
+                    keylet::offer(A1.id(), (*sle)[sfSequence]));
                 sleNew->setAccountID (sfAccount, A1.id());
                 sleNew->setFieldU32 (sfSequence, (*sle)[sfSequence]);
                 sleNew->setFieldAmount (sfTakerPays, XRP(-1));
@@ -371,9 +370,8 @@ class Invariants_test : public beast::unit_test::suite
                 auto const sle = ac.view().peek (keylet::account(A1.id()));
                 if(! sle)
                     return false;
-                auto const offer_index =
-                    getOfferIndex (A1.id(), (*sle)[sfSequence]);
-                auto sleNew = std::make_shared<SLE> (ltOFFER, offer_index);
+                auto sleNew = std::make_shared<SLE> (
+                    keylet::offer(A1.id(), (*sle)[sfSequence]));
                 sleNew->setAccountID (sfAccount, A1.id());
                 sleNew->setFieldU32 (sfSequence, (*sle)[sfSequence]);
                 sleNew->setFieldAmount (sfTakerPays, A1["USD"](10));
@@ -390,9 +388,8 @@ class Invariants_test : public beast::unit_test::suite
                 auto const sle = ac.view().peek (keylet::account(A1.id()));
                 if(! sle)
                     return false;
-                auto const offer_index =
-                    getOfferIndex (A1.id(), (*sle)[sfSequence]);
-                auto sleNew = std::make_shared<SLE> (ltOFFER, offer_index);
+                auto sleNew = std::make_shared<SLE> (
+                    keylet::offer(A1.id(), (*sle)[sfSequence]));
                 sleNew->setAccountID (sfAccount, A1.id());
                 sleNew->setFieldU32 (sfSequence, (*sle)[sfSequence]);
                 sleNew->setFieldAmount (sfTakerPays, XRP(10));

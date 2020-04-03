@@ -1338,11 +1338,11 @@ CreateOffer::applyGuts (Sandbox& sb, Sandbox& sbCancel)
     }
 
     // We need to place the remainder of the offer into its order book.
-    auto const offer_index = getOfferIndex (account_, uSequence);
+    auto const offer_index = keylet::offer(account_, uSequence);
 
     // Add offer to owner's directory.
-    auto const ownerNode = dirAdd(sb, keylet::ownerDir (account_),
-        offer_index, false, describeOwnerDir (account_), viewJ);
+    auto const ownerNode = sb.dirInsert(keylet::ownerDir (account_),
+        offer_index, describeOwnerDir(account_));
 
     if (!ownerNode)
     {
@@ -1363,9 +1363,9 @@ CreateOffer::applyGuts (Sandbox& sb, Sandbox& sbCancel)
     // Add offer to order book, using the original rate
     // before any crossing occured.
     auto dir = keylet::quality (keylet::book (book), uRate);
-    bool const bookExisted = static_cast<bool>(sb.peek (dir));
+    bool const bookExisted = static_cast<bool>(sb.peek(dir));
 
-    auto const bookNode = dirAdd (sb, dir, offer_index, true,
+    auto const bookNode = sb.dirAppend(dir, offer_index,
         [&](SLE::ref sle)
         {
             sle->setFieldH160 (sfTakerPaysCurrency,
@@ -1377,7 +1377,7 @@ CreateOffer::applyGuts (Sandbox& sb, Sandbox& sbCancel)
             sle->setFieldH160 (sfTakerGetsIssuer,
                 saTakerGets.issue().account);
             sle->setFieldU64 (sfExchangeRate, uRate);
-        }, viewJ);
+        });
 
     if (!bookNode)
     {
@@ -1386,7 +1386,7 @@ CreateOffer::applyGuts (Sandbox& sb, Sandbox& sbCancel)
         return { tecDIR_FULL, true };
     }
 
-    auto sleOffer = std::make_shared<SLE>(ltOFFER, offer_index);
+    auto sleOffer = std::make_shared<SLE>(offer_index);
     sleOffer->setAccountID (sfAccount, account_);
     sleOffer->setFieldU32 (sfSequence, uSequence);
     sleOffer->setFieldH256 (sfBookDirectory, dir.key);

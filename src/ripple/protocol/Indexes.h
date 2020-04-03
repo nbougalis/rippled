@@ -111,19 +111,18 @@ Keylet line(
 /** @} */
 
 /** An offer from an account */
-struct offer_t
+/** @{ */
+Keylet offer(
+    AccountID const& id,
+    std::uint32_t seq) noexcept;
+
+inline
+Keylet offer(
+    uint256 const& key) noexcept
 {
-    explicit offer_t() = default;
-
-    Keylet operator()(AccountID const& id,
-        std::uint32_t seq) const;
-
-    Keylet operator()(uint256 const& key) const
-    {
-        return { ltOFFER, key };
-    }
-};
-static offer_t const offer {};
+    return { ltOFFER, key };
+}
+/** @} */
 
 /** The initial directory page for a specific quality */
 struct quality_t
@@ -231,9 +230,6 @@ payChan(AccountID const& src, AccountID const& dst, std::uint32_t seq) noexcept;
 
 uint256
 getBookBase (Book const& book);
-
-uint256
-getOfferIndex (AccountID const& account, std::uint32_t uSequence);
 
 uint256
 getQualityIndex (uint256 const& uBase, const std::uint64_t uNodeDir = 0);

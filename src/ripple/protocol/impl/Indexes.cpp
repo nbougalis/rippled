@@ -45,13 +45,6 @@ getBookBase (Book const& book)
 }
 
 uint256
-getOfferIndex (AccountID const& account, std::uint32_t uSequence)
-{
-    return indexHash(LedgerNameSpace::spaceOffer,
-        account, std::uint32_t(uSequence));
-}
-
-uint256
 getQualityIndex (uint256 const& uBase, const std::uint64_t uNodeDir)
 {
     // Indexes are stored in big endian format: they print as hex as stored.
@@ -178,11 +171,12 @@ Keylet line(
             accounts.first, accounts.second, currency) };
 }
 
-Keylet offer_t::operator()(AccountID const& id,
-    std::uint32_t seq) const
+Keylet offer(
+    AccountID const& id,
+    std::uint32_t seq) noexcept
 {
     return { ltOFFER,
-        getOfferIndex(id, seq) };
+        indexHash(LedgerNameSpace::spaceOffer, id, seq) };
 }
 
 Keylet quality_t::operator()(Keylet const& k,
