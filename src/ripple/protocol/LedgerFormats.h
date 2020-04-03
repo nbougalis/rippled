@@ -89,25 +89,23 @@ enum LedgerEntryType
 
     // No longer used or supported. Left here to prevent accidental
     // reassignment of the ledger type.
-    ltNICKNAME          = 'n',
+    ltNICKNAME          [[deprecated]] = 'n',
 
-    ltNotUsed01         = 'c',
+    ltNotUsed01         [[deprecated]] = 'c',
 };
 
 /**
     @ingroup protocol
 */
 // Used as a prefix for computing ledger indexes (keys).
-enum LedgerNameSpace
+enum class LedgerNameSpace : std::uint16_t
 {
     spaceAccount        = 'a',
     spaceDirNode        = 'd',
-    spaceGenerator      = 'g',
     spaceRipple         = 'r',
-    spaceOffer          = 'o',  // Entry for an offer.
-    spaceOwnerDir       = 'O',  // Directory of things owned by an account.
-    spaceBookDir        = 'B',  // Directory of order books.
-    spaceContract       = 'c',
+    spaceOffer          = 'o',
+    spaceOwnerDir       = 'O',
+    spaceBookDir        = 'B',
     spaceSkipList       = 's',
     spaceEscrow         = 'u',
     spaceAmendment      = 'f',
@@ -120,7 +118,9 @@ enum LedgerNameSpace
 
     // No longer used or supported. Left here to reserve the space and
     // avoid accidental reuse of the space.
-    spaceNickname       = 'n',
+    spaceContract       [[deprecated]] = 'c',
+    spaceGenerator      [[deprecated]] = 'g',
+    spaceNickname       [[deprecated]] = 'n',
 };
 
 /**

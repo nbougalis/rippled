@@ -25,26 +25,30 @@
 
 namespace ripple {
 
+template <class... Args>
+static
+uint256 indexHash(LedgerNameSpace space, Args const&... args)
+{
+    return sha512Half(safe_cast<std::uint16_t>(space),
+        args...);
+}
+
 uint256
 getBookBase (Book const& book)
 {
     assert (isConsistent (book));
     // Return with quality 0.
-    return getQualityIndex(sha512Half(
-        std::uint16_t(spaceBookDir),
-        book.in.currency,
-        book.out.currency,
-        book.in.account,
-        book.out.account));
+    return getQualityIndex(
+        indexHash(LedgerNameSpace::spaceBookDir,
+            book.in.currency, book.out.currency,
+            book.in.account, book.out.account));
 }
 
 uint256
 getOfferIndex (AccountID const& account, std::uint32_t uSequence)
 {
-    return sha512Half(
-        std::uint16_t(spaceOffer),
-        account,
-        std::uint32_t(uSequence));
+    return indexHash(LedgerNameSpace::spaceOffer,
+        account, std::uint32_t(uSequence));
 }
 
 uint256
@@ -82,28 +86,22 @@ getQuality (uint256 const& uBase)
 uint256
 getTicketIndex (AccountID const& account, std::uint32_t uSequence)
 {
-    return sha512Half(
-        std::uint16_t(spaceTicket),
-        account,
-        std::uint32_t(uSequence));
+    return indexHash(LedgerNameSpace::spaceTicket,
+        account, std::uint32_t(uSequence));
 }
 
 uint256
 getCheckIndex (AccountID const& account, std::uint32_t uSequence)
 {
-    return sha512Half(
-        std::uint16_t(spaceCheck),
-        account,
-        std::uint32_t(uSequence));
+    return indexHash(LedgerNameSpace::spaceCheck,
+        account, std::uint32_t(uSequence));
 }
 
 uint256
 getDepositPreauthIndex (AccountID const& owner, AccountID const& preauthorized)
 {
-    return sha512Half(
-        std::uint16_t(spaceDepositPreauth),
-        owner,
-        preauthorized);
+    return indexHash(LedgerNameSpace::spaceDepositPreauth,
+        owner, preauthorized);
 }
 
 //------------------------------------------------------------------------------
@@ -114,7 +112,7 @@ Keylet account(
     AccountID const& id) noexcept
 {
     return { ltACCOUNT_ROOT,
-        sha512Half(std::uint16_t(spaceAccount), id) };
+        indexHash(LedgerNameSpace::spaceAccount, id) };
 }
 
 Keylet child (uint256 const& key) noexcept
@@ -125,29 +123,28 @@ Keylet child (uint256 const& key) noexcept
 Keylet const& skip() noexcept
 {
     static Keylet const ret { ltLEDGER_HASHES,
-        sha512Half(std::uint16_t(spaceSkipList)) };
+        indexHash(LedgerNameSpace::spaceSkipList) };
     return ret;
 }
 
 Keylet skip(LedgerIndex ledger) noexcept
 {
     return { ltLEDGER_HASHES,
-        sha512Half(
-            std::uint16_t(spaceSkipList),
+        indexHash(LedgerNameSpace::spaceSkipList,
             std::uint32_t(static_cast<std::uint32_t>(ledger) >> 16)) };
 }
 
 Keylet const& amendments() noexcept
 {
     static Keylet const ret { ltAMENDMENTS,
-        sha512Half(std::uint16_t(spaceAmendment)) };
+        indexHash(LedgerNameSpace::spaceAmendment) };
     return ret;
 }
 
 Keylet const& fees() noexcept
 {
     static Keylet const ret { ltFEE_SETTINGS,
-        sha512Half(std::uint16_t(spaceFee)) };
+        indexHash(LedgerNameSpace::spaceFee) };
     return ret;
 }
 
@@ -177,7 +174,7 @@ Keylet line(
     auto const accounts = std::minmax(id0, id1);
 
     return { ltRIPPLE_STATE,
-        sha512Half(std::uint16_t(spaceRipple),
+        indexHash(LedgerNameSpace::spaceRipple,
             accounts.first, accounts.second, currency) };
 }
 
@@ -219,7 +216,7 @@ Keylet signers(
     std::uint32_t page) noexcept
 {
     return { ltSIGNER_LIST,
-        sha512Half(std::uint16_t(spaceSignerList), account, page) };
+        indexHash(LedgerNameSpace::spaceSignerList, account, page) };
 }
 
 Keylet signers(
@@ -252,7 +249,7 @@ Keylet unchecked (uint256 const& key) noexcept
 Keylet ownerDir(AccountID const& id) noexcept
 {
     return { ltDIR_NODE,
-        sha512Half(std::uint16_t(spaceOwnerDir), id) };
+        indexHash(LedgerNameSpace::spaceOwnerDir, id) };
 }
 
 Keylet page(
@@ -263,30 +260,21 @@ Keylet page(
         return { ltDIR_NODE, key };
 
     return { ltDIR_NODE,
-        sha512Half(std::uint16_t(spaceDirNode), key, index) };
+        indexHash(LedgerNameSpace::spaceDirNode, key, index) };
 }
 
 Keylet
-escrow (AccountID const& source, std::uint32_t seq) noexcept
+escrow(AccountID const& src, std::uint32_t seq) noexcept
 {
-    sha512_half_hasher h;
-    using beast::hash_append;
-    hash_append(h, std::uint16_t(spaceEscrow));
-    hash_append(h, source);
-    hash_append(h, seq);
-    return { ltESCROW, static_cast<uint256>(h) };
+    return { ltESCROW,
+        indexHash(LedgerNameSpace::spaceEscrow, src, seq) };
 }
 
 Keylet
-payChan (AccountID const& source, AccountID const& dst, std::uint32_t seq) noexcept
+payChan(AccountID const& src, AccountID const& dst, std::uint32_t seq) noexcept
 {
-    sha512_half_hasher h;
-    using beast::hash_append;
-    hash_append(h, std::uint16_t(spaceXRPUChannel));
-    hash_append(h, source);
-    hash_append(h, dst);
-    hash_append(h, seq);
-    return { ltPAYCHAN, static_cast<uint256>(h) };
+    return { ltPAYCHAN,
+        indexHash(LedgerNameSpace::spaceXRPUChannel, src, dst, seq) };
 }
 
 } // keylet

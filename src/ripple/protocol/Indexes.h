@@ -219,11 +219,11 @@ Keylet page(
 
 /** An escrow entry */
 Keylet
-escrow (AccountID const& source, std::uint32_t seq) noexcept;
+escrow(AccountID const& src, std::uint32_t seq) noexcept;
 
 /** A PaymentChannel */
 Keylet
-payChan (AccountID const& source, AccountID const& dst, std::uint32_t seq) noexcept;
+payChan(AccountID const& src, AccountID const& dst, std::uint32_t seq) noexcept;
 
 } // keylet
 
