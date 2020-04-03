@@ -99,12 +99,12 @@ getAccountObjects(ReadView const& ledger, AccountID const& account,
     boost::optional<std::vector<LedgerEntryType>> const& typeFilter, uint256 dirIndex,
     uint256 const& entryIndex, std::uint32_t const limit, Json::Value& jvResult)
 {
-    auto const rootDirIndex = getOwnerDirIndex (account);
+    auto const root = keylet::ownerDir(account);
     auto found = false;
 
     if (dirIndex.isZero ())
     {
-        dirIndex = rootDirIndex;
+        dirIndex = root.key;
         found = true;
     }
 
@@ -165,7 +165,7 @@ getAccountObjects(ReadView const& ledger, AccountID const& account,
         if (nodeIndex == 0)
             return true;
 
-        dirIndex = getDirNodeIndex (rootDirIndex, nodeIndex);
+        dirIndex = keylet::page(root, nodeIndex).key;
         dir = ledger.read({ltDIR_NODE, dirIndex});
         if (! dir)
             return true;

@@ -138,7 +138,7 @@ Json::Value doLedgerEntry (RPC::JsonContext& context)
                     uDirRoot.SetHex (
                         context.params[jss::directory][jss::dir_root].asString());
 
-                    uNodeIndex = getDirNodeIndex (uDirRoot, uSubIndex);
+                    uNodeIndex = keylet::page(uDirRoot, uSubIndex).key;
                 }
             }
             else if (context.params[jss::directory].isMember (jss::owner))
@@ -152,8 +152,8 @@ Json::Value doLedgerEntry (RPC::JsonContext& context)
                 }
                 else
                 {
-                    uint256 uDirRoot = getOwnerDirIndex (*ownerID);
-                    uNodeIndex = getDirNodeIndex (uDirRoot, uSubIndex);
+                    uNodeIndex = keylet::page(
+                        keylet::ownerDir(*ownerID), uSubIndex).key;
                 }
             }
             else

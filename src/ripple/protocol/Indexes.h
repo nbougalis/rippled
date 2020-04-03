@@ -55,7 +55,7 @@ Keylet account(AccountID const& id) noexcept;
 Keylet const& amendments() noexcept;
 
 /** Any item that can be in an owner dir. */
-Keylet child (uint256 const& key);
+Keylet child (uint256 const& key) noexcept;
 
 /** The index of the "short" skip list
 
@@ -64,7 +64,7 @@ Keylet child (uint256 const& key);
 */
 Keylet const& skip() noexcept;
 
-/** The index of "long" skip list for the given ledger.
+/** The index of the long skip for a particular ledger range.
 
     The "long" skip list is a node that holds the hashes of (up to) 256 flag
     ledgers.
@@ -196,31 +196,34 @@ static depositPreauth_t const depositPreauth {};
 //------------------------------------------------------------------------------
 
 /** Any ledger entry */
-Keylet unchecked(uint256 const& key);
+Keylet unchecked(uint256 const& key) noexcept;
 
 /** The root page of an account's directory */
-Keylet ownerDir (AccountID const& id);
+Keylet ownerDir (AccountID const& id) noexcept;
 
 /** A page in a directory */
 /** @{ */
-Keylet page (uint256 const& root, std::uint64_t index);
-Keylet page (Keylet const& root, std::uint64_t index);
-/** @} */
+Keylet page(
+    uint256 const& root,
+    std::uint64_t index = 0) noexcept;
 
-// DEPRECATED
 inline
-Keylet page (uint256 const& key)
+Keylet page(
+    Keylet const& root,
+    std::uint64_t index = 0) noexcept
 {
-    return { ltDIR_NODE, key };
+    assert(root.type == ltDIR_NODE);
+    return page(root.key, index);
 }
+/** @} */
 
 /** An escrow entry */
 Keylet
-escrow (AccountID const& source, std::uint32_t seq);
+escrow (AccountID const& source, std::uint32_t seq) noexcept;
 
 /** A PaymentChannel */
 Keylet
-payChan (AccountID const& source, AccountID const& dst, std::uint32_t seq);
+payChan (AccountID const& source, AccountID const& dst, std::uint32_t seq) noexcept;
 
 } // keylet
 
@@ -231,12 +234,6 @@ getBookBase (Book const& book);
 
 uint256
 getOfferIndex (AccountID const& account, std::uint32_t uSequence);
-
-uint256
-getOwnerDirIndex (AccountID const& account);
-
-uint256
-getDirNodeIndex (uint256 const& uDirRoot, const std::uint64_t uNodeIndex);
 
 uint256
 getQualityIndex (uint256 const& uBase, const std::uint64_t uNodeDir = 0);

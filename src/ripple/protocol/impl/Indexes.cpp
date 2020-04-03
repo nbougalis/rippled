@@ -48,27 +48,6 @@ getOfferIndex (AccountID const& account, std::uint32_t uSequence)
 }
 
 uint256
-getOwnerDirIndex (AccountID const& account)
-{
-    return sha512Half(
-        std::uint16_t(spaceOwnerDir),
-        account);
-}
-
-
-uint256
-getDirNodeIndex (uint256 const& uDirRoot, const std::uint64_t uNodeIndex)
-{
-    if (uNodeIndex == 0)
-        return uDirRoot;
-
-    return sha512Half(
-        std::uint16_t(spaceDirNode),
-        uDirRoot,
-        std::uint64_t(uNodeIndex));
-}
-
-uint256
 getQualityIndex (uint256 const& uBase, const std::uint64_t uNodeDir)
 {
     // Indexes are stored in big endian format: they print as hex as stored.
@@ -132,13 +111,13 @@ getDepositPreauthIndex (AccountID const& owner, AccountID const& preauthorized)
 namespace keylet {
 
 Keylet account(
-    AccountID const& id) const
+    AccountID const& id) noexcept
 {
     return { ltACCOUNT_ROOT,
         sha512Half(std::uint16_t(spaceAccount), id) };
 }
 
-Keylet child (uint256 const& key)
+Keylet child (uint256 const& key) noexcept
 {
     return { ltCHILD, key };
 }
@@ -183,12 +162,18 @@ Keylet line(
     AccountID const& id1,
     Currency const& currency) noexcept
 {
+    // There is code in SetTrust that calls us with id0 == id1, to allow users
+    // to locate and delete such "weird" trustlines. If we remove that code, we
+    // could enable this assert:
+    //assert(id0 != id1);
+
     // A trust line is shared between two accounts; while we typically think
     // of this as an "issuer" and a "holder" the relationship is actually fully
     // bidirectional.
     //
-    // We define a "canonical" order for the two accounts by sorting them, from
-    // smallest to largest and hashing them in that sorted order:
+    // So that we can generate a unique ID for a trust line, regardess of which
+    // side of the line we're looking at, we define a "canonical" order for the
+    // two accounts (smallest then largest)  and hash them in that order:
     auto const accounts = std::minmax(id0, id1);
 
     return { ltRIPPLE_STATE,
@@ -259,33 +244,30 @@ Keylet depositPreauth_t::operator()(AccountID const& owner,
 
 //------------------------------------------------------------------------------
 
-Keylet unchecked (uint256 const& key)
+Keylet unchecked (uint256 const& key) noexcept
 {
     return { ltANY, key };
 }
 
-Keylet ownerDir(AccountID const& id)
+Keylet ownerDir(AccountID const& id) noexcept
 {
     return { ltDIR_NODE,
-        getOwnerDirIndex(id) };
+        sha512Half(std::uint16_t(spaceOwnerDir), id) };
 }
 
-Keylet page(uint256 const& key,
-    std::uint64_t index)
+Keylet page(
+    uint256 const& key,
+    std::uint64_t index) noexcept
 {
+    if (index == 0)
+        return { ltDIR_NODE, key };
+
     return { ltDIR_NODE,
-        getDirNodeIndex(key, index) };
-}
-
-Keylet page(Keylet const& root,
-    std::uint64_t index)
-{
-    assert(root.type == ltDIR_NODE);
-    return page(root.key, index);
+        sha512Half(std::uint16_t(spaceDirNode), key, index) };
 }
 
 Keylet
-escrow (AccountID const& source, std::uint32_t seq)
+escrow (AccountID const& source, std::uint32_t seq) noexcept
 {
     sha512_half_hasher h;
     using beast::hash_append;
@@ -296,7 +278,7 @@ escrow (AccountID const& source, std::uint32_t seq)
 }
 
 Keylet
-payChan (AccountID const& source, AccountID const& dst, std::uint32_t seq)
+payChan (AccountID const& source, AccountID const& dst, std::uint32_t seq) noexcept
 {
     sha512_half_hasher h;
     using beast::hash_append;
