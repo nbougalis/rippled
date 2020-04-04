@@ -157,7 +157,7 @@ DepositPreauth::doApply ()
     else
     {
         AccountID const unauth {ctx_.tx[sfUnauthorize]};
-        uint256 const preauthIndex {getDepositPreauthIndex (account_, unauth)};
+        uint256 const preauthIndex = keylet::pregetDepositPreauthIndex (account_, unauth)};
 
         return DepositPreauth::removeFromLedger (
             ctx_.app, view(), preauthIndex, j_);

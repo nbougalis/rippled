@@ -178,19 +178,17 @@ struct check_t
 static check_t const check {};
 
 /** A DepositPreauth */
-struct depositPreauth_t
+/** @{ */
+Keylet depositPreauth(
+    AccountID const& owner,
+    AccountID const& preauthorized) noexcept;
+
+inline
+Keylet depositPreauth(uint256 const& key) noexcept
 {
-    explicit depositPreauth_t() = default;
-
-    Keylet operator()(AccountID const& owner,
-        AccountID const& preauthorized) const;
-
-    Keylet operator()(uint256 const& key) const
-    {
-        return { ltDEPOSIT_PREAUTH, key };
-    }
-};
-static depositPreauth_t const depositPreauth {};
+    return { ltDEPOSIT_PREAUTH, key };
+}
+/** @} */
 
 //------------------------------------------------------------------------------
 
@@ -246,9 +244,6 @@ getTicketIndex (AccountID const& account, std::uint32_t uSequence);
 
 uint256
 getCheckIndex (AccountID const& account, std::uint32_t uSequence);
-
-uint256
-getDepositPreauthIndex (AccountID const& owner, AccountID const& preauthorized);
 
 }
 
