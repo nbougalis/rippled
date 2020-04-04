@@ -221,12 +221,16 @@ class Invariants_test : public beast::unit_test::suite
                 auto const sle = ac.view().peek (keylet::account(A1.id()));
                 if(! sle)
                     return false;
+
                 // make a dummy escrow ledger entry, then change the type to an
                 // unsupported value so that the valid type invariant check
                 // will fail.
                 auto sleNew = std::make_shared<SLE> (
                     keylet::escrow(A1, (*sle)[sfSequence] + 2));
-                sleNew->type_ = ltNICKNAME;
+
+                // We don't use ltNICKNAME directly since it's marked deprecated
+                // to prevent accidental use elsewhere.
+                sleNew->type_ = static_cast<LedgerEntryType>('n');
                 ac.view().insert (sleNew);
                 return true;
             });

@@ -94,34 +94,7 @@ enum LedgerEntryType
     ltNotUsed01         [[deprecated]] = 'c',
 };
 
-/**
-    @ingroup protocol
-*/
-// Used as a prefix for computing ledger indexes (keys).
-enum class LedgerNameSpace : std::uint16_t
-{
-    spaceAccount        = 'a',
-    spaceDirNode        = 'd',
-    spaceRipple         = 'r',
-    spaceOffer          = 'o',
-    spaceOwnerDir       = 'O',
-    spaceBookDir        = 'B',
-    spaceSkipList       = 's',
-    spaceEscrow         = 'u',
-    spaceAmendment      = 'f',
-    spaceFee            = 'e',
-    spaceTicket         = 'T',
-    spaceSignerList     = 'S',
-    spaceXRPUChannel    = 'x',
-    spaceCheck          = 'C',
-    spaceDepositPreauth = 'p',
 
-    // No longer used or supported. Left here to reserve the space and
-    // avoid accidental reuse of the space.
-    spaceContract       [[deprecated]] = 'c',
-    spaceGenerator      [[deprecated]] = 'g',
-    spaceNickname       [[deprecated]] = 'n',
-};
 
 /**
     @ingroup protocol

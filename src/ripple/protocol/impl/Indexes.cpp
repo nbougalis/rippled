@@ -25,12 +25,53 @@
 
 namespace ripple {
 
+/** Type-specific prefix for calculating ledger indices.
+
+    The identifier for a given object within the ledger is calculated based
+    on some object-specific parameters. To ensure that different types of
+    objects have different indices, even if they happen to use the same set
+    of parameters, we use "tagged hashing" by adding a type-specific prefix.
+
+    @note These values are part of the protocol and *CANNOT* be arbitrarily
+          changed. If they were, on-ledger objects may no longer be able to
+          be located or addressed.
+
+          Additions to this list are OK, but changing existing entries to
+          assign them a different values should never be needed.
+
+          Entries that are removed should be moved to the bottom of the enum
+          and marked as [[deprecated]] to prevent accidental reuse.
+*/
+enum class LedgerNameSpace : std::uint16_t
+{
+    ACCOUNT                       = 'a',
+    DIR_NODE                      = 'd',
+    TRUST_LINE                    = 'r',
+    OFFER                         = 'o',
+    OWNER_DIR                     = 'O',
+    BOOK_DIR                      = 'B',
+    SKIP_LIST                     = 's',
+    ESCROW                        = 'u',
+    AMENDMENTS                    = 'f',
+    FEE_SETTINGS                  = 'e',
+    TICKET                        = 'T',
+    SIGNER_LIST                   = 'S',
+    XRP_PAYMENT_CHANNEL           = 'x',
+    CHECK                         = 'C',
+    DEPOSIT_PREAUTH               = 'p',
+
+    // No longer used or supported. Left here to reserve the space
+    // to avoid accidental reuse.
+    CONTRACT       [[deprecated]] = 'c',
+    GENERATOR      [[deprecated]] = 'g',
+    NICKNAME       [[deprecated]] = 'n',
+};
+
 template <class... Args>
 static
 uint256 indexHash(LedgerNameSpace space, Args const&... args)
 {
-    return sha512Half(safe_cast<std::uint16_t>(space),
-        args...);
+    return sha512Half(safe_cast<std::uint16_t>(space), args...);
 }
 
 uint256
@@ -39,7 +80,7 @@ getBookBase (Book const& book)
     assert (isConsistent (book));
     // Return with quality 0.
     return getQualityIndex(
-        indexHash(LedgerNameSpace::spaceBookDir,
+        indexHash(LedgerNameSpace::BOOK_DIR,
             book.in.currency, book.out.currency,
             book.in.account, book.out.account));
 }
@@ -79,21 +120,21 @@ getQuality (uint256 const& uBase)
 uint256
 getTicketIndex (AccountID const& account, std::uint32_t uSequence)
 {
-    return indexHash(LedgerNameSpace::spaceTicket,
+    return indexHash(LedgerNameSpace::TICKET,
         account, std::uint32_t(uSequence));
 }
 
 uint256
 getCheckIndex (AccountID const& account, std::uint32_t uSequence)
 {
-    return indexHash(LedgerNameSpace::spaceCheck,
+    return indexHash(LedgerNameSpace::CHECK,
         account, std::uint32_t(uSequence));
 }
 
 uint256
 getDepositPreauthIndex (AccountID const& owner, AccountID const& preauthorized)
 {
-    return indexHash(LedgerNameSpace::spaceDepositPreauth,
+    return indexHash(LedgerNameSpace::DEPOSIT_PREAUTH,
         owner, preauthorized);
 }
 
@@ -105,7 +146,7 @@ Keylet account(
     AccountID const& id) noexcept
 {
     return { ltACCOUNT_ROOT,
-        indexHash(LedgerNameSpace::spaceAccount, id) };
+        indexHash(LedgerNameSpace::ACCOUNT, id) };
 }
 
 Keylet child (uint256 const& key) noexcept
@@ -116,28 +157,28 @@ Keylet child (uint256 const& key) noexcept
 Keylet const& skip() noexcept
 {
     static Keylet const ret { ltLEDGER_HASHES,
-        indexHash(LedgerNameSpace::spaceSkipList) };
+        indexHash(LedgerNameSpace::SKIP_LIST) };
     return ret;
 }
 
 Keylet skip(LedgerIndex ledger) noexcept
 {
     return { ltLEDGER_HASHES,
-        indexHash(LedgerNameSpace::spaceSkipList,
+        indexHash(LedgerNameSpace::SKIP_LIST,
             std::uint32_t(static_cast<std::uint32_t>(ledger) >> 16)) };
 }
 
 Keylet const& amendments() noexcept
 {
     static Keylet const ret { ltAMENDMENTS,
-        indexHash(LedgerNameSpace::spaceAmendment) };
+        indexHash(LedgerNameSpace::AMENDMENTS) };
     return ret;
 }
 
 Keylet const& fees() noexcept
 {
     static Keylet const ret { ltFEE_SETTINGS,
-        indexHash(LedgerNameSpace::spaceFee) };
+        indexHash(LedgerNameSpace::FEE_SETTINGS) };
     return ret;
 }
 
@@ -167,7 +208,7 @@ Keylet line(
     auto const accounts = std::minmax(id0, id1);
 
     return { ltRIPPLE_STATE,
-        indexHash(LedgerNameSpace::spaceRipple,
+        indexHash(LedgerNameSpace::TRUST_LINE,
             accounts.first, accounts.second, currency) };
 }
 
@@ -176,7 +217,7 @@ Keylet offer(
     std::uint32_t seq) noexcept
 {
     return { ltOFFER,
-        indexHash(LedgerNameSpace::spaceOffer, id, seq) };
+        indexHash(LedgerNameSpace::OFFER, id, seq) };
 }
 
 Keylet quality_t::operator()(Keylet const& k,
@@ -210,7 +251,7 @@ Keylet signers(
     std::uint32_t page) noexcept
 {
     return { ltSIGNER_LIST,
-        indexHash(LedgerNameSpace::spaceSignerList, account, page) };
+        indexHash(LedgerNameSpace::SIGNER_LIST, account, page) };
 }
 
 Keylet signers(
@@ -243,7 +284,7 @@ Keylet unchecked (uint256 const& key) noexcept
 Keylet ownerDir(AccountID const& id) noexcept
 {
     return { ltDIR_NODE,
-        indexHash(LedgerNameSpace::spaceOwnerDir, id) };
+        indexHash(LedgerNameSpace::OWNER_DIR, id) };
 }
 
 Keylet page(
@@ -254,21 +295,21 @@ Keylet page(
         return { ltDIR_NODE, key };
 
     return { ltDIR_NODE,
-        indexHash(LedgerNameSpace::spaceDirNode, key, index) };
+        indexHash(LedgerNameSpace::DIR_NODE, key, index) };
 }
 
 Keylet
 escrow(AccountID const& src, std::uint32_t seq) noexcept
 {
     return { ltESCROW,
-        indexHash(LedgerNameSpace::spaceEscrow, src, seq) };
+        indexHash(LedgerNameSpace::ESCROW, src, seq) };
 }
 
 Keylet
 payChan(AccountID const& src, AccountID const& dst, std::uint32_t seq) noexcept
 {
     return { ltPAYCHAN,
-        indexHash(LedgerNameSpace::spaceXRPUChannel, src, dst, seq) };
+        indexHash(LedgerNameSpace::XRP_PAYMENT_CHANNEL, src, dst, seq) };
 }
 
 } // keylet
