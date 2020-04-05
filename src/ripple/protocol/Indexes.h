@@ -163,19 +163,17 @@ Keylet signers(
     AccountID const& account) noexcept;
 
 /** A Check */
-struct check_t
+/** @{ */
+Keylet check(
+    AccountID const& id,
+    std::uint32_t seq) noexcept;
+
+inline
+Keylet check(uint256 const& key) noexcept
 {
-    explicit check_t() = default;
-
-    Keylet operator()(AccountID const& id,
-        std::uint32_t seq) const;
-
-    Keylet operator()(uint256 const& key) const
-    {
-        return { ltCHECK, key };
-    }
-};
-static check_t const check {};
+    return { ltCHECK, key };
+}
+/** @} */
 
 /** A DepositPreauth */
 /** @{ */
@@ -241,9 +239,6 @@ getQuality (uint256 const& uBase);
 
 uint256
 getTicketIndex (AccountID const& account, std::uint32_t uSequence);
-
-uint256
-getCheckIndex (AccountID const& account, std::uint32_t uSequence);
 
 }
 

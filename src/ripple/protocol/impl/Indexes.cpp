@@ -124,13 +124,6 @@ getTicketIndex (AccountID const& account, std::uint32_t uSequence)
         account, std::uint32_t(uSequence));
 }
 
-uint256
-getCheckIndex (AccountID const& account, std::uint32_t uSequence)
-{
-    return indexHash(LedgerNameSpace::CHECK,
-        account, std::uint32_t(uSequence));
-}
-
 //------------------------------------------------------------------------------
 
 namespace keylet {
@@ -253,11 +246,12 @@ Keylet signers(
     return signers (account, 0);
 }
 
-Keylet check_t::operator()(AccountID const& id,
-    std::uint32_t seq) const
+Keylet check(
+    AccountID const& id,
+    std::uint32_t seq) noexcept
 {
     return { ltCHECK,
-        getCheckIndex(id, seq) };
+        indexHash(LedgerNameSpace::CHECK, id, seq) };
 }
 
 Keylet depositPreauth(
