@@ -763,14 +763,11 @@ int main (int argc, char** argv)
             _ftime (&t);
     #endif
     }
-    ripple::sha512_deprecatedMSVCWorkaround();
 #endif
 
     atexit(&google::protobuf::ShutdownProtobufLibrary);
 
     auto const result (ripple::run (argc, argv));
-
-    beast::basic_seconds_clock_main_hook();
 
     return result;
 }

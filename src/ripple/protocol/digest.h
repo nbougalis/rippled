@@ -250,18 +250,6 @@ using sha512_half_hasher_s =
 
 //------------------------------------------------------------------------------
 
-#ifdef _MSC_VER
-// Call from main to fix magic statics pre-VS2015
-inline
-void
-sha512_deprecatedMSVCWorkaround()
-{
-    beast::sha512_hasher h;
-    auto const digest = static_cast<
-        beast::sha512_hasher::result_type>(h);
-}
-#endif
-
 /** Returns the SHA512-Half of a series of objects. */
 template <class... Args>
 sha512_half_hasher::result_type
