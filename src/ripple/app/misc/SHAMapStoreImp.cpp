@@ -322,7 +322,7 @@ void
 SHAMapStoreImp::run()
 {
     beast::setCurrentThreadName ("SHAMapStore");
-    lastRotated_ = state_db_.getState().lastRotated;
+    LedgerIndex lastRotated = state_db_.getState().lastRotated;
     netOPs_ = &app_.getOPs();
     ledgerMaster_ = &app_.getLedgerMaster();
     fullBelowCache_ = &app_.family().fullbelow();
@@ -331,7 +331,20 @@ SHAMapStoreImp::run()
     ledgerDb_ = &app_.getLedgerDB();
 
     if (advisoryDelete_)
-        canDelete_ = state_db_.getCanDelete ();
+    {
+        canDelete_ = state_db_.getCanDelete();
+        // On startup, don't acquire ledgers from the network that
+        // can be deleted.
+        minimumOnline_ = canDelete_.load() + 1;
+    }
+    else
+    {
+        // On startup, don't acquire ledgers from the network older than
+        // the earliest persisted, if any.
+        auto const minSql = app_.getLedgerMaster().minSqlSeq();
+        if (minSql.has_value())
+            minimumOnline_ = *minSql;
+    }
 
     while (true)
     {
@@ -357,18 +370,18 @@ SHAMapStoreImp::run()
         }
 
         LedgerIndex const validatedSeq = validatedLedger->info().seq;
-        if (!lastRotated_)
+        if (!lastRotated)
         {
-            lastRotated_ = validatedSeq;
-            state_db_.setLastRotated (lastRotated_);
+            lastRotated = validatedSeq;
+            state_db_.setLastRotated (lastRotated);
         }
 
-        // will delete up to (not including) lastRotated_
-        if (validatedSeq >= lastRotated_ + deleteInterval_
-                && canDelete_ >= lastRotated_ - 1)
+        // will delete up to (not including) lastRotated
+        if (validatedSeq >= lastRotated + deleteInterval_
+                && canDelete_ >= lastRotated - 1)
         {
             JLOG(journal_.warn()) << "rotating  validatedSeq " << validatedSeq
-                << " lastRotated_ " << lastRotated_ << " deleteInterval "
+                << " lastRotated " << lastRotated << " deleteInterval "
                 << deleteInterval_ << " canDelete_ " << canDelete_;
 
             switch (health())
@@ -383,7 +396,7 @@ SHAMapStoreImp::run()
                     ;
             }
 
-            clearPrior (lastRotated_);
+            clearPrior (lastRotated);
             switch (health())
             {
                 case Health::stopping:
@@ -448,13 +461,13 @@ SHAMapStoreImp::run()
 
             std::string nextArchiveDir =
                 dbRotating_->getWritableBackend()->getName();
-            lastRotated_ = validatedSeq;
+            lastRotated = validatedSeq;
             std::shared_ptr<NodeStore::Backend> oldBackend;
             {
                 std::lock_guard lock (dbRotating_->peekMutex());
 
                 state_db_.setState (SavedState {newBackend->getName(),
-                                                nextArchiveDir, lastRotated_});
+                                                nextArchiveDir, lastRotated});
                 clearCaches (validatedSeq);
                 oldBackend = dbRotating_->rotateBackends(
                     std::move(newBackend),
@@ -598,7 +611,7 @@ SHAMapStoreImp::clearSql (DatabaseCon& database,
         min = *m;
     }
 
-    if(min > lastRotated || health() != Health::ok)
+    if (min > lastRotated || health() != Health::ok)
         return false;
 
     boost::format formattedDeleteQuery (deleteQuery);
@@ -646,6 +659,9 @@ SHAMapStoreImp::clearPrior (LedgerIndex lastRotated)
     if (health())
         return;
 
+    // Do not allow ledgers to be acquired from the network
+    // that are about to be deleted.
+    minimumOnline_ = lastRotated + 1;
     ledgerMaster_->clearPriorLedgers (lastRotated);
     if (health())
         return;

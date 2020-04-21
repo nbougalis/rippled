@@ -24,6 +24,8 @@
 #include <ripple/nodestore/Manager.h>
 #include <ripple/protocol/ErrorCodes.h>
 #include <ripple/core/Stoppable.h>
+#include <atomic>
+#include <optional>
 
 namespace ripple {
 
@@ -66,6 +68,10 @@ public:
 
     /** Returns the number of file descriptors that are needed. */
     virtual int fdRequired() const = 0;
+
+    /** If online deletion is enabled, return the minimum ledger
+     * to keep. */
+    virtual std::optional<LedgerIndex> const minimumOnline() const = 0;
 };
 
 //------------------------------------------------------------------------------

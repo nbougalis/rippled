@@ -255,6 +255,10 @@ public:
         return !mValidLedger.empty();
     }
 
+    // Returns the minimum ledger sequence in SQL database, if any.
+    boost::optional<LedgerIndex> minSqlSeq();
+
+
 private:
     void setValidLedger(
         std::shared_ptr<Ledger const> const& l);
