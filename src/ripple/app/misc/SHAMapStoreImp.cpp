@@ -333,13 +333,15 @@ SHAMapStoreImp::run()
     if (advisoryDelete_)
     {
         canDelete_ = state_db_.getCanDelete();
-        // On startup, don't acquire ledgers from the network that
+
+        // On startup, don't acquire ledgers from the network that we know
         // can be deleted.
-        minimumOnline_ = canDelete_.load() + 1;
+        if (state_db_.getState().lastRotated)
+            minimumOnline_ = canDelete_.load() + 1;
     }
-    else
+    if (!minimumOnline_)
     {
-        // On startup, don't acquire ledgers from the network older than
+        // Or else don't acquire ledgers from the network older than
         // the earliest persisted, if any.
         auto const minSql = app_.getLedgerMaster().minSqlSeq();
         if (minSql.has_value())
@@ -745,6 +747,14 @@ SHAMapStoreImp::onChildrenStopped()
     {
         stopped();
     }
+}
+
+boost::optional<LedgerIndex>
+SHAMapStoreImp::minimumOnline() const
+{
+    if (deleteInterval_)
+        return minimumOnline_.load();
+    return app_.getLedgerMaster().minSqlSeq();
 }
 
 //------------------------------------------------------------------------------

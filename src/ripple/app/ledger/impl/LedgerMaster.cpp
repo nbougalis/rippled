@@ -149,8 +149,7 @@ static bool
 shouldAcquire (
     std::uint32_t const currentLedger,
     std::uint32_t const ledgerHistory,
-    boost::optional<LedgerIndex> minSeq,
-    std::optional<LedgerIndex> const minimumOnline,
+    boost::optional<LedgerIndex> const minimumOnline,
     std::uint32_t const candidateLedger,
     beast::Journal j)
 {
@@ -164,13 +163,8 @@ shouldAcquire (
         if (currentLedger - candidateLedger <= ledgerHistory)
             return true;
 
-        // Or if online deletion is enabled, whether greater than or equal to
-        // the minimum ledger to keep online.
-        if (minimumOnline.has_value())
-            return candidateLedger >= *minimumOnline;
-
-        // Or greater than or equal to the minimum ledger in SQLite, if any.
-        return minSeq.has_value() && candidateLedger >= *minSeq;
+        // Or if greater than or equal to a specific minimum ledger.
+        return minimumOnline.has_value() && candidateLedger >= *minimumOnline;
     }();
 
     JLOG (j.trace())
@@ -1891,7 +1885,6 @@ void LedgerMaster::doAdvance (std::unique_lock<std::recursive_mutex>& sl)
                         "tryAdvance discovered missing " << *missing;
                     if ((mFillInProgress == 0 || *missing > mFillInProgress) &&
                         shouldAcquire(mValidLedgerSeq, ledger_history_,
-                            minSqlSeq(),
                             app_.getSHAMapStore().minimumOnline(), *missing,
                             m_journal))
                     {

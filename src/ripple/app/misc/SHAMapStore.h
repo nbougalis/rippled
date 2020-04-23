@@ -24,8 +24,8 @@
 #include <ripple/nodestore/Manager.h>
 #include <ripple/protocol/ErrorCodes.h>
 #include <ripple/core/Stoppable.h>
+#include <boost/optional.hpp>
 #include <atomic>
-#include <optional>
 
 namespace ripple {
 
@@ -70,8 +70,38 @@ public:
     virtual int fdRequired() const = 0;
 
     /** If online deletion is enabled, return the minimum ledger
-     * to keep. */
-    virtual std::optional<LedgerIndex> const minimumOnline() const = 0;
+     * to keep online, which is the lower bound for attempting to acquire
+     * historical ledgers over the peer to peer network.
+     * If online_delete is not enabled, then the minimum value to
+     * keep online is the minimum ledger that has been persisted already.
+     *
+     * With online_delete,this value is governed by the
+     * following circumstances:
+     *
+     * Upon process startup:
+     *
+     * With advisory_delete enabled and online_delete having been executed
+     * previously:
+     * Upon process startup, this value is set to one past the value
+     * that is allowed to be deleted. In other words, anything greater
+     * than what can be deleted should be acquired from the network and
+     * then retained. If nothing has yet been deleted, then do not
+     * rely upon the value of what is allowed to be deleted because it
+     * could cause fetching of more history than configured by
+     * ledger_history.
+     *
+     * Without advisory_delete or if online_delete has never executed:
+     * Upon process startup, this value is set to the earliest ledger
+     * that has been persisted in SQLite.
+     *
+     * Each time online_delete executes:
+     *
+     * Just prior to clearing SQL databases of historical ledgers, move
+     * the value forward to one past the greatest ledger being deleted.
+     * This minimizes fetching of ledgers that are in the process of being
+     * deleted.
+     */
+    virtual boost::optional<LedgerIndex> minimumOnline() const = 0;
 };
 
 //------------------------------------------------------------------------------

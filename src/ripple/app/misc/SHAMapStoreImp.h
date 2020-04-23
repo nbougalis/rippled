@@ -176,13 +176,7 @@ public:
     void rendezvous() const override;
     int fdRequired() const override;
 
-    std::optional<LedgerIndex> const
-    minimumOnline() const override
-    {
-        if (deleteInterval_)
-            return minimumOnline_;
-        return {};
-    }
+    boost::optional<LedgerIndex> minimumOnline() const override;
 
 private:
     // callback for visitNodes
