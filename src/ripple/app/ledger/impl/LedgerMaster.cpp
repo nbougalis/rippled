@@ -164,7 +164,8 @@ shouldAcquire (
             return true;
 
         // Or if greater than or equal to a specific minimum ledger.
-        return minimumOnline.has_value() && candidateLedger >= *minimumOnline;
+      return candidateLedger >=
+             minimumOnline.value_or(std::numeric_limits<LedgerIndex>::max());
     }();
 
     JLOG (j.trace())
