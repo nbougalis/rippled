@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.17"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>rippled: Sustain.h Source File</title>
+<title>rippled: secure_erase.cpp Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -61,18 +61,18 @@ $(function() {
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_df9c78dcf3f59a33b12284f95992a64b.html">ripple</a></li><li class="navelem"><a class="el" href="dir_5f536ab1985a8dcd28bcfd618bc58e92.html">basics</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_df9c78dcf3f59a33b12284f95992a64b.html">ripple</a></li><li class="navelem"><a class="el" href="dir_d5da7ddd3d406e00ccd5e9ec8a805734.html">crypto</a></li><li class="navelem"><a class="el" href="dir_e0372dc464190647d9bdbe8304e20257.html">impl</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="headertitle">
-<div class="title">Sustain.h</div>  </div>
+<div class="title">secure_erase.cpp</div>  </div>
 </div><!--header-->
 <div class="contents">
 <div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;<span class="comment">//------------------------------------------------------------------------------</span></div>
 <div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;<span class="comment">/*</span></div>
 <div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160;<span class="comment">    This file is part of rippled: https://github.com/ripple/rippled</span></div>
-<div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;<span class="comment">    Copyright (c) 2012, 2013 Ripple Labs Inc.</span></div>
+<div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;<span class="comment">    Copyright (c) 2020 Ripple Labs Inc.</span></div>
 <div class="line"><a name="l00005"></a><span class="lineno">    5</span>&#160;<span class="comment"></span> </div>
 <div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160;<span class="comment">    Permission to use, copy, modify, and/or distribute this software for any</span></div>
 <div class="line"><a name="l00007"></a><span class="lineno">    7</span>&#160;<span class="comment">    purpose  with  or without fee is hereby granted, provided that the above</span></div>
@@ -88,29 +88,22 @@ $(function() {
 <div class="line"><a name="l00017"></a><span class="lineno">   17</span>&#160;<span class="comment">*/</span></div>
 <div class="line"><a name="l00018"></a><span class="lineno">   18</span>&#160;<span class="comment">//==============================================================================</span></div>
 <div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160; </div>
-<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;<span class="preprocessor">#ifndef RIPPLE_BASICS_SUSTAIN_H_INCLUDED</span></div>
-<div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160;<span class="preprocessor">#define RIPPLE_BASICS_SUSTAIN_H_INCLUDED</span></div>
+<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;<span class="preprocessor">#include &lt;ripple/crypto/secure_erase.h&gt;</span></div>
+<div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160;<span class="preprocessor">#include &lt;openssl/crypto.h&gt;</span></div>
 <div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160; </div>
-<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;<span class="preprocessor">#include &lt;<a class="codeRef" href="http://en.cppreference.com/w/cpp/header/string.html">string</a>&gt;</span></div>
+<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;<span class="keyword">namespace </span><a class="code" href="namespaceripple.html">ripple</a> {</div>
 <div class="line"><a name="l00024"></a><span class="lineno">   24</span>&#160; </div>
-<div class="line"><a name="l00025"></a><span class="lineno">   25</span>&#160;<span class="keyword">namespace </span><a class="code" href="namespaceripple.html">ripple</a> {</div>
-<div class="line"><a name="l00026"></a><span class="lineno">   26</span>&#160; </div>
-<div class="line"><a name="l00027"></a><span class="lineno">   27</span>&#160;<span class="comment">// &quot;Sustain&quot; is a system for a buddy process that monitors the main process</span></div>
-<div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160;<span class="comment">// and relaunches it on a fault.</span></div>
-<div class="line"><a name="l00029"></a><span class="lineno">   29</span>&#160;<span class="keywordtype">bool</span> <a class="code" href="namespaceripple.html#ad96d0727b6a7b3e35205d7e5dec0f772">HaveSustain</a> ();</div>
-<div class="line"><a name="l00030"></a><span class="lineno">   30</span>&#160;<a class="codeRef" href="http://en.cppreference.com/w/cpp/string/basic_string.html">std::string</a> <a class="code" href="namespaceripple.html#afe8f9eb98fca56ba0fa3d9c0c7c18b68">StopSustain</a> ();</div>
-<div class="line"><a name="l00031"></a><span class="lineno">   31</span>&#160;<a class="codeRef" href="http://en.cppreference.com/w/cpp/string/basic_string.html">std::string</a> <a class="code" href="namespaceripple.html#a567da61c53fecbdab6995e7991fdf7eb">DoSustain</a> ();</div>
-<div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160; </div>
-<div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160;} <span class="comment">// ripple</span></div>
-<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160; </div>
-<div class="line"><a name="l00035"></a><span class="lineno">   35</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00025"></a><span class="lineno">   25</span>&#160;<span class="keywordtype">void</span></div>
+<div class="line"><a name="l00026"></a><span class="lineno"><a class="line" href="namespaceripple.html#afce562bec88f81bc110dbdc1794eadcd">   26</a></span>&#160;<a class="code" href="namespaceripple.html#afce562bec88f81bc110dbdc1794eadcd">secure_erase</a>(<span class="keywordtype">void</span>* dest, <a class="codeRef" href="http://en.cppreference.com/w/cpp/types/size_t.html">std::size_t</a> bytes)</div>
+<div class="line"><a name="l00027"></a><span class="lineno">   27</span>&#160;{</div>
+<div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160;    OPENSSL_cleanse(dest, bytes);</div>
+<div class="line"><a name="l00029"></a><span class="lineno">   29</span>&#160;}</div>
+<div class="line"><a name="l00030"></a><span class="lineno">   30</span>&#160; </div>
+<div class="line"><a name="l00031"></a><span class="lineno">   31</span>&#160;}  <span class="comment">// namespace ripple</span></div>
 </div><!-- fragment --></div><!-- contents -->
-<div class="ttc" id="abasic_string_html"><div class="ttname"><a href="http://en.cppreference.com/w/cpp/string/basic_string.html">std::string</a></div><div class="ttdoc">STL class.</div></div>
-<div class="ttc" id="anamespaceripple_html_ad96d0727b6a7b3e35205d7e5dec0f772"><div class="ttname"><a href="namespaceripple.html#ad96d0727b6a7b3e35205d7e5dec0f772">ripple::HaveSustain</a></div><div class="ttdeci">bool HaveSustain()</div><div class="ttdef"><b>Definition:</b> <a href="Sustain_8cpp_source.html#l00141">Sustain.cpp:141</a></div></div>
 <div class="ttc" id="anamespaceripple_html"><div class="ttname"><a href="namespaceripple.html">ripple</a></div><div class="ttdoc">Use hash_* containers for keys that do not need a cryptographically secure hashing algorithm.</div><div class="ttdef"><b>Definition:</b> <a href="RCLCensorshipDetector_8h_source.html#l00029">RCLCensorshipDetector.h:29</a></div></div>
-<div class="ttc" id="anamespaceripple_html_afe8f9eb98fca56ba0fa3d9c0c7c18b68"><div class="ttname"><a href="namespaceripple.html#afe8f9eb98fca56ba0fa3d9c0c7c18b68">ripple::StopSustain</a></div><div class="ttdeci">std::string StopSustain()</div><div class="ttdef"><b>Definition:</b> <a href="Sustain_8cpp_source.html#l00151">Sustain.cpp:151</a></div></div>
-<div class="ttc" id="anamespaceripple_html_a567da61c53fecbdab6995e7991fdf7eb"><div class="ttname"><a href="namespaceripple.html#a567da61c53fecbdab6995e7991fdf7eb">ripple::DoSustain</a></div><div class="ttdeci">std::string DoSustain()</div><div class="ttdef"><b>Definition:</b> <a href="Sustain_8cpp_source.html#l00146">Sustain.cpp:146</a></div></div>
-<div class="ttc" id="astring_html"><div class="ttname"><a href="http://en.cppreference.com/w/cpp/header/string.html">string</a></div></div>
+<div class="ttc" id="asize_t_html"><div class="ttname"><a href="http://en.cppreference.com/w/cpp/types/size_t.html">std::size_t</a></div></div>
+<div class="ttc" id="anamespaceripple_html_afce562bec88f81bc110dbdc1794eadcd"><div class="ttname"><a href="namespaceripple.html#afce562bec88f81bc110dbdc1794eadcd">ripple::secure_erase</a></div><div class="ttdeci">void secure_erase(void *dest, std::size_t bytes)</div><div class="ttdoc">Attempts to clear the given blob of memory.</div><div class="ttdef"><b>Definition:</b> <a href="secure__erase_8cpp_source.html#l00026">secure_erase.cpp:26</a></div></div>
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
 Generated by &#160;<a href="http://www.doxygen.org/index.html">
