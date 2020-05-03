@@ -138,6 +138,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a90ce3f79e011586bc87d6fdcb4cf9a0e"><td class="memItemLeft" align="right" valign="top">virtual int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1SHAMapStore.html#a90ce3f79e011586bc87d6fdcb4cf9a0e">fdRequired</a> () const =0</td></tr>
 <tr class="memdesc:a90ce3f79e011586bc87d6fdcb4cf9a0e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns the number of file descriptors that are needed.  <a href="classripple_1_1SHAMapStore.html#a90ce3f79e011586bc87d6fdcb4cf9a0e">More...</a><br /></td></tr>
 <tr class="separator:a90ce3f79e011586bc87d6fdcb4cf9a0e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a05bec537a1aea25f251635dafc755900"><td class="memItemLeft" align="right" valign="top">virtual boost::optional&lt; <a class="el" href="namespaceripple.html#a12af8e98b794e8ee3b4dbecaed2a4efd">LedgerIndex</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1SHAMapStore.html#a05bec537a1aea25f251635dafc755900">minimumOnline</a> () const =0</td></tr>
+<tr class="memdesc:a05bec537a1aea25f251635dafc755900"><td class="mdescLeft">&#160;</td><td class="mdescRight">The minimum ledger to try and maintain in our database.  <a href="classripple_1_1SHAMapStore.html#a05bec537a1aea25f251635dafc755900">More...</a><br /></td></tr>
+<tr class="separator:a05bec537a1aea25f251635dafc755900"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae9b6cb02b4e1128bd2c4e1a81c9d695c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classripple_1_1RootStoppable.html">RootStoppable</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1Stoppable.html#ae9b6cb02b4e1128bd2c4e1a81c9d695c">getRoot</a> ()</td></tr>
 <tr class="separator:ae9b6cb02b4e1128bd2c4e1a81c9d695c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adea135697761febf430a8628814c7902"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1Stoppable.html#adea135697761febf430a8628814c7902">setParent</a> (<a class="el" href="classripple_1_1Stoppable.html">Stoppable</a> &amp;parent)</td></tr>
@@ -218,7 +221,7 @@ Private Attributes</h2></td></tr>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>class to create database, launch online delete thread, and related SQLite database </p>
 
-<p class="definition">Definition at line <a class="el" href="SHAMapStore_8h_source.html#l00036">36</a> of file <a class="el" href="SHAMapStore_8h_source.html">SHAMapStore.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="SHAMapStore_8h_source.html#l00037">37</a> of file <a class="el" href="SHAMapStore_8h_source.html">SHAMapStore.h</a>.</p>
 </div><h2 class="groupheader">Member Typedef Documentation</h2>
 <a id="a43594a8835ccb53d7b80983694d26cad"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a43594a8835ccb53d7b80983694d26cad">&#9670;&nbsp;</a></span>Children</h2>
@@ -261,7 +264,7 @@ Private Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="SHAMapStore_8h_source.html#l00039">39</a> of file <a class="el" href="SHAMapStore_8h_source.html">SHAMapStore.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="SHAMapStore_8h_source.html#l00040">40</a> of file <a class="el" href="SHAMapStore_8h_source.html">SHAMapStore.h</a>.</p>
 
 </div>
 </div>
@@ -532,6 +535,43 @@ Private Attributes</h2></td></tr>
 <p>Returns the number of file descriptors that are needed. </p>
 
 <p>Implemented in <a class="el" href="classripple_1_1SHAMapStoreImp.html#ac502b9f3e8822e3111bce648c7375d32">ripple::SHAMapStoreImp</a>.</p>
+
+</div>
+</div>
+<a id="a05bec537a1aea25f251635dafc755900"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a05bec537a1aea25f251635dafc755900">&#9670;&nbsp;</a></span>minimumOnline()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">virtual boost::optional&lt;<a class="el" href="namespaceripple.html#a12af8e98b794e8ee3b4dbecaed2a4efd">LedgerIndex</a>&gt; ripple::SHAMapStore::minimumOnline </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>The minimum ledger to try and maintain in our database. </p>
+<p>This defines the lower bound for attempting to acquire historical ledgers over the peer to peer network.</p>
+<p>With online_delete,this value is governed by the following circumstances:</p>
+<ul>
+<li>With advisory_delete enabled and online_delete having been executed previously, this value is set to one past the value that is allowed to be deleted. In other words, anything greater than what can be deleted should be acquired from the network and then retained. If nothing has yet been deleted, then do not rely upon the value of what is allowed to be deleted because it could cause fetching of more history than configured by ledger_history.</li>
+<li>Without advisory_delete or if online_delete has never executed, this value is set to the earliest ledger that has been persisted in the SQL database.</li>
+</ul>
+<p>Each time online_delete executes, just prior to clearing SQL databases of historical ledgers, move the value forward to one past the greatest ledger being deleted. This minimizes fetching of ledgers that are in the process of being deleted.</p>
+<dl class="section return"><dt>Returns</dt><dd>If online deletion is enabled and if it has been executed, the minimum ledger to keep available; an unseated optional otherwise. </dd></dl>
+
+<p>Implemented in <a class="el" href="classripple_1_1SHAMapStoreImp.html#a6a83852c52d91ffb7fe55092d7b07bce">ripple::SHAMapStoreImp</a>.</p>
 
 </div>
 </div>
