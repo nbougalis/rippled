@@ -426,9 +426,6 @@ Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1Generator.html">Generator</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Produces a sequence of secp256k1 key pairs.  <a href="classripple_1_1Generator.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structripple_1_1get__peer__json.html">get_peer_json</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A functor to visit all active peers and retrieve their JSON data.  <a href="structripple_1_1get__peer__json.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1GetCounts__test.html">GetCounts_test</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1GRPCServer.html">GRPCServer</a></td></tr>
@@ -821,10 +818,6 @@ Classes</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1Sandbox.html">Sandbox</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Discardable, editable view to a ledger.  <a href="classripple_1_1Sandbox.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structripple_1_1ScoreHasLedger.html">ScoreHasLedger</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structripple_1_1ScoreHasTxSet.html">ScoreHasTxSet</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1SecretKey.html">SecretKey</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A secret key.  <a href="classripple_1_1SecretKey.html#details">More...</a><br /></td></tr>
@@ -2140,10 +2133,16 @@ Functions</h2></td></tr>
 <tr class="memitem:a18d8dde90d603d1c67c2aa616950dbd9"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/types/size_t.html">std::size_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceripple.html#a18d8dde90d603d1c67c2aa616950dbd9">applyTransactions</a> (<a class="el" href="classripple_1_1Application.html">Application</a> &amp;app, <a class="elRef" href="http://en.cppreference.com/w/cpp/memory/shared_ptr.html">std::shared_ptr</a>&lt; <a class="el" href="classripple_1_1Ledger.html">Ledger</a> const &gt; const &amp;built, <a class="el" href="classripple_1_1CanonicalTXSet.html">CanonicalTXSet</a> &amp;txns, <a class="elRef" href="http://en.cppreference.com/w/cpp/container/set.html">std::set</a>&lt; <a class="el" href="namespaceripple.html#a3f39560bfd60c64700b109c412e90f72">TxID</a> &gt; &amp;failed, <a class="el" href="classripple_1_1OpenView.html">OpenView</a> &amp;view, <a class="el" href="classbeast_1_1Journal.html">beast::Journal</a> j)</td></tr>
 <tr class="memdesc:a18d8dde90d603d1c67c2aa616950dbd9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Apply a set of consensus transactions to a ledger.  <a href="namespaceripple.html#a18d8dde90d603d1c67c2aa616950dbd9">More...</a><br /></td></tr>
 <tr class="separator:a18d8dde90d603d1c67c2aa616950dbd9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afeee0ebe7f71555ed01b34dbcfb0c7cd"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structripple_1_1LedgerInfo.html">LedgerInfo</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceripple.html#afeee0ebe7f71555ed01b34dbcfb0c7cd">deserializeHeader</a> (<a class="el" href="classripple_1_1Slice.html">Slice</a> data)</td></tr>
+<tr class="memdesc:afeee0ebe7f71555ed01b34dbcfb0c7cd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Deserialize a ledger header from a byte array.  <a href="namespaceripple.html#afeee0ebe7f71555ed01b34dbcfb0c7cd">More...</a><br /></td></tr>
+<tr class="separator:afeee0ebe7f71555ed01b34dbcfb0c7cd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6852360c60203e3ad674250c949b6b64"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structripple_1_1LedgerInfo.html">LedgerInfo</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceripple.html#a6852360c60203e3ad674250c949b6b64">deserializePrefixedHeader</a> (<a class="el" href="classripple_1_1Slice.html">Slice</a> data)</td></tr>
+<tr class="memdesc:a6852360c60203e3ad674250c949b6b64"><td class="mdescLeft">&#160;</td><td class="mdescRight">Deserialize a ledger header (prefixed with 4 bytes) from a byte array.  <a href="namespaceripple.html#a6852360c60203e3ad674250c949b6b64">More...</a><br /></td></tr>
+<tr class="separator:a6852360c60203e3ad674250c949b6b64"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af6550c765f1787e0c238e1c34e5d3836"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/memory/unique_ptr.html">std::unique_ptr</a>&lt; <a class="el" href="classripple_1_1InboundLedgers.html">InboundLedgers</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceripple.html#af6550c765f1787e0c238e1c34e5d3836">make_InboundLedgers</a> (<a class="el" href="classripple_1_1Application.html">Application</a> &amp;app, <a class="el" href="classripple_1_1InboundLedgers.html#a0b264439abc0967cb47ebd106c0d62f6">InboundLedgers::clock_type</a> &amp;clock, <a class="el" href="classripple_1_1Stoppable.html">Stoppable</a> &amp;parent, <a class="el" href="classbeast_1_1insight_1_1Collector.html#ad1677ecd39a09b6a8bb8f2e073266bc4">beast::insight::Collector::ptr</a> const &amp;collector)</td></tr>
 <tr class="separator:af6550c765f1787e0c238e1c34e5d3836"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a97e038e03a328e365f134768009fae11"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/memory/unique_ptr.html">std::unique_ptr</a>&lt; <a class="el" href="classripple_1_1InboundTransactions.html">InboundTransactions</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceripple.html#a97e038e03a328e365f134768009fae11">make_InboundTransactions</a> (<a class="el" href="classripple_1_1Application.html">Application</a> &amp;app, <a class="el" href="classripple_1_1InboundLedgers.html#a0b264439abc0967cb47ebd106c0d62f6">InboundLedgers::clock_type</a> &amp;clock, <a class="el" href="classripple_1_1Stoppable.html">Stoppable</a> &amp;parent, <a class="el" href="classbeast_1_1insight_1_1Collector.html#ad1677ecd39a09b6a8bb8f2e073266bc4">beast::insight::Collector::ptr</a> const &amp;collector, <a class="elRef" href="http://en.cppreference.com/w/cpp/utility/functional/function.html">std::function</a>&lt; void(<a class="elRef" href="http://en.cppreference.com/w/cpp/memory/shared_ptr.html">std::shared_ptr</a>&lt; <a class="el" href="classripple_1_1SHAMap.html">SHAMap</a> &gt; const &amp;, bool)&gt; gotSet)</td></tr>
-<tr class="separator:a97e038e03a328e365f134768009fae11"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a290d712d85ae7ad9fe05a68c81faaf9a"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/memory/unique_ptr.html">std::unique_ptr</a>&lt; <a class="el" href="classripple_1_1InboundTransactions.html">InboundTransactions</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceripple.html#a290d712d85ae7ad9fe05a68c81faaf9a">make_InboundTransactions</a> (<a class="el" href="classripple_1_1Application.html">Application</a> &amp;app, <a class="el" href="classripple_1_1Stoppable.html">Stoppable</a> &amp;parent, <a class="el" href="classbeast_1_1insight_1_1Collector.html#ad1677ecd39a09b6a8bb8f2e073266bc4">beast::insight::Collector::ptr</a> const &amp;collector, <a class="elRef" href="http://en.cppreference.com/w/cpp/utility/functional/function.html">std::function</a>&lt; void(<a class="elRef" href="http://en.cppreference.com/w/cpp/memory/shared_ptr.html">std::shared_ptr</a>&lt; <a class="el" href="classripple_1_1SHAMap.html">SHAMap</a> &gt; const &amp;, bool)&gt; gotSet)</td></tr>
+<tr class="separator:a290d712d85ae7ad9fe05a68c81faaf9a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0c461888c7fa73767ba90dda65be47fd"><td class="memItemLeft" align="right" valign="top">static boost::optional&lt; <a class="el" href="namespaceripple.html#a12af8e98b794e8ee3b4dbecaed2a4efd">LedgerIndex</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceripple.html#a0c461888c7fa73767ba90dda65be47fd">minSqlSeq</a> (<a class="el" href="classripple_1_1Application.html">Application</a> &amp;app)</td></tr>
 <tr class="separator:a0c461888c7fa73767ba90dda65be47fd"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6b4e4ed181fcd5f9e2d920d039d1606d"><td class="memItemLeft" align="right" valign="top">static bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceripple.html#a6b4e4ed181fcd5f9e2d920d039d1606d">shouldAcquire</a> (<a class="elRef" href="http://en.cppreference.com/w/cpp/types/integer.html">std::uint32_t</a> const currentLedger, <a class="elRef" href="http://en.cppreference.com/w/cpp/types/integer.html">std::uint32_t</a> const ledgerHistory, boost::optional&lt; <a class="el" href="namespaceripple.html#a12af8e98b794e8ee3b4dbecaed2a4efd">LedgerIndex</a> &gt; minSeq, <a class="elRef" href="http://en.cppreference.com/w/cpp/types/integer.html">std::uint32_t</a> const lastRotated, <a class="elRef" href="http://en.cppreference.com/w/cpp/types/integer.html">std::uint32_t</a> const candidateLedger, <a class="el" href="classbeast_1_1Journal.html">beast::Journal</a> j)</td></tr>
@@ -8223,6 +8222,50 @@ template&lt;class ApplyTxs &gt; </div>
 
 </div>
 </div>
+<a id="afeee0ebe7f71555ed01b34dbcfb0c7cd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afeee0ebe7f71555ed01b34dbcfb0c7cd">&#9670;&nbsp;</a></span>deserializeHeader()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structripple_1_1LedgerInfo.html">LedgerInfo</a> ripple::deserializeHeader </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="classripple_1_1Slice.html">Slice</a>&#160;</td>
+          <td class="paramname"><em>data</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Deserialize a ledger header from a byte array. </p>
+
+<p class="definition">Definition at line <a class="el" href="InboundLedger_8cpp_source.html#l00267">267</a> of file <a class="el" href="InboundLedger_8cpp_source.html">InboundLedger.cpp</a>.</p>
+
+</div>
+</div>
+<a id="a6852360c60203e3ad674250c949b6b64"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6852360c60203e3ad674250c949b6b64">&#9670;&nbsp;</a></span>deserializePrefixedHeader()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structripple_1_1LedgerInfo.html">LedgerInfo</a> ripple::deserializePrefixedHeader </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="classripple_1_1Slice.html">Slice</a>&#160;</td>
+          <td class="paramname"><em>data</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Deserialize a ledger header (prefixed with 4 bytes) from a byte array. </p>
+
+<p class="definition">Definition at line <a class="el" href="InboundLedger_8cpp_source.html#l00288">288</a> of file <a class="el" href="InboundLedger_8cpp_source.html">InboundLedger.cpp</a>.</p>
+
+</div>
+</div>
 <a id="af6550c765f1787e0c238e1c34e5d3836"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#af6550c765f1787e0c238e1c34e5d3836">&#9670;&nbsp;</a></span>make_InboundLedgers()</h2>
 
@@ -8261,12 +8304,12 @@ template&lt;class ApplyTxs &gt; </div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="InboundLedgers_8cpp_source.html#l00465">465</a> of file <a class="el" href="InboundLedgers_8cpp_source.html">InboundLedgers.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="InboundLedgers_8cpp_source.html#l00437">437</a> of file <a class="el" href="InboundLedgers_8cpp_source.html">InboundLedgers.cpp</a>.</p>
 
 </div>
 </div>
-<a id="a97e038e03a328e365f134768009fae11"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a97e038e03a328e365f134768009fae11">&#9670;&nbsp;</a></span>make_InboundTransactions()</h2>
+<a id="a290d712d85ae7ad9fe05a68c81faaf9a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a290d712d85ae7ad9fe05a68c81faaf9a">&#9670;&nbsp;</a></span>make_InboundTransactions()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -8276,12 +8319,6 @@ template&lt;class ApplyTxs &gt; </div>
           <td>(</td>
           <td class="paramtype"><a class="el" href="classripple_1_1Application.html">Application</a> &amp;&#160;</td>
           <td class="paramname"><em>app</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype"><a class="el" href="classripple_1_1InboundLedgers.html#a0b264439abc0967cb47ebd106c0d62f6">InboundLedgers::clock_type</a> &amp;&#160;</td>
-          <td class="paramname"><em>clock</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -8309,7 +8346,7 @@ template&lt;class ApplyTxs &gt; </div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="InboundTransactions_8cpp_source.html#l00296">296</a> of file <a class="el" href="InboundTransactions_8cpp_source.html">InboundTransactions.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="InboundTransactions_8cpp_source.html#l00264">264</a> of file <a class="el" href="InboundTransactions_8cpp_source.html">InboundTransactions.cpp</a>.</p>
 
 </div>
 </div>
@@ -9211,7 +9248,7 @@ template&lt;class Object &gt; </div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="Application_8cpp_source.html#l02349">2349</a> of file <a class="el" href="Application_8cpp_source.html">Application.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="Application_8cpp_source.html#l02348">2348</a> of file <a class="el" href="Application_8cpp_source.html">Application.cpp</a>.</p>
 
 </div>
 </div>
@@ -21078,7 +21115,7 @@ template&lt;typename T &gt; </div>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="OverlayImpl_8cpp_source.html#l01322">1322</a> of file <a class="el" href="OverlayImpl_8cpp_source.html">OverlayImpl.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="OverlayImpl_8cpp_source.html#l01255">1255</a> of file <a class="el" href="OverlayImpl_8cpp_source.html">OverlayImpl.cpp</a>.</p>
 
 </div>
 </div>
@@ -21152,7 +21189,7 @@ template&lt;typename T &gt; </div>
 
 <p>Creates the implementation of <a class="el" href="classripple_1_1Overlay.html" title="Manages the set of connected peers.">Overlay</a>. </p>
 
-<p class="definition">Definition at line <a class="el" href="OverlayImpl_8cpp_source.html#l01427">1427</a> of file <a class="el" href="OverlayImpl_8cpp_source.html">OverlayImpl.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="OverlayImpl_8cpp_source.html#l01360">1360</a> of file <a class="el" href="OverlayImpl_8cpp_source.html">OverlayImpl.cpp</a>.</p>
 
 </div>
 </div>
@@ -21224,7 +21261,7 @@ template&lt;typename T &gt; </div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="PeerImp_8cpp_source.html#l02519">2519</a> of file <a class="el" href="PeerImp_8cpp_source.html">PeerImp.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="PeerImp_8cpp_source.html#l02518">2518</a> of file <a class="el" href="PeerImp_8cpp_source.html">PeerImp.cpp</a>.</p>
 
 </div>
 </div>
@@ -21274,7 +21311,7 @@ template&lt;typename T &gt; </div>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="PeerImp_8cpp_source.html#l02543">2543</a> of file <a class="el" href="PeerImp_8cpp_source.html">PeerImp.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="PeerImp_8cpp_source.html#l02542">2542</a> of file <a class="el" href="PeerImp_8cpp_source.html">PeerImp.cpp</a>.</p>
 
 </div>
 </div>
