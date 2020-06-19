@@ -641,10 +641,7 @@ AmendmentTableImpl::injectJson(
         v[jss::validations] = votesTotal;
 
         if (votesNeeded)
-        {
-            v[jss::vote] = votesFor * 256 / votesNeeded;
             v[jss::threshold] = votesNeeded;
-        }
     }
 }
 
