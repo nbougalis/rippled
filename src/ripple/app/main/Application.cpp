@@ -231,19 +231,7 @@ public:
     static std::size_t
     numberOfThreads(Config const& config)
     {
-#if RIPPLE_SINGLE_IO_SERVICE_THREAD
-        return 1;
-#else
-        auto const cores = std::thread::hardware_concurrency();
-
-        // Use a single thread when running on under-provisioned systems
-        // or if we are configured to use minimal resources.
-        if ((cores == 1) || ((config.NODE_SIZE == 0) && (cores == 2)))
-            return 1;
-
-        // Otherwise, prefer two threads.
-        return 2;
-#endif
+        return 3;
     }
 
     //--------------------------------------------------------------------------
