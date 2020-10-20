@@ -91,7 +91,7 @@ SHAMap::dirtyUp(
     assert(
         (state_ != SHAMapState::Synching) &&
         (state_ != SHAMapState::Immutable));
-    assert(child && (child->getSeq() == seq_));
+    assert(child && (child->owner() == seq_));
 
     while (!stack.empty())
     {
@@ -406,8 +406,8 @@ std::shared_ptr<Node>
 SHAMap::unshareNode(std::shared_ptr<Node> node, SHAMapNodeID const& nodeID)
 {
     // make sure the node is suitable for the intended operation (copy on write)
-    assert(node->getSeq() <= seq_);
-    if (node->getSeq() != seq_)
+    assert(node->owner() <= seq_);
+    if (node->owner() != seq_)
     {
         // have a CoW
         assert(state_ != SHAMapState::Immutable);
@@ -641,8 +641,6 @@ SHAMap::delItem(uint256 const& id)
     if (!leaf || (leaf->peekItem()->key() != id))
         return false;
 
-    SHAMapTreeNode::TNType type = leaf->getType();
-
     // What gets attached to the end of the chain
     // (For now, nothing, since we deleted the leaf)
     std::shared_ptr<SHAMapAbstractNode> prevNode;
@@ -682,8 +680,7 @@ SHAMap::delItem(uint256 const& id)
                             break;
                         }
                     }
-                    prevNode = std::make_shared<SHAMapTreeNode>(
-                        item, type, node->getSeq());
+                    prevNode = node->clone(node->owner());
                 }
                 else
                 {
@@ -750,7 +747,7 @@ SHAMap::addGiveItem(
         std::shared_ptr<SHAMapItem const> otherItem = leaf->peekItem();
         assert(otherItem && (tag != otherItem->key()));
 
-        node = std::make_shared<SHAMapInnerNode>(node->getSeq());
+        node = std::make_shared<SHAMapInnerNode>(node->owner());
 
         int b1, b2;
 
@@ -834,11 +831,10 @@ SHAMap::updateGiveItem(
 
     node = unshareNode(std::move(node), nodeID);
 
-    if (!node->setItem(
-            std::move(item),
-            !isTransaction ? SHAMapTreeNode::tnACCOUNT_STATE
-                           : (hasMeta ? SHAMapTreeNode::tnTRANSACTION_MD
-                                      : SHAMapTreeNode::tnTRANSACTION_NM)))
+    if (node->getType() != SHAMapTreeNode::tnACCOUNT_STATE)
+        LogicError("Attempt to replace SHAMap node with tx-type!");
+
+    if (!node->setItem(std::move(item)))
     {
         JLOG(journal_.trace()) << "SHAMap setItem, no change";
         return true;
@@ -898,9 +894,9 @@ SHAMap::writeNode(
     std::shared_ptr<SHAMapAbstractNode> node) const
 {
     // Node is ours, so we can just make it shareable
-    assert(node->getSeq() == seq_);
+    assert(node->owner() == seq_);
     assert(backed_);
-    node->setSeq(0);
+    node->unshare();
 
     canonicalize(node->getNodeHash(), node);
 
@@ -923,9 +919,9 @@ SHAMap::preFlushNode(std::shared_ptr<Node> node) const
 {
     // A shared node should never need to be flushed
     // because that would imply someone modified it
-    assert(node->getSeq() != 0);
+    assert(node->owner() != 0);
 
-    if (node->getSeq() != seq_)
+    if (node->owner() != seq_)
     {
         // Node is not uniquely ours, so unshare it before
         // possibly modifying it
@@ -955,7 +951,7 @@ SHAMap::walkSubTree(bool doWrite, NodeObjectType t, std::uint32_t seq)
     int flushed = 0;
     Serializer s;
 
-    if (!root_ || (root_->getSeq() == 0))
+    if (!root_ || (root_->owner() == 0))
         return flushed;
 
     if (root_->isLeaf())
@@ -965,7 +961,7 @@ SHAMap::walkSubTree(bool doWrite, NodeObjectType t, std::uint32_t seq)
         if (doWrite && backed_)
             root_ = writeNode(t, seq, std::move(root_));
         else
-            root_->setSeq(0);
+            root_->unshare();
         return 1;
     }
 
@@ -1002,7 +998,7 @@ SHAMap::walkSubTree(bool doWrite, NodeObjectType t, std::uint32_t seq)
                 int branch = pos;
                 auto child = node->getChild(pos++);
 
-                if (child && (child->getSeq() != 0))
+                if (child && (child->owner() != 0))
                 {
                     // This is a node that needs to be flushed
 
@@ -1025,13 +1021,13 @@ SHAMap::walkSubTree(bool doWrite, NodeObjectType t, std::uint32_t seq)
                         // flush this leaf
                         ++flushed;
 
-                        assert(node->getSeq() == seq_);
+                        assert(node->owner() == seq_);
                         child->updateHash();
 
                         if (doWrite && backed_)
                             child = writeNode(t, seq, std::move(child));
                         else
-                            child->setSeq(0);
+                            child->unshare();
 
                         node->shareChild(branch, child);
                     }
@@ -1047,7 +1043,7 @@ SHAMap::walkSubTree(bool doWrite, NodeObjectType t, std::uint32_t seq)
             node = std::static_pointer_cast<SHAMapInnerNode>(
                 writeNode(t, seq, std::move(node)));
         else
-            node->setSeq(0);
+            node->unshare();
 
         ++flushed;
 
@@ -1059,7 +1055,7 @@ SHAMap::walkSubTree(bool doWrite, NodeObjectType t, std::uint32_t seq)
         stack.pop();
 
         // Hook this inner node to its parent
-        assert(parent->getSeq() == seq_);
+        assert(parent->owner() == seq_);
         parent->shareChild(pos, node);
 
         // Continue with parent's next child, if any
@@ -1120,7 +1116,7 @@ std::shared_ptr<SHAMapAbstractNode>
 SHAMap::getCache(SHAMapHash const& hash) const
 {
     auto ret = f_.getTreeNodeCache(ledgerSeq_)->fetch(hash.as_uint256());
-    assert(!ret || !ret->getSeq());
+    assert(!ret || !ret->owner());
     return ret;
 }
 
@@ -1130,7 +1126,7 @@ SHAMap::canonicalize(
     std::shared_ptr<SHAMapAbstractNode>& node) const
 {
     assert(backed_);
-    assert(node->getSeq() == 0);
+    assert(node->owner() == 0);
     assert(node->getNodeHash() == hash);
 
     f_.getTreeNodeCache(ledgerSeq_)
