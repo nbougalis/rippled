@@ -63,9 +63,8 @@ class RCLConsensus
         InboundTransactions& inboundTransactions_;
         beast::Journal const j_;
 
-        NodeID const nodeID_;
-        PublicKey const valPublic_;
-        SecretKey const valSecret_;
+        // If the server is validating, the necessary keying information:
+        ValidatorKeys const& validatorKeys_;
 
         // A randomly selected non-zero value used to tag our validations
         std::uint64_t const valCookie_;
