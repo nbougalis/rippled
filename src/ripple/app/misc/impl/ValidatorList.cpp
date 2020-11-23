@@ -279,7 +279,7 @@ ValidatorList::applyListAndBroadcast(
                     JLOG(j_.debug())
                         << "Sent validator list for " << strHex(publisherKey)
                         << " with sequence " << sequence << " to "
-                        << peer->getRemoteAddress().to_string() << " ("
+                        << peer->getRemoteAddress() << " ("
                         << peer->id() << ")";
                     // Don't send it next time.
                     hashRouter.addSuppressionPeer(hash, peer->id());

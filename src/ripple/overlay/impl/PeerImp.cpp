@@ -76,7 +76,7 @@ PeerImp::PeerImp(
     , stream_(*stream_ptr_)
     , strand_(socket_.get_executor())
     , timer_(waitable_timer{socket_.get_executor()})
-    , remote_address_(slot->remote_endpoint())
+    , remote_address_(beast::IP::to_asio_endpoint(slot->remote_endpoint()))
     , overlay_(overlay)
     , m_inbound(true)
     , protocol_(protocol)
@@ -249,9 +249,7 @@ PeerImp::send(std::shared_ptr<Message> const& m)
         journal_.active(beast::severities::kDebug) &&
         (sendq_size % Tuning::sendQueueLogFreq) == 0)
     {
-        std::string const n = name();
-        JLOG(journal_.debug()) << (n.empty() ? remote_address_.to_string() : n)
-                               << " sendq: " << sendq_size;
+        JLOG(journal_.debug()) << remote_address_ << " sendq: " << sendq_size;
     }
 
     send_queue_.push(m);
@@ -315,7 +313,7 @@ PeerImp::json()
     Json::Value ret(Json::objectValue);
 
     ret[jss::public_key] = toBase58(TokenType::NodePublic, publicKey_);
-    ret[jss::address] = remote_address_.to_string();
+    ret[jss::address] = to_string(remote_address_);
 
     if (m_inbound)
         ret[jss::inbound] = true;
@@ -538,9 +536,7 @@ PeerImp::fail(std::string const& reason)
                 reason));
     if (journal_.active(beast::severities::kWarning) && socket_.is_open())
     {
-        std::string const n = name();
-        JLOG(journal_.warn()) << (n.empty() ? remote_address_.to_string() : n)
-                              << " failed: " << reason;
+        JLOG(journal_.warn()) << remote_address_ << " failed: " << reason;
     }
     close();
 }
@@ -553,7 +549,7 @@ PeerImp::fail(std::string const& name, error_code ec)
     {
         JLOG(journal_.warn())
             << name << " from " << toBase58(TokenType::NodePublic, publicKey_)
-            << " at " << remote_address_.to_string() << ": " << ec.message();
+            << " at " << remote_address_ << ": " << ec.message();
     }
     close();
 }
@@ -767,7 +763,7 @@ http_response_type
 PeerImp::makeResponse(
     bool crawl,
     http_request_type const& req,
-    beast::IP::Address remote_ip,
+    boost::asio::ip::address remote_ip,
     uint256 const& sharedValue)
 {
     http_response_type resp;
@@ -866,8 +862,8 @@ PeerImp::doProtocolStart()
 
             JLOG(p_journal_.debug())
                 << "Sending validator list for " << strHex(pubKey)
-                << " with sequence " << sequence << " to "
-                << remote_address_.to_string() << " (" << id_ << ")";
+                << " with sequence " << sequence << " to " << remote_address_
+                << " (" << id_ << ")";
             auto m = std::make_shared<Message>(vl, protocol::mtVALIDATORLIST);
             send(m);
             // Don't send it next time.
@@ -1334,7 +1330,7 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMPeerShardInfo> const& m)
     }
     else if (crawl())  // Check if peer will share IP publicly
     {
-        endpoint = remote_address_;
+        endpoint = beast::IP::from_asio(remote_address_);
     }
 
     // Get the Public key of the node reporting the shard info
@@ -1387,24 +1383,35 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMEndpoints> const& m)
 
     for (auto const& tm : m->endpoints_v2())
     {
-        auto result = beast::IP::Endpoint::from_string_checked(tm.endpoint());
-        if (!result)
+        auto result = [this, &tm]() {
+            // If hops == 0, this Endpoint describes the peer we are connected
+            // to -- in that case, we take the remote address seen on the socket
+            // and store that in the IP::Endpoint. If this is the first time,
+            // then we'll verify that their listener can receive incoming by
+            // performing a connectivity test.
+            if (tm.hops() == 0)
+                return remote_address_;
+
+            // Otherwise we take the address/port specified.
+            boost::asio::ip::tcp::endpoint ret;
+
+            if (auto ep =
+                    beast::IP::Endpoint::from_string_checked(tm.endpoint()))
+                ret = beast::IP::to_asio_endpoint(*ep);
+
+            return ret;
+        }();
+
+        // Make sure it at least looks valid:
+        if (!result.address().is_unspecified() && result.port() != 0)
         {
-            JLOG(p_journal_.error()) << "failed to parse incoming endpoint: {"
-                                     << tm.endpoint() << "}";
+            endpoints.emplace_back(result, tm.hops());
             continue;
         }
 
-        // If hops == 0, this Endpoint describes the peer we are connected
-        // to -- in that case, we take the remote address seen on the
-        // socket and store that in the IP::Endpoint. If this is the first
-        // time, then we'll verify that their listener can receive incoming
-        // by performing a connectivity test.  if hops > 0, then we just
-        // take the address/port we were given
-
-        endpoints.emplace_back(
-            tm.hops() > 0 ? *result : remote_address_.at_port(result->port()),
-            tm.hops());
+        JLOG(p_journal_.error()) << "failed to parse incoming endpoint: {"
+                                 << tm.endpoint() << "}";
+        charge(Resource::feeBadData);
     }
 
     if (!endpoints.empty())
@@ -1966,9 +1973,8 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMValidatorList> const& m)
         auto const version = m->version();
         auto const hash = sha512Half(manifest, blob, signature, version);
 
-        JLOG(p_journal_.debug())
-            << "Received validator list from " << remote_address_.to_string()
-            << " (" << id_ << ")";
+        JLOG(p_journal_.debug()) << "Received validator list from "
+                                 << remote_address_ << " (" << id_ << ")";
 
         if (!app_.getHashRouter().addSuppressionPeer(hash, id_))
         {
@@ -1986,7 +1992,7 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMValidatorList> const& m)
             blob,
             signature,
             version,
-            remote_address_.to_string(),
+            to_string(remote_address_),
             hash,
             app_.overlay(),
             app_.getHashRouter());
@@ -1996,8 +2002,8 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMValidatorList> const& m)
             << "Processed validator list from "
             << (applyResult.publisherKey ? strHex(*applyResult.publisherKey)
                                          : "unknown or invalid publisher")
-            << " from " << remote_address_.to_string() << " (" << id_
-            << ") with result " << to_string(disp);
+            << " from " << remote_address_ << " (" << id_ << ") with result "
+            << to_string(disp);
 
         switch (disp)
         {

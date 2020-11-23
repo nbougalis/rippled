@@ -173,10 +173,10 @@ protected:
         return port_;
     }
 
-    beast::IP::Endpoint
+    boost::asio::ip::tcp::endpoint const&
     remoteAddress() override
     {
-        return beast::IPAddressConversion::from_asio(remote_address_);
+        return remote_address_;
     }
 
     http_request_type&

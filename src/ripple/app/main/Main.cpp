@@ -24,6 +24,7 @@
 #include <ripple/basics/contract.h>
 #include <ripple/beast/clock/basic_seconds_clock.h>
 #include <ripple/beast/core/CurrentThreadName.h>
+#include <ripple/beast/net/IPAddressConversion.h>
 #include <ripple/core/Config.h>
 #include <ripple/core/ConfigSections.h>
 #include <ripple/core/DatabaseCon.h>
@@ -676,7 +677,7 @@ run(int argc, char** argv)
                 return -1;
         }
 
-        config->rpc_ip = std::move(*endpoint);
+        config->rpc_ip = beast::IP::to_asio_endpoint(*endpoint);
     }
 
     if (vm.count("quorum"))

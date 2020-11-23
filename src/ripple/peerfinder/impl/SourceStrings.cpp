@@ -18,6 +18,7 @@
 //==============================================================================
 
 #include <ripple/peerfinder/impl/SourceStrings.h>
+#include <ripple/beast/net/IPAddressConversion.h>
 
 namespace ripple {
 namespace PeerFinder {
@@ -45,12 +46,9 @@ public:
         results.addresses.reserve(m_strings.size());
         for (int i = 0; i < m_strings.size(); ++i)
         {
-            beast::IP::Endpoint ep(
-                beast::IP::Endpoint::from_string(m_strings[i]));
-            if (is_unspecified(ep))
-                ep = beast::IP::Endpoint::from_string(m_strings[i]);
-            if (!is_unspecified(ep))
-                results.addresses.push_back(ep);
+            auto const ep = beast::IP::Endpoint::from_string(m_strings[i]);
+            if (!ep.address().is_unspecified())
+                results.addresses.push_back(beast::IP::to_asio_endpoint(ep));
         }
     }
 

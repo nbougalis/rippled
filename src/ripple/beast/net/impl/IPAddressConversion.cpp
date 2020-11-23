@@ -34,12 +34,6 @@ from_asio(boost::asio::ip::tcp::endpoint const& endpoint)
     return Endpoint{endpoint.address(), endpoint.port()};
 }
 
-boost::asio::ip::address
-to_asio_address(Endpoint const& endpoint)
-{
-    return endpoint.address();
-}
-
 boost::asio::ip::tcp::endpoint
 to_asio_endpoint(Endpoint const& endpoint)
 {

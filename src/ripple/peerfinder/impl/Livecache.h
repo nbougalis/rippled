@@ -201,10 +201,10 @@ class Livecache : protected detail::LivecacheBase
 {
 private:
     using cache_type = beast::aged_map<
-        beast::IP::Endpoint,
+        boost::asio::ip::tcp::endpoint,
         Element,
         std::chrono::steady_clock,
-        std::less<beast::IP::Endpoint>,
+        std::less<boost::asio::ip::tcp::endpoint>,
         Allocator>;
 
     beast::Journal m_journal;
@@ -493,7 +493,7 @@ Livecache<Allocator>::onWrite(beast::PropertyStream::Map& map)
         auto const& e(iter->second);
         beast::PropertyStream::Map item(set);
         item["hops"] = e.endpoint.hops;
-        item["address"] = e.endpoint.address.to_string();
+        item["address"] = to_string(e.endpoint.address);
         std::stringstream ss;
         ss << (iter.when() - expired).count();
         item["expires"] = ss.str();

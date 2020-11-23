@@ -27,7 +27,8 @@ Endpoint::Endpoint() : m_port(0)
 {
 }
 
-Endpoint::Endpoint(Address const& addr, Port port) : m_addr(addr), m_port(port)
+Endpoint::Endpoint(boost::asio::ip::address const& addr, Port port)
+    : m_addr(addr), m_port(port)
 {
 }
 
@@ -154,7 +155,7 @@ operator>>(std::istream& is, Endpoint& endpoint)
     }
 
     boost::system::error_code ec;
-    auto addr = Address::from_string(addrStr, ec);
+    auto addr = boost::asio::ip::address::from_string(addrStr, ec);
     if (ec)
     {
         is.setstate(std::ios_base::failbit);

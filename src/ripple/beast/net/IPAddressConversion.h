@@ -39,12 +39,6 @@ from_asio(boost::asio::ip::address const& address);
 Endpoint
 from_asio(boost::asio::ip::tcp::endpoint const& endpoint);
 
-/** Convert to asio::ip::address.
-    The port is ignored.
-*/
-boost::asio::ip::address
-to_asio_address(Endpoint const& endpoint);
-
 /** Convert to asio::ip::tcp::endpoint. */
 boost::asio::ip::tcp::endpoint
 to_asio_endpoint(Endpoint const& endpoint);
@@ -52,35 +46,18 @@ to_asio_endpoint(Endpoint const& endpoint);
 }  // namespace IP
 }  // namespace beast
 
-namespace beast {
+namespace ripple {
 
-// DEPRECATED
-struct IPAddressConversion
+inline std::string
+to_string(boost::asio::ip::tcp::endpoint const& endpoint)
 {
-    explicit IPAddressConversion() = default;
+    std::string ret = endpoint.address().to_string();
 
-    static IP::Endpoint
-    from_asio(boost::asio::ip::address const& address)
-    {
-        return IP::from_asio(address);
-    }
-    static IP::Endpoint
-    from_asio(boost::asio::ip::tcp::endpoint const& endpoint)
-    {
-        return IP::from_asio(endpoint);
-    }
-    static boost::asio::ip::address
-    to_asio_address(IP::Endpoint const& address)
-    {
-        return IP::to_asio_address(address);
-    }
-    static boost::asio::ip::tcp::endpoint
-    to_asio_endpoint(IP::Endpoint const& address)
-    {
-        return IP::to_asio_endpoint(address);
-    }
-};
+    if (endpoint.address().is_v6())
+        ret = "[" + ret + "]";
 
-}  // namespace beast
+    return ret + ":" + std::to_string(endpoint.port());
+}
 
+}  // namespace ripple
 #endif

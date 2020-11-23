@@ -43,12 +43,10 @@ public:
     {
         auto const& h = ws->request();
         if (ipAllowed(
-                beast::IPAddressConversion::from_asio(ws->remote_endpoint())
-                    .address(),
+                ws->remote_endpoint().address(),
                 ws->port().secure_gateway_ip))
         {
-            auto it = h.find("X-User");
-            if (it != h.end())
+            if (auto it = h.find("X-User"); it != h.end())
                 user_ = it->value().to_string();
             fwdfor_ = std::string(forwardedFor(h));
         }

@@ -25,7 +25,7 @@
 #include <ripple/beast/insight/MeterImpl.h>
 #include <ripple/beast/insight/StatsDCollector.h>
 #include <ripple/beast/net/IPAddressConversion.h>
-#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/ip/udp.hpp>
 #include <boost/optional.hpp>
 #include <cassert>
 #include <climits>
@@ -221,7 +221,7 @@ private:
     };
 
     Journal m_journal;
-    IP::Endpoint m_address;
+    boost::asio::ip::udp::endpoint m_address;
     std::string m_prefix;
     boost::asio::io_service m_io_service;
     boost::optional<boost::asio::io_service::work> m_work;
@@ -235,15 +235,9 @@ private:
     // Must come last for order of init
     std::thread m_thread;
 
-    static boost::asio::ip::udp::endpoint
-    to_endpoint(IP::Endpoint const& ep)
-    {
-        return boost::asio::ip::udp::endpoint(ep.address(), ep.port());
-    }
-
 public:
     StatsDCollectorImp(
-        IP::Endpoint const& address,
+        boost::asio::ip::udp::endpoint const& address,
         std::string const& prefix,
         Journal journal)
         : m_journal(journal)
@@ -471,7 +465,7 @@ public:
     {
         boost::system::error_code ec;
 
-        if (m_socket.connect(to_endpoint(m_address), ec))
+        if (m_socket.connect(m_address, ec))
         {
             if (auto stream = m_journal.error())
                 stream << "Connect failed: " << ec.message();
@@ -734,7 +728,7 @@ StatsDMeterImpl::do_process()
 
 std::shared_ptr<StatsDCollector>
 StatsDCollector::New(
-    IP::Endpoint const& address,
+    boost::asio::ip::udp::endpoint const& address,
     std::string const& prefix,
     Journal journal)
 {

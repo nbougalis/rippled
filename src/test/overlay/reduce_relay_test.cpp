@@ -76,10 +76,11 @@ public:
     send(std::shared_ptr<Message> const& m) override
     {
     }
-    beast::IP::Endpoint
+    boost::asio::ip::tcp::endpoint const&
     getRemoteAddress() const override
     {
-        return {};
+        static boost::asio::ip::tcp::endpoint const ep;
+        return ep;
     }
     void
     charge(Resource::Charge const& fee) override

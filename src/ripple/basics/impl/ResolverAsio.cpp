@@ -265,8 +265,7 @@ public:
         {
             while (iter != boost::asio::ip::tcp::resolver::iterator())
             {
-                addresses.push_back(
-                    beast::IPAddressConversion::from_asio(*iter));
+                addresses.push_back(beast::IP::from_asio(*iter));
                 ++iter;
             }
         }

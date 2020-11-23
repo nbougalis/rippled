@@ -23,8 +23,6 @@
 #include <ripple/beast/net/IPAddressConversion.h>
 #include <ripple/resource/ResourceManager.h>
 #include <ripple/resource/impl/Logic.h>
-#include <boost/asio/ip/address_v4.hpp>
-#include <boost/core/ignore_unused.hpp>
 #include <boost/system/error_code.hpp>
 #include <condition_variable>
 #include <memory>
@@ -68,14 +66,14 @@ public:
     }
 
     Consumer
-    newInboundEndpoint(beast::IP::Endpoint const& address) override
+    newInboundEndpoint(boost::asio::ip::tcp::endpoint const& address) override
     {
-        return logic_.newInboundEndpoint(address);
+        return logic_.newInboundEndpoint(beast::IP::from_asio(address));
     }
 
     Consumer
     newInboundEndpoint(
-        beast::IP::Endpoint const& address,
+        boost::asio::ip::tcp::endpoint const& address,
         bool const proxy,
         boost::string_view const& forwardedFor) override
     {
@@ -89,24 +87,23 @@ public:
         {
             journal_.warn()
                 << "forwarded for (" << forwardedFor << ") from proxy "
-                << address.to_string()
+                << address
                 << " doesn't convert to IP endpoint: " << ec.message();
             return newInboundEndpoint(address);
         }
-        return newInboundEndpoint(
-            beast::IPAddressConversion::from_asio(proxiedIp));
+        return newInboundEndpoint({proxiedIp, 0});
     }
 
     Consumer
-    newOutboundEndpoint(beast::IP::Endpoint const& address) override
+    newOutboundEndpoint(boost::asio::ip::tcp::endpoint const& address) override
     {
-        return logic_.newOutboundEndpoint(address);
+        return logic_.newOutboundEndpoint(beast::IP::from_asio(address));
     }
 
     Consumer
-    newUnlimitedEndpoint(beast::IP::Endpoint const& address) override
+    newUnlimitedEndpoint(boost::asio::ip::tcp::endpoint const& address) override
     {
-        return logic_.newUnlimitedEndpoint(address);
+        return logic_.newUnlimitedEndpoint(beast::IP::from_asio(address));
     }
 
     Gossip

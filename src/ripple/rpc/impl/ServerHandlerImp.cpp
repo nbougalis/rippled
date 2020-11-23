@@ -45,9 +45,6 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/beast/http/fields.hpp>
 #include <boost/beast/http/string_body.hpp>
-#include <boost/optional.hpp>
-#include <boost/regex.hpp>
-#include <boost/type_traits.hpp>
 #include <algorithm>
 #include <stdexcept>
 
@@ -93,7 +90,7 @@ authorized(Port const& port, std::map<std::string, std::string> const& h)
     std::string strUserPass64 = it->second.substr(6);
     boost::trim(strUserPass64);
     std::string strUserPass = base64_decode(strUserPass64);
-    std::string::size_type nColon = strUserPass.find(":");
+    std::string::size_type nColon = strUserPass.find(':');
     if (nColon == std::string::npos)
         return false;
     std::string strUser = strUserPass.substr(0, nColon);
@@ -148,7 +145,7 @@ ServerHandlerImp::onStop()
 bool
 ServerHandlerImp::onAccept(
     Session& session,
-    boost::asio::ip::tcp::endpoint endpoint)
+    boost::asio::ip::tcp::endpoint const& endpoint)
 {
     std::lock_guard lock(countlock_);
 
@@ -196,16 +193,14 @@ ServerHandlerImp::onHandoff(
         }
 
         auto is{std::make_shared<WSInfoSub>(m_networkOPs, ws)};
-        auto const beast_remote_address =
-            beast::IPAddressConversion::from_asio(remote_address);
         is->getConsumer() = requestInboundEndpoint(
             m_resourceManager,
-            beast_remote_address,
+            remote_address,
             requestRole(
                 Role::GUEST,
                 session.port(),
                 Json::Value(),
-                beast_remote_address,
+                remote_address,
                 is->user()),
             is->user(),
             is->forwarded_for());
@@ -425,7 +420,7 @@ ServerHandlerImp::processSession(
             required,
             session->port(),
             jv,
-            beast::IP::from_asio(session->remote_endpoint().address()),
+            session->remote_endpoint(),
             is->user());
         if (Role::FORBID == role)
         {
@@ -516,7 +511,7 @@ ServerHandlerImp::processSession(
     processRequest(
         session->port(),
         buffers_to_string(session->request().body().data()),
-        session->remoteAddress().at_port(0),
+        session->remoteAddress(),
         makeOutput(*session),
         coro,
         forwardedFor(session->request()),
@@ -553,7 +548,7 @@ void
 ServerHandlerImp::processRequest(
     Port const& port,
     std::string const& request,
-    beast::IP::Endpoint const& remoteIPAddress,
+    boost::asio::ip::tcp::endpoint const& remote_endpoint,
     Output&& output,
     std::shared_ptr<JobQueue::Coro> coro,
     boost::string_view forwardedFor,
@@ -652,24 +647,24 @@ ServerHandlerImp::processRequest(
                 required,
                 port,
                 jsonRPC[jss::params][Json::UInt(0)],
-                remoteIPAddress,
+                remote_endpoint,
                 user);
         }
         else
         {
             role = requestRole(
-                required, port, Json::objectValue, remoteIPAddress, user);
+                required, port, Json::objectValue, remote_endpoint, user);
         }
 
         Resource::Consumer usage;
         if (isUnlimited(role))
         {
-            usage = m_resourceManager.newUnlimitedEndpoint(remoteIPAddress);
+            usage = m_resourceManager.newUnlimitedEndpoint(remote_endpoint);
         }
         else
         {
             usage = m_resourceManager.newInboundEndpoint(
-                remoteIPAddress, role == Role::PROXY, forwardedFor);
+                remote_endpoint, role == Role::PROXY, forwardedFor);
             if (usage.disconnect())
             {
                 if (!batch)
@@ -1110,7 +1105,7 @@ setup_Client(ServerHandler::Setup& setup)
     if (iter == setup.ports.cend())
         return;
     setup.client.secure = iter->protocol.count("https") > 0;
-    setup.client.ip = beast::IP::is_unspecified(iter->ip)
+    setup.client.ip = iter->ip.is_unspecified()
         ?
         // VFALCO HACK! to make localhost work
         (iter->ip.is_v6() ? "::1" : "127.0.0.1")

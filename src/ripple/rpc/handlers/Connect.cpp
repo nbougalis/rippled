@@ -56,11 +56,12 @@ doConnect(RPC::JsonContext& context)
     else
         iPort = DEFAULT_PEER_PORT;
 
-    auto ip =
-        beast::IP::Endpoint::from_string(context.params[jss::ip].asString());
+    auto const ip = boost::asio::ip::address::from_string(
+        context.params[jss::ip].asString());
 
-    if (!is_unspecified(ip))
-        context.app.overlay().connect(ip.at_port(iPort));
+    if (!ip.is_unspecified())
+        context.app.overlay().connect(boost::asio::ip::tcp::endpoint{
+            ip, static_cast<std::uint16_t>(iPort)});
 
     return RPC::makeObjectValue("connecting");
 }

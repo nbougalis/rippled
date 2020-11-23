@@ -33,8 +33,6 @@
 
 namespace ripple {
 
-using Endpoints = std::vector<boost::asio::ip::tcp::endpoint>;
-
 /** A multi-protocol server.
 
     This server maintains multiple configured listening ports,
@@ -57,7 +55,7 @@ public:
     /** Set the listening port settings.
         This may only be called once.
     */
-    virtual Endpoints
+    virtual std::vector<boost::asio::ip::tcp::endpoint>
     ports(std::vector<Port> const& v) = 0;
 
     /** Close the server.
@@ -108,7 +106,7 @@ public:
         return j_;
     }
 
-    Endpoints
+    std::vector<boost::asio::ip::tcp::endpoint>
     ports(std::vector<Port> const& ports) override;
 
     void
@@ -157,13 +155,13 @@ ServerImpl<Handler>::~ServerImpl()
 }
 
 template <class Handler>
-Endpoints
+std::vector<boost::asio::ip::tcp::endpoint>
 ServerImpl<Handler>::ports(std::vector<Port> const& ports)
 {
     if (closed())
         Throw<std::logic_error>("ports() on closed Server");
     ports_.reserve(ports.size());
-    Endpoints eps;
+    std::vector<boost::asio::ip::tcp::endpoint> eps;
     eps.reserve(ports.size());
     for (auto const& port : ports)
     {

@@ -88,16 +88,16 @@ public:
         mBuffer.clear();
     }
 
-    beast::IP::Endpoint
+    boost::asio::ip::tcp::endpoint
     local_endpoint()
     {
-        return beast::IP::from_asio(lowest_layer().local_endpoint());
+        return lowest_layer().local_endpoint();
     }
 
-    beast::IP::Endpoint
+    boost::asio::ip::tcp::endpoint
     remote_endpoint()
     {
-        return beast::IP::from_asio(lowest_layer().remote_endpoint());
+        return lowest_layer().remote_endpoint();
     }
 
     lowest_layer_type&

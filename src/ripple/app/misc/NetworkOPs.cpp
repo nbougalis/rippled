@@ -1066,7 +1066,7 @@ NetworkOPsImp::processClusterTimer()
     for (auto& item : gossip.items)
     {
         protocol::TMLoadSource& node = *cluster.add_loadsources();
-        node.set_name(to_string(item.address));
+        node.set_name(item.address.to_string());
         node.set_cost(item.balance);
     }
     app_.overlay().foreach(send_if(

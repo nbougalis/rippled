@@ -18,6 +18,7 @@
 //==============================================================================
 
 #include <ripple/app/main/CollectorManager.h>
+#include <ripple/beast/net/IPEndpoint.h>
 #include <memory>
 
 namespace ripple {
@@ -38,10 +39,12 @@ public:
         {
             beast::IP::Endpoint const address(beast::IP::Endpoint::from_string(
                 get<std::string>(params, "address")));
-            std::string const& prefix(get<std::string>(params, "prefix"));
 
-            m_collector =
-                beast::insight::StatsDCollector::New(address, prefix, journal);
+            m_collector = beast::insight::StatsDCollector::New(
+                boost::asio::ip::udp::endpoint{
+                    address.address(), address.port()},
+                get<std::string>(params, "prefix"),
+                journal);
         }
         else
         {

@@ -203,14 +203,13 @@ OverlayImpl::onHandoff(
         return handoff;
     }
 
-    auto consumer = m_resourceManager.newInboundEndpoint(
-        beast::IPAddressConversion::from_asio(remote_endpoint));
+    auto consumer = m_resourceManager.newInboundEndpoint(remote_endpoint);
     if (consumer.disconnect())
         return handoff;
 
     auto const slot = m_peerFinder->new_inbound_slot(
-        beast::IPAddressConversion::from_asio(local_endpoint),
-        beast::IPAddressConversion::from_asio(remote_endpoint));
+        beast::IP::from_asio(local_endpoint),
+        beast::IP::from_asio(remote_endpoint));
 
     if (slot == nullptr)
     {
@@ -375,7 +374,7 @@ OverlayImpl::makeRedirectResponse(
     {
         Json::Value& ips = (msg.body()["peer-ips"] = Json::arrayValue);
         for (auto const& _ : m_peerFinder->redirect(slot))
-            ips.append(_.address.to_string());
+            ips.append(to_string(_.address));
     }
     msg.prepare_payload();
     return std::make_shared<SimpleWriter>(msg);
@@ -402,7 +401,7 @@ OverlayImpl::makeErrorResponse(
 //------------------------------------------------------------------------------
 
 void
-OverlayImpl::connect(beast::IP::Endpoint const& remote_endpoint)
+OverlayImpl::connect(boost::asio::ip::tcp::endpoint const& remote_endpoint)
 {
     assert(work_);
 
@@ -413,7 +412,8 @@ OverlayImpl::connect(beast::IP::Endpoint const& remote_endpoint)
         return;
     }
 
-    auto const slot = peerFinder().new_outbound_slot(remote_endpoint);
+    auto const slot =
+        peerFinder().new_outbound_slot(beast::IP::from_asio(remote_endpoint));
     if (slot == nullptr)
     {
         JLOG(journal_.debug()) << "Connect: No slot for " << remote_endpoint;
@@ -423,7 +423,7 @@ OverlayImpl::connect(beast::IP::Endpoint const& remote_endpoint)
     auto const p = std::make_shared<ConnectAttempt>(
         app_,
         io_service_,
-        beast::IPAddressConversion::to_asio_endpoint(remote_endpoint),
+        remote_endpoint,
         usage,
         setup_.context,
         next_id_++,
@@ -562,9 +562,9 @@ OverlayImpl::onPrepare()
             for (auto const& addr : addresses)
             {
                 if (addr.port() == 0)
-                    ips.push_back(to_string(addr.at_port(DEFAULT_PEER_PORT)));
+                    ips.push_back(addr.at_port(DEFAULT_PEER_PORT).to_string());
                 else
-                    ips.push_back(to_string(addr));
+                    ips.push_back(addr.to_string());
             }
 
             std::string const base("config: ");
@@ -1344,9 +1344,8 @@ OverlayImpl::stop()
 void
 OverlayImpl::autoConnect()
 {
-    auto const result = m_peerFinder->autoconnect();
-    for (auto addr : result)
-        connect(addr);
+    for (auto ep : m_peerFinder->autoconnect())
+        connect(ep);
 }
 
 void
@@ -1479,9 +1478,11 @@ setup_Overlay(BasicConfig const& config)
         if (!ip.empty())
         {
             boost::system::error_code ec;
-            setup.public_ip = beast::IP::Address::from_string(ip, ec);
+            setup.public_ip = boost::asio::ip::address::from_string(ip, ec);
+#if 0
             if (ec || beast::IP::is_private(setup.public_ip))
                 Throw<std::runtime_error>("Configured public IP is invalid");
+#endif
         }
     }
 

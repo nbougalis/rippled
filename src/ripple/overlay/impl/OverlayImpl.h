@@ -178,7 +178,7 @@ public:
         endpoint_type remote_endpoint) override;
 
     void
-    connect(beast::IP::Endpoint const& remote_endpoint) override;
+    connect(boost::asio::ip::tcp::endpoint const& remote) override;
 
     int
     limit() override;

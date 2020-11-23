@@ -19,6 +19,7 @@
 
 #include <ripple/app/main/GRPCServer.h>
 #include <ripple/beast/core/CurrentThreadName.h>
+#include <ripple/beast/net/IPAddressConversion.h>
 #include <ripple/resource/Fees.h>
 
 namespace ripple {
@@ -201,7 +202,8 @@ GRPCServerImpl::CallData<Request, Response>::getUsage()
     std::string peer = getEndpoint(ctx_.peer());
     boost::optional<beast::IP::Endpoint> endpoint =
         beast::IP::Endpoint::from_string_checked(peer);
-    return app_.getResourceManager().newInboundEndpoint(endpoint.get());
+    return app_.getResourceManager().newInboundEndpoint(
+        beast::IP::to_asio_endpoint(endpoint.get()));
 }
 
 GRPCServerImpl::GRPCServerImpl(Application& app)

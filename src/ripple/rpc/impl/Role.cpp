@@ -17,6 +17,7 @@
 */
 //==============================================================================
 
+#include <ripple/beast/net/IPAddressConversion.h>
 #include <ripple/rpc/Role.h>
 #include <boost/beast/core/string.hpp>
 #include <boost/beast/http/field.hpp>
@@ -42,13 +43,13 @@ passwordUnrequiredOrSentCorrect(Port const& port, Json::Value const& params)
 
 bool
 ipAllowed(
-    beast::IP::Address const& remoteIp,
-    std::vector<beast::IP::Address> const& adminIp)
+    boost::asio::ip::address const& remoteIp,
+    std::vector<boost::asio::ip::address> const& adminIp)
 {
     return std::find_if(
                adminIp.begin(),
                adminIp.end(),
-               [&remoteIp](beast::IP::Address const& ip) {
+               [&remoteIp](boost::asio::ip::address const& ip) {
                    return ip.is_unspecified() || ip == remoteIp;
                }) != adminIp.end();
 }
@@ -57,7 +58,7 @@ bool
 isAdmin(
     Port const& port,
     Json::Value const& params,
-    beast::IP::Address const& remoteIp)
+    boost::asio::ip::address const& remoteIp)
 {
     return ipAllowed(remoteIp, port.admin_ip) &&
         passwordUnrequiredOrSentCorrect(port, params);
@@ -68,16 +69,16 @@ requestRole(
     Role const& required,
     Port const& port,
     Json::Value const& params,
-    beast::IP::Endpoint const& remoteIp,
+    boost::asio::ip::tcp::endpoint const& remote,
     boost::string_view const& user)
 {
-    if (isAdmin(port, params, remoteIp.address()))
+    if (isAdmin(port, params, remote.address()))
         return Role::ADMIN;
 
     if (required == Role::ADMIN)
         return Role::FORBID;
 
-    if (ipAllowed(remoteIp.address(), port.secure_gateway_ip))
+    if (ipAllowed(remote.address(), port.secure_gateway_ip))
     {
         if (user.size())
             return Role::IDENTIFIED;
@@ -104,13 +105,14 @@ isUnlimited(
     beast::IP::Endpoint const& remoteIp,
     std::string const& user)
 {
-    return isUnlimited(requestRole(required, port, params, remoteIp, user));
+    return isUnlimited(requestRole(
+        required, port, params, beast::IP::to_asio_endpoint(remoteIp), user));
 }
 
 Resource::Consumer
 requestInboundEndpoint(
     Resource::Manager& manager,
-    beast::IP::Endpoint const& remoteAddress,
+    boost::asio::ip::tcp::endpoint const& remoteAddress,
     Role const& role,
     boost::string_view const& user,
     boost::string_view const& forwardedFor)

@@ -72,9 +72,9 @@ populate(
     Section const& section,
     std::string const& field,
     std::ostream& log,
-    boost::optional<std::vector<beast::IP::Address>>& ips,
+    boost::optional<std::vector<boost::asio::ip::address>>& ips,
     bool allowAllIps,
-    std::vector<beast::IP::Address> const& admin_ip)
+    std::vector<boost::asio::ip::address> const& admin_ip)
 {
     auto const result = section.find(field);
     if (result.second)
@@ -94,7 +94,7 @@ populate(
                 Throw<std::exception>();
             }
 
-            if (is_unspecified(*addr))
+            if (addr->address().is_unspecified())
             {
                 if (!allowAllIps)
                 {
@@ -121,7 +121,7 @@ populate(
             if (std::find_if(
                     admin_ip.begin(),
                     admin_ip.end(),
-                    [&address](beast::IP::Address const& a) {
+                    [&address](boost::asio::ip::address const& a) {
                         return address == a;
                     }) != admin_ip.end())
             {

@@ -37,6 +37,8 @@
 #include <ripple/peerfinder/impl/Store.h>
 #include <ripple/peerfinder/impl/iosformat.h>
 
+#include <boost/asio/ip/tcp.hpp>
+
 #include <algorithm>
 #include <functional>
 #include <map>
@@ -94,7 +96,7 @@ public:
     // The addresses (but not port) we are connected to. This includes
     // outgoing connection attempts. Note that this set can contain
     // duplicates (since the port is not set)
-    std::multiset<beast::IP::Address> connectedAddresses_;
+    std::multiset<boost::asio::ip::address> connectedAddresses_;
 
     // Set of public keys belonging to active peers
     std::set<PublicKey> keys_;
@@ -221,10 +223,13 @@ public:
     // Called when the Checker completes a connectivity test
     void
     checkComplete(
-        beast::IP::Endpoint const& remoteAddress,
-        beast::IP::Endpoint const& checkedAddress,
+        boost::asio::ip::tcp::endpoint const& remoteAddress_,
+        boost::asio::ip::tcp::endpoint const& checkedAddress_,
         boost::system::error_code ec)
     {
+        auto const remoteAddress = beast::IP::from_asio(remoteAddress_);
+        auto const checkedAddress = beast::IP::from_asio(checkedAddress_);
+
         if (ec == boost::asio::error::operation_aborted)
             return;
 
@@ -273,6 +278,7 @@ public:
 
         std::lock_guard _(lock_);
 
+#if 0 // FIXME NIKB
         // Check for duplicate connection
         if (is_public(remote_endpoint))
         {
@@ -286,6 +292,7 @@ public:
                 return SlotImp::ptr();
             }
         }
+#endif
 
         // Create the slot
         SlotImp::ptr const slot(std::make_shared<SlotImp>(
@@ -463,18 +470,16 @@ public:
     // VFALCO TODO This should add the returned addresses to the
     //             squelch list in one go once the list is built,
     //             rather than having each module add to the squelch list.
-    std::vector<beast::IP::Endpoint>
+    std::vector<boost::asio::ip::tcp::endpoint>
     autoconnect()
     {
-        std::vector<beast::IP::Endpoint> const none;
-
         std::lock_guard _(lock_);
 
         // Count how many more outbound attempts to make
         //
         auto needed(counts_.attempts_needed());
         if (needed == 0)
-            return none;
+            return {};
 
         ConnectHandouts h(needed, m_squelches);
 
@@ -508,7 +513,7 @@ public:
                 JLOG(m_journal.debug())
                     << beast::leftw(18) << "Logic waiting on "
                     << counts_.attempts() << " attempts";
-                return none;
+                return {};
             }
         }
 
@@ -516,7 +521,7 @@ public:
         // have less than the desired number of outbound slots
         //
         if (!config_.autoConnect || counts_.out_active() >= counts_.out_max())
-            return none;
+            return {};
 
         // 2. Use Livecache if:
         //    There are any entries in the cache OR
@@ -539,7 +544,7 @@ public:
                 JLOG(m_journal.debug())
                     << beast::leftw(18) << "Logic waiting on "
                     << counts_.attempts() << " attempts";
-                return none;
+                return {};
             }
         }
 
@@ -562,7 +567,7 @@ public:
         for (auto iter(bootcache_.begin());
              !h.full() && iter != bootcache_.end();
              ++iter)
-            h.try_insert(*iter);
+            h.try_insert(beast::IP::to_asio_endpoint(*iter));
 
         if (!h.list().empty())
         {
@@ -574,7 +579,7 @@ public:
         }
 
         // If we get here we are stuck
-        return none;
+        return {};
     }
 
     std::vector<std::pair<std::shared_ptr<Slot>, std::vector<Endpoint>>>
@@ -636,8 +641,8 @@ public:
                 // is ignored, the type/version (ipv4 vs ipv6) doesn't matter
                 // either. ipv6 has a slightly more compact string
                 // representation of 0, so use that for self entries.
-                ep.address = beast::IP::Endpoint(beast::IP::AddressV6())
-                                 .at_port(config_.listeningPort);
+                ep.address = boost::asio::ip::tcp::endpoint{
+                    boost::asio::ip::address_v6(), config_.listeningPort};
                 for (auto& t : targets)
                     t.insert(ep);
             }
@@ -714,8 +719,8 @@ public:
                 {
                     // Fill in our neighbors remote address
                     neighbor = true;
-                    ep.address =
-                        slot->remote_endpoint().at_port(ep.address.port());
+                    ep.address = beast::IP::to_asio_endpoint(
+                        slot->remote_endpoint().at_port(ep.address.port()));
                 }
                 else
                 {
@@ -811,7 +816,8 @@ public:
                         std::bind(
                             &Logic::checkComplete,
                             this,
-                            slot->remote_endpoint(),
+                            beast::IP::to_asio_endpoint(
+                                slot->remote_endpoint()),
                             ep.address,
                             std::placeholders::_1));
 
@@ -833,7 +839,7 @@ public:
             // since their listening port is misconfigured.
             //
             livecache_.insert(ep);
-            bootcache_.insert(ep.address);
+            bootcache_.insert(beast::IP::from_asio(ep.address));
         }
 
         slot->whenAcceptEndpoints = now + Tuning::secondsPerMessage;
@@ -956,7 +962,7 @@ public:
     // Note that this does not use the port information in the IP::Endpoint
     // Must have the lock held
     bool
-    fixed(beast::IP::Address const& address) const
+    fixed(boost::asio::ip::address const& address) const
     {
         for (auto const& entry : fixed_)
             if (entry.first.address() == address)
@@ -992,7 +998,7 @@ public:
                     }))
             {
                 squelches.insert(iter->first.address());
-                c.push_back(iter->first);
+                c.push_back(beast::IP::to_asio_endpoint(iter->first));
                 --needed;
             }
         }
@@ -1022,13 +1028,14 @@ public:
     // Returns the number of addresses added.
     //
     int
-    addBootcacheAddresses(IPAddresses const& list)
+    addBootcacheAddresses(
+        std::vector<boost::asio::ip::tcp::endpoint> const& list)
     {
-        int count(0);
+        int count = 0;
         std::lock_guard _(lock_);
-        for (auto addr : list)
+        for (auto const& addr : list)
         {
-            if (bootcache_.insertStatic(addr))
+            if (bootcache_.insertStatic(beast::IP::from_asio(addr)))
                 ++count;
         }
         return count;
@@ -1063,7 +1070,8 @@ public:
 
         if (!results.error)
         {
-            int const count(addBootcacheAddresses(results.addresses));
+            int const count = addBootcacheAddresses(results.addresses);
+
             JLOG(m_journal.info())
                 << beast::leftw(18) << "Logic added " << count << " new "
                 << ((count == 1) ? "address" : "addresses") << " from "
@@ -1085,12 +1093,12 @@ public:
 
     // Returns true if the IP::Endpoint contains no invalid data.
     bool
-    is_valid_address(beast::IP::Endpoint const& address)
+    is_valid_address(boost::asio::ip::tcp::endpoint const& address)
     {
-        if (is_unspecified(address))
+        if (address.address().is_unspecified())
             return false;
-        if (!is_public(address))
-            return false;
+        //        if (!is_public(address))
+        //            return false;
         if (address.port() == 0)
             return false;
         return true;
@@ -1110,8 +1118,8 @@ public:
             beast::PropertyStream::Map item(set);
             SlotImp const& slot(*entry.second);
             if (slot.local_endpoint() != boost::none)
-                item["local_address"] = to_string(*slot.local_endpoint());
-            item["remote_address"] = to_string(slot.remote_endpoint());
+                item["local_address"] = slot.local_endpoint()->to_string();
+            item["remote_address"] = slot.remote_endpoint().to_string();
             if (slot.inbound())
                 item["inbound"] = "yes";
             if (slot.fixed())
@@ -1207,7 +1215,7 @@ Logic<Checker>::onRedirects(
     std::lock_guard _(lock_);
     std::size_t n = 0;
     for (; first != last && n < Tuning::maxRedirects; ++first, ++n)
-        bootcache_.insert(beast::IPAddressConversion::from_asio(*first));
+        bootcache_.insert(beast::IP::from_asio(*first));
     if (n > 0)
     {
         JLOG(m_journal.trace()) << beast::leftw(18) << "Logic add " << n

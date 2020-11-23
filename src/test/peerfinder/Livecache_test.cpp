@@ -20,11 +20,12 @@
 #include <ripple/basics/chrono.h>
 #include <ripple/basics/safe_cast.h>
 #include <ripple/beast/clock/manual_clock.h>
+#include <ripple/beast/net/IPAddressConversion.h>
 #include <ripple/beast/unit_test.h>
 #include <ripple/peerfinder/impl/Livecache.h>
 #include <boost/algorithm/string.hpp>
-#include <test/beast/IPEndpointCommon.h>
 #include <test/unit_test/SuiteJournal.h>
+#include <algorithm>
 
 namespace ripple {
 namespace PeerFinder {
@@ -40,15 +41,57 @@ class Livecache_test : public beast::unit_test::suite
     TestStopwatch clock_;
     test::SuiteJournal journal_;
 
+    beast::xor_shift_engine gen_;
+    std::uniform_int_distribution<std::uint8_t> dist_;
+
+    inline boost::asio::ip::tcp::endpoint
+    randomEP()
+    {
+        auto make4 = [this]() -> boost::asio::ip::address {
+            boost::asio::ip::address_v4 ret;
+            boost::asio::ip::address_v4::bytes_type raw;
+            do
+            {
+                std::generate(std::begin(raw), std::end(raw), [this]() {
+                    return dist_(gen_);
+                });
+                ret = boost::asio::ip::make_address_v4(raw);
+            } while (ret.is_unspecified());
+            return ret;
+        };
+
+        auto make6 = [this]() -> boost::asio::ip::address {
+            boost::asio::ip::address_v6 ret;
+            boost::asio::ip::address_v6::bytes_type raw;
+            do
+            {
+                std::generate(std::begin(raw), std::end(raw), [this]() {
+                    return dist_(gen_);
+                });
+                ret = boost::asio::ip::make_address_v6(raw);
+            } while (ret.is_unspecified());
+            return ret;
+        };
+
+        std::uint16_t constexpr minPort = 2459;
+        std::uint16_t constexpr maxPort = 51235;
+
+        return {
+            ripple::rand_bool(gen_) ? boost::asio::ip::address{make4()}
+                                    : boost::asio::ip::address{make6()},
+            ripple::rand_int(gen_, minPort, maxPort)};
+    }
+
 public:
-    Livecache_test() : journal_("Livecache_test", *this)
+    Livecache_test()
+        : journal_("Livecache_test", *this), gen_(0x243F6A8885A308D3)
     {
     }
 
     // Add the address as an endpoint
     template <class C>
     inline void
-    add(beast::IP::Endpoint ep, C& c, int hops = 0)
+    add(boost::asio::ip::tcp::endpoint ep, C& c, int hops = 0)
     {
         Endpoint cep{ep, hops};
         c.insert(cep);
@@ -61,17 +104,26 @@ public:
         Livecache<> c(clock_, journal_);
         BEAST_EXPECT(c.empty());
 
-        for (auto i = 0; i < 10; ++i)
-            add(beast::IP::randomEP(true), c);
+        std::vector<boost::asio::ip::tcp::endpoint> eps;
+
+        for (auto i = 0; i != 20; ++i)
+            eps.push_back(randomEP());
+
+        std::sort(eps.begin(), eps.end());
+        eps.erase(std::unique(eps.begin(), eps.end()), eps.end());
+        std::shuffle(eps.begin(), eps.end(), gen_);
+
+        for (auto const& ep : eps)
+            add(ep, c);
 
         BEAST_EXPECT(!c.empty());
-        BEAST_EXPECT(c.size() == 10);
+        BEAST_EXPECT(c.size() == eps.size());
 
-        for (auto i = 0; i < 10; ++i)
-            add(beast::IP::randomEP(false), c);
+        for (auto const& ep : eps)
+            add(ep, c);
 
         BEAST_EXPECT(!c.empty());
-        BEAST_EXPECT(c.size() == 20);
+        BEAST_EXPECT(c.size() == eps.size());
     }
 
     void
@@ -80,27 +132,29 @@ public:
         testcase("Insert/Update");
         Livecache<> c(clock_, journal_);
 
-        auto ep1 = Endpoint{beast::IP::randomEP(), 2};
+        auto const ep = randomEP();
+
+        auto ep1 = Endpoint{ep, 2};
         c.insert(ep1);
         BEAST_EXPECT(c.size() == 1);
         // third position list will contain the entry
         BEAST_EXPECT((c.hops.begin() + 2)->begin()->hops == 2);
 
-        auto ep2 = Endpoint{ep1.address, 4};
+        auto ep2 = Endpoint{ep, 4};
         // this will not change the entry has higher hops
         c.insert(ep2);
         BEAST_EXPECT(c.size() == 1);
         // still in third position list
         BEAST_EXPECT((c.hops.begin() + 2)->begin()->hops == 2);
 
-        auto ep3 = Endpoint{ep1.address, 2};
+        auto ep3 = Endpoint{ep, 2};
         // this will not change the entry has the same hops as existing
         c.insert(ep3);
         BEAST_EXPECT(c.size() == 1);
         // still in third position list
         BEAST_EXPECT((c.hops.begin() + 2)->begin()->hops == 2);
 
-        auto ep4 = Endpoint{ep1.address, 1};
+        auto ep4 = Endpoint{ep, 1};
         c.insert(ep4);
         BEAST_EXPECT(c.size() == 1);
         // now at second position list
@@ -114,7 +168,7 @@ public:
         using namespace std::chrono_literals;
         Livecache<> c(clock_, journal_);
 
-        auto ep1 = Endpoint{beast::IP::randomEP(), 1};
+        auto ep1 = Endpoint{randomEP(), 1};
         c.insert(ep1);
         BEAST_EXPECT(c.size() == 1);
         c.expire();
@@ -137,7 +191,7 @@ public:
         constexpr auto num_eps = 40;
         Livecache<> c(clock_, journal_);
         for (auto i = 0; i < num_eps; ++i)
-            add(beast::IP::randomEP(true),
+            add(randomEP(),
                 c,
                 ripple::rand_int(0, safe_cast<int>(Tuning::maxHops + 1)));
         auto h = c.hops.histogram();
@@ -161,7 +215,7 @@ public:
         testcase("Shuffle");
         Livecache<> c(clock_, journal_);
         for (auto i = 0; i < 100; ++i)
-            add(beast::IP::randomEP(true),
+            add(randomEP(),
                 c,
                 ripple::rand_int(0, safe_cast<int>(Tuning::maxHops + 1)));
 

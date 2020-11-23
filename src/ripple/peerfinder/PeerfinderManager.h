@@ -31,9 +31,6 @@ namespace PeerFinder {
 
 using clock_type = beast::abstract_clock<std::chrono::steady_clock>;
 
-/** Represents a set of addresses. */
-using IPAddresses = std::vector<beast::IP::Endpoint>;
-
 //------------------------------------------------------------------------------
 
 /** PeerFinder configuration settings. */
@@ -98,16 +95,22 @@ struct Config
 /** Describes a connectible peer address along with some metadata. */
 struct Endpoint
 {
-    Endpoint();
+    Endpoint() = default;
 
-    Endpoint(beast::IP::Endpoint const& ep, int hops_);
+    Endpoint(boost::asio::ip::tcp::endpoint const& ep, int hops_)
+        : hops(hops_), address(ep)
+    {
+    }
 
-    int hops;
-    beast::IP::Endpoint address;
+    int hops = 0;
+    boost::asio::ip::tcp::endpoint address;
 };
 
-bool
-operator<(Endpoint const& lhs, Endpoint const& rhs);
+inline bool
+operator<(Endpoint const& lhs, Endpoint const& rhs)
+{
+    return lhs.address < rhs.address;
+}
 
 /** A set of Endpoint used for connecting. */
 using Endpoints = std::vector<Endpoint>;
@@ -236,7 +239,7 @@ public:
     redirect(std::shared_ptr<Slot> const& slot) = 0;
 
     /** Return a set of addresses we should connect to. */
-    virtual std::vector<beast::IP::Endpoint>
+    virtual std::vector<boost::asio::ip::tcp::endpoint>
     autoconnect() = 0;
 
     virtual std::vector<std::pair<std::shared_ptr<Slot>, std::vector<Endpoint>>>

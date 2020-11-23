@@ -103,8 +103,8 @@ buildHandshake(
     boost::beast::http::fields& h,
     ripple::uint256 const& sharedValue,
     boost::optional<std::uint32_t> networkID,
-    beast::IP::Address public_ip,
-    beast::IP::Address remote_ip,
+    boost::asio::ip::address public_ip,
+    boost::asio::ip::address remote_ip,
     Application& app)
 {
     if (networkID)
@@ -132,11 +132,11 @@ buildHandshake(
     if (!app.config().SERVER_DOMAIN.empty())
         h.insert("Server-Domain", app.config().SERVER_DOMAIN);
 
-    if (beast::IP::is_public(remote_ip))
-        h.insert("Remote-IP", remote_ip.to_string());
-
-    if (!public_ip.is_unspecified())
-        h.insert("Local-IP", public_ip.to_string());
+    //    if (beast::IP::is_public(remote_ip))
+    //        h.insert("Remote-IP", remote_ip.to_string());
+    //
+    //    if (!public_ip.is_unspecified())
+    //        h.insert("Local-IP", public_ip.to_string());
 
     if (auto const cl = app.getLedgerMaster().getClosedLedger())
     {
@@ -156,8 +156,8 @@ verifyHandshake(
     boost::beast::http::fields const& headers,
     ripple::uint256 const& sharedValue,
     boost::optional<std::uint32_t> networkID,
-    beast::IP::Address public_ip,
-    beast::IP::Address remote,
+    boost::asio::ip::address public_ip,
+    boost::asio::ip::address remote,
     Application& app)
 {
     if (auto const iter = headers.find("Server-Domain"); iter != headers.end())
@@ -261,10 +261,10 @@ verifyHandshake(
         if (ec)
             throw std::runtime_error("Invalid Local-IP");
 
-        if (beast::IP::is_public(remote) && remote != local_ip)
-            throw std::runtime_error(
-                "Incorrect Local-IP: " + remote.to_string() + " instead of " +
-                local_ip.to_string());
+        //        if (beast::IP::is_public(remote) && remote != local_ip)
+        //            throw std::runtime_error(
+        //                "Incorrect Local-IP: " + remote.to_string() + "
+        //                instead of " + local_ip.to_string());
     }
 
     if (auto const iter = headers.find("Remote-IP"); iter != headers.end())
@@ -276,16 +276,17 @@ verifyHandshake(
         if (ec)
             throw std::runtime_error("Invalid Remote-IP");
 
-        if (beast::IP::is_public(remote) &&
-            !beast::IP::is_unspecified(public_ip))
-        {
-            // We know our public IP and peer reports our connection came
-            // from some other IP.
-            if (remote_ip != public_ip)
-                throw std::runtime_error(
-                    "Incorrect Remote-IP: " + public_ip.to_string() +
-                    " instead of " + remote_ip.to_string());
-        }
+        //        if (beast::IP::is_public(remote) &&
+        //            !beast::IP::is_unspecified(public_ip))
+        //        {
+        //            // We know our public IP and peer reports our connection
+        //            came
+        //            // from some other IP.
+        //            if (remote_ip != public_ip)
+        //                throw std::runtime_error(
+        //                    "Incorrect Remote-IP: " + public_ip.to_string() +
+        //                    " instead of " + remote_ip.to_string());
+        //        }
     }
 
     return publicKey;

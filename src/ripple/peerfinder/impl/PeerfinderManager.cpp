@@ -196,7 +196,7 @@ public:
         return m_logic.redirect(impl);
     }
 
-    std::vector<beast::IP::Endpoint>
+    std::vector<boost::asio::ip::tcp::endpoint>
     autoconnect() override
     {
         return m_logic.autoconnect();

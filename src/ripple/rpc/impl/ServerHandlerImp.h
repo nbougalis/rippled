@@ -52,33 +52,28 @@ public:
 
         std::vector<Port> ports;
 
-        // Memberspace
-        struct client_t
+        // Configuration when acting in client role:
+        struct
         {
-            explicit client_t() = default;
-
             bool secure = false;
+
+            // FIXME: use boost::asio::ip::tcp::endpoint instead
             std::string ip;
             std::uint16_t port = 0;
+
             std::string user;
             std::string password;
             std::string admin_user;
             std::string admin_password;
-        };
-
-        // Configuration when acting in client role
-        client_t client;
+        } client;
 
         // Configuration for the Overlay
-        struct overlay_t
+        struct
         {
-            explicit overlay_t() = default;
-
+            // FIXME: use boost::asio::ip::tcp::endpoint instead
             boost::asio::ip::address ip;
             std::uint16_t port = 0;
-        };
-
-        overlay_t overlay;
+        } overlay;
 
         void
         makeContexts();
@@ -136,7 +131,7 @@ public:
     //
 
     bool
-    onAccept(Session& session, boost::asio::ip::tcp::endpoint endpoint);
+    onAccept(Session& session, boost::asio::ip::tcp::endpoint const& endpoint);
 
     Handoff
     onHandoff(
@@ -188,8 +183,8 @@ private:
     processRequest(
         Port const& port,
         std::string const& request,
-        beast::IP::Endpoint const& remoteIPAddress,
-        Output&&,
+        boost::asio::ip::tcp::endpoint const& remote_endpoint,
+        Output&& output,
         std::shared_ptr<JobQueue::Coro> coro,
         boost::string_view forwardedFor,
         boost::string_view user);

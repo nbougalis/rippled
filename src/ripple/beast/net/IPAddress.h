@@ -22,9 +22,9 @@
 
 #include <ripple/beast/hash/hash_append.h>
 #include <ripple/beast/hash/uhash.h>
-#include <ripple/beast/net/IPAddressV4.h>
-#include <ripple/beast/net/IPAddressV6.h>
 #include <boost/asio/ip/address.hpp>
+#include <boost/asio/ip/address_v4.hpp>
+#include <boost/asio/ip/address_v6.hpp>
 #include <boost/functional/hash.hpp>
 #include <cassert>
 #include <cstdint>
@@ -36,59 +36,9 @@
 //------------------------------------------------------------------------------
 
 namespace beast {
-namespace IP {
-
-using Address = boost::asio::ip::address;
-
-/** Returns the address represented as a string. */
-inline std::string
-to_string(Address const& addr)
-{
-    return addr.to_string();
-}
-
-/** Returns `true` if this is a loopback address. */
-inline bool
-is_loopback(Address const& addr)
-{
-    return addr.is_loopback();
-}
-
-/** Returns `true` if the address is unspecified. */
-inline bool
-is_unspecified(Address const& addr)
-{
-    return addr.is_unspecified();
-}
-
-/** Returns `true` if the address is a multicast address. */
-inline bool
-is_multicast(Address const& addr)
-{
-    return addr.is_multicast();
-}
-
-/** Returns `true` if the address is a private unroutable address. */
-inline bool
-is_private(Address const& addr)
-{
-    return (addr.is_v4()) ? is_private(addr.to_v4()) : is_private(addr.to_v6());
-}
-
-/** Returns `true` if the address is a public routable address. */
-inline bool
-is_public(Address const& addr)
-{
-    return (addr.is_v4()) ? is_public(addr.to_v4()) : is_public(addr.to_v6());
-}
-
-}  // namespace IP
-
-//------------------------------------------------------------------------------
-
 template <class Hasher>
 void
-hash_append(Hasher& h, beast::IP::Address const& addr) noexcept
+hash_append(Hasher& h, boost::asio::ip::address const& addr) noexcept
 {
     using beast::hash_append;
     if (addr.is_v4())
@@ -100,32 +50,32 @@ hash_append(Hasher& h, beast::IP::Address const& addr) noexcept
 }
 }  // namespace beast
 
-namespace std {
-template <>
-struct hash<beast::IP::Address>
-{
-    explicit hash() = default;
-
-    std::size_t
-    operator()(beast::IP::Address const& addr) const
-    {
-        return beast::uhash<>{}(addr);
-    }
-};
-}  // namespace std
-
-namespace boost {
-template <>
-struct hash<::beast::IP::Address>
-{
-    explicit hash() = default;
-
-    std::size_t
-    operator()(::beast::IP::Address const& addr) const
-    {
-        return ::beast::uhash<>{}(addr);
-    }
-};
-}  // namespace boost
+//namespace std {
+//template <>
+//struct hash<boost::asio::ip::address>
+//{
+//    explicit hash() = default;
+//
+//    std::size_t
+//    operator()(boost::asio::ip::address const& addr) const
+//    {
+//        return beast::uhash<>{}(addr);
+//    }
+//};
+//}  // namespace std
+//
+//namespace boost {
+//template <>
+//struct hash<asio::ip::address>
+//{
+//    explicit hash() = default;
+//
+//    std::size_t
+//    operator()(asio::ip::address const& addr) const
+//    {
+//        return ::beast::uhash<>{}(addr);
+//    }
+//};
+//}  // namespace boost
 
 #endif

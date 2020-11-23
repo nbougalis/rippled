@@ -26,6 +26,7 @@
 #include <ripple/beast/net/IPEndpoint.h>
 #include <ripple/beast/utility/Journal.h>
 #include <ripple/protocol/SystemParameters.h>  // VFALCO Breaks levelization
+#include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core/string.hpp>
 #include <boost/filesystem.hpp>  // VFALCO FIX: This include should not be here
 #include <boost/lexical_cast.hpp>
@@ -191,7 +192,7 @@ public:
     bool REDUCE_RELAY_SQUELCH = false;
 
     // These override the command line client settings
-    boost::optional<beast::IP::Endpoint> rpc_ip;
+    boost::optional<boost::asio::ip::tcp::endpoint> rpc_ip;
 
     std::unordered_set<uint256, beast::uhash<>> features;
 

@@ -49,8 +49,8 @@ struct Port
     boost::asio::ip::address ip;
     std::uint16_t port = 0;
     std::set<std::string, boost::beast::iless> protocol;
-    std::vector<beast::IP::Address> admin_ip;
-    std::vector<beast::IP::Address> secure_gateway_ip;
+    std::vector<boost::asio::ip::address> admin_ip;
+    std::vector<boost::asio::ip::address> secure_gateway_ip;
     std::string user;
     std::string password;
     std::string admin_user;
@@ -107,8 +107,8 @@ struct ParsedPort
 
     boost::optional<boost::asio::ip::address> ip;
     boost::optional<std::uint16_t> port;
-    boost::optional<std::vector<beast::IP::Address>> admin_ip;
-    boost::optional<std::vector<beast::IP::Address>> secure_gateway_ip;
+    boost::optional<std::vector<boost::asio::ip::address>> admin_ip;
+    boost::optional<std::vector<boost::asio::ip::address>> secure_gateway_ip;
 };
 
 void

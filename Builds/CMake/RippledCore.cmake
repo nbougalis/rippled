@@ -29,8 +29,6 @@ target_sources (xrpl_core PRIVATE
   src/ripple/beast/insight/impl/NullCollector.cpp
   src/ripple/beast/insight/impl/StatsDCollector.cpp
   src/ripple/beast/net/impl/IPAddressConversion.cpp
-  src/ripple/beast/net/impl/IPAddressV4.cpp
-  src/ripple/beast/net/impl/IPAddressV6.cpp
   src/ripple/beast/net/impl/IPEndpoint.cpp
   src/ripple/beast/utility/src/beast_Journal.cpp
   src/ripple/beast/utility/src/beast_PropertyStream.cpp)
@@ -543,7 +541,6 @@ target_sources (rippled PRIVATE
        subdir: peerfinder
   #]===============================]
   src/ripple/peerfinder/impl/Bootcache.cpp
-  src/ripple/peerfinder/impl/Endpoint.cpp
   src/ripple/peerfinder/impl/PeerfinderConfig.cpp
   src/ripple/peerfinder/impl/PeerfinderManager.cpp
   src/ripple/peerfinder/impl/SlotImp.cpp

@@ -21,13 +21,13 @@
 #define RIPPLE_RESOURCE_MANAGER_H_INCLUDED
 
 #include <ripple/beast/insight/Collector.h>
-#include <ripple/beast/net/IPEndpoint.h>
 #include <ripple/beast/utility/Journal.h>
 #include <ripple/beast/utility/PropertyStream.h>
 #include <ripple/json/json_value.h>
 #include <ripple/resource/Consumer.h>
 #include <ripple/resource/Gossip.h>
 #include <boost/utility/string_view.hpp>
+#include <boost/asio/ip/tcp.hpp>
 
 namespace ripple {
 namespace Resource {
@@ -44,20 +44,20 @@ public:
     /** Create a new endpoint keyed by inbound IP address or the forwarded
      * IP if proxied. */
     virtual Consumer
-    newInboundEndpoint(beast::IP::Endpoint const& address) = 0;
+    newInboundEndpoint(boost::asio::ip::tcp::endpoint const& address) = 0;
     virtual Consumer
     newInboundEndpoint(
-        beast::IP::Endpoint const& address,
+        boost::asio::ip::tcp::endpoint const& address,
         bool const proxy,
         boost::string_view const& forwardedFor) = 0;
 
     /** Create a new endpoint keyed by outbound IP address and port. */
     virtual Consumer
-    newOutboundEndpoint(beast::IP::Endpoint const& address) = 0;
+    newOutboundEndpoint(boost::asio::ip::tcp::endpoint const& address) = 0;
 
     /** Create a new unlimited endpoint keyed by forwarded IP. */
     virtual Consumer
-    newUnlimitedEndpoint(beast::IP::Endpoint const& address) = 0;
+    newUnlimitedEndpoint(boost::asio::ip::tcp::endpoint const& address) = 0;
 
     /** Extract packaged consumer information for export. */
     virtual Gossip

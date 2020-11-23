@@ -272,22 +272,19 @@ class ConnectHandouts
 public:
     // Keeps track of addresses we have made outgoing connections
     // to, for the purposes of not connecting to them too frequently.
-    using Squelches = beast::aged_set<beast::IP::Address>;
-
-    using list_type = std::vector<beast::IP::Endpoint>;
+    using Squelches = beast::aged_set<boost::asio::ip::address>;
 
 private:
     std::size_t m_needed;
     Squelches& m_squelches;
-    list_type m_list;
+    std::vector<boost::asio::ip::tcp::endpoint> m_list;
 
 public:
     template <class = void>
     ConnectHandouts(std::size_t needed, Squelches& squelches);
 
-    template <class = void>
     bool
-    try_insert(beast::IP::Endpoint const& endpoint);
+    try_insert(boost::asio::ip::tcp::endpoint const& endpoint);
 
     bool
     empty() const
@@ -307,13 +304,13 @@ public:
         return try_insert(endpoint.address);
     }
 
-    list_type&
+    std::vector<boost::asio::ip::tcp::endpoint>&
     list()
     {
         return m_list;
     }
 
-    list_type const&
+    std::vector<boost::asio::ip::tcp::endpoint> const&
     list() const
     {
         return m_list;
@@ -327,9 +324,8 @@ ConnectHandouts::ConnectHandouts(std::size_t needed, Squelches& squelches)
     m_list.reserve(needed);
 }
 
-template <class>
-bool
-ConnectHandouts::try_insert(beast::IP::Endpoint const& endpoint)
+inline bool
+ConnectHandouts::try_insert(boost::asio::ip::tcp::endpoint const& endpoint)
 {
     if (full())
         return false;
@@ -338,7 +334,7 @@ ConnectHandouts::try_insert(beast::IP::Endpoint const& endpoint)
     if (std::any_of(
             m_list.begin(),
             m_list.end(),
-            [&endpoint](beast::IP::Endpoint const& other) {
+            [&endpoint](boost::asio::ip::tcp::endpoint const& other) {
                 // Ignore port for security reasons
                 return other.address() == endpoint.address();
             }))

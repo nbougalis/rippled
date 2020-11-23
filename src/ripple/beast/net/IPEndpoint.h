@@ -25,6 +25,7 @@
 #include <ripple/beast/net/IPAddress.h>
 
 #include <boost/optional.hpp>
+#include <boost/asio/ip/tcp.hpp>
 
 #include <cstdint>
 #include <ios>
@@ -43,7 +44,7 @@ public:
     Endpoint();
 
     /** Create an endpoint from the address and optional port. */
-    explicit Endpoint(Address const& addr, Port port = 0);
+    explicit Endpoint(boost::asio::ip::address const& addr, Port port = 0);
 
     /** Create an Endpoint from a string.
         If the port is omitted, the endpoint will have a zero port.
@@ -73,35 +74,11 @@ public:
     }
 
     /** Returns the address portion of this endpoint. */
-    Address const&
+    boost::asio::ip::address const&
     address() const
     {
         return m_addr;
     }
-
-    /** Convenience accessors for the address part. */
-    /** @{ */
-    bool
-    is_v4() const
-    {
-        return m_addr.is_v4();
-    }
-    bool
-    is_v6() const
-    {
-        return m_addr.is_v6();
-    }
-    AddressV4 const
-    to_v4() const
-    {
-        return m_addr.to_v4();
-    }
-    AddressV6 const
-    to_v6() const
-    {
-        return m_addr.to_v6();
-    }
-    /** @} */
 
     /** Arithmetic comparison. */
     /** @{ */
@@ -141,64 +118,18 @@ public:
     }
 
 private:
-    Address m_addr;
+    boost::asio::ip::address m_addr;
     Port m_port;
 };
 
 //------------------------------------------------------------------------------
-
-// Properties
-
-/** Returns `true` if the endpoint is a loopback address. */
-inline bool
-is_loopback(Endpoint const& endpoint)
-{
-    return is_loopback(endpoint.address());
-}
-
-/** Returns `true` if the endpoint is unspecified. */
-inline bool
-is_unspecified(Endpoint const& endpoint)
-{
-    return is_unspecified(endpoint.address());
-}
-
-/** Returns `true` if the endpoint is a multicast address. */
-inline bool
-is_multicast(Endpoint const& endpoint)
-{
-    return is_multicast(endpoint.address());
-}
-
-/** Returns `true` if the endpoint is a private unroutable address. */
-inline bool
-is_private(Endpoint const& endpoint)
-{
-    return is_private(endpoint.address());
-}
-
-/** Returns `true` if the endpoint is a public routable address. */
-inline bool
-is_public(Endpoint const& endpoint)
-{
-    return is_public(endpoint.address());
-}
-
-//------------------------------------------------------------------------------
-
-/** Returns the endpoint represented as a string. */
-inline std::string
-to_string(Endpoint const& endpoint)
-{
-    return endpoint.to_string();
-}
 
 /** Output stream conversion. */
 template <typename OutputStream>
 OutputStream&
 operator<<(OutputStream& os, Endpoint const& endpoint)
 {
-    os << to_string(endpoint);
+    os << endpoint.to_string();
     return os;
 }
 
@@ -224,6 +155,59 @@ struct hash<::beast::IP::Endpoint>
         return ::beast::uhash<>{}(endpoint);
     }
 };
+
+template <>
+struct hash<::boost::asio::ip::address_v4>
+{
+    explicit hash() = default;
+
+    std::size_t
+    operator()(::boost::asio::ip::address_v4 const& address) const
+    {
+        return ::beast::uhash<>{}(address.to_bytes());
+    }
+};
+
+template <>
+struct hash<::boost::asio::ip::address_v6>
+{
+    explicit hash() = default;
+
+    std::size_t
+    operator()(::boost::asio::ip::address_v6 const& address) const
+    {
+        return ::beast::uhash<>{}(address.to_bytes());
+    }
+};
+
+template <>
+struct hash<::boost::asio::ip::address>
+{
+    explicit hash() = default;
+
+    std::size_t
+    operator()(::boost::asio::ip::address const& address) const
+    {
+        if (address.is_v4())
+            return ::beast::uhash<>{}(address.to_v4());
+        return ::beast::uhash<>{}(address.to_v6());
+    }
+};
+
+template <>
+struct hash<::boost::asio::ip::tcp::endpoint>
+{
+    explicit hash() = default;
+
+    std::size_t
+    operator()(::boost::asio::ip::tcp::endpoint const& endpoint) const
+    {
+        std::size_t result = ::beast::uhash<>{}(endpoint.address());
+        if (endpoint.port())
+            boost::hash_combine(result, 60649 * endpoint.port());
+        return result;
+    }
+};
 }  // namespace std
 
 namespace boost {
@@ -237,6 +221,59 @@ struct hash<::beast::IP::Endpoint>
     operator()(::beast::IP::Endpoint const& endpoint) const
     {
         return ::beast::uhash<>{}(endpoint);
+    }
+};
+
+template <>
+struct hash<::boost::asio::ip::address_v4>
+{
+    explicit hash() = default;
+
+    std::size_t
+    operator()(::boost::asio::ip::address_v4 const& address) const
+    {
+        return ::beast::uhash<>{}(address.to_bytes());
+    }
+};
+
+template <>
+struct hash<::boost::asio::ip::address_v6>
+{
+    explicit hash() = default;
+
+    std::size_t
+    operator()(::boost::asio::ip::address_v6 const& address) const
+    {
+        return ::beast::uhash<>{}(address.to_bytes());
+    }
+};
+
+template <>
+struct hash<::boost::asio::ip::address>
+{
+    explicit hash() = default;
+
+    std::size_t
+    operator()(::boost::asio::ip::address const& address) const
+    {
+        if (address.is_v4())
+            return ::beast::uhash<>{}(address.to_v4());
+        return ::beast::uhash<>{}(address.to_v6());
+    }
+};
+
+template <>
+struct hash<::boost::asio::ip::tcp::endpoint>
+{
+    explicit hash() = default;
+
+    std::size_t
+    operator()(::boost::asio::ip::tcp::endpoint const& endpoint) const
+    {
+        std::size_t result = ::beast::uhash<>{}(endpoint.address());
+        if (endpoint.port())
+            boost::hash_combine(result, 60649 * endpoint.port());
+        return result;
     }
 };
 }  // namespace boost

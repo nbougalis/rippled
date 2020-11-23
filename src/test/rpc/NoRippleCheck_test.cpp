@@ -272,8 +272,12 @@ class NoRippleCheckLimits_test : public beast::unit_test::suite
             using namespace ripple::Resource;
             using namespace std::chrono;
             using namespace beast::IP;
+
+            auto const localhost =
+                boost::asio::ip::make_address(test::getEnvLocalhostAddr());
+
             auto c = env.app().getResourceManager().newInboundEndpoint(
-                Endpoint::from_string(test::getEnvLocalhostAddr()));
+                {localhost, 0});
 
             // if we go above the warning threshold, reset
             if (c.balance() > warningThreshold)

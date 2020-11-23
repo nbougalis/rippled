@@ -81,10 +81,9 @@ public:
         st.execute();
         while (st.fetch())
         {
-            beast::IP::Endpoint const endpoint(
-                beast::IP::Endpoint::from_string(s));
+            auto const endpoint = beast::IP::Endpoint::from_string(s);
 
-            if (!is_unspecified(endpoint))
+            if (!endpoint.address().is_unspecified())
             {
                 cb(endpoint, valence);
                 ++n;
@@ -115,7 +114,7 @@ public:
 
             for (auto const& e : v)
             {
-                s.emplace_back(to_string(e.endpoint));
+                s.emplace_back(e.endpoint.to_string());
                 valence.emplace_back(e.valence);
             }
 
@@ -207,7 +206,7 @@ public:
                 {
                     Store::Entry entry;
                     entry.endpoint = beast::IP::Endpoint::from_string(s);
-                    if (!is_unspecified(entry.endpoint))
+                    if (!entry.endpoint.address().is_unspecified())
                     {
                         entry.valence = valence;
                         list.push_back(entry);
@@ -229,7 +228,7 @@ public:
 
                 for (auto iter(list.cbegin()); iter != list.cend(); ++iter)
                 {
-                    s.emplace_back(to_string(iter->endpoint));
+                    s.emplace_back(iter->endpoint.to_string());
                     valence.emplace_back(iter->valence);
                 }
 

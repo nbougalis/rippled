@@ -20,6 +20,7 @@
 #ifndef RIPPLE_OVERLAY_OVERLAY_H_INCLUDED
 #define RIPPLE_OVERLAY_OVERLAY_H_INCLUDED
 
+#include <ripple/beast/net/IPAddressConversion.h>
 #include <ripple/beast/utility/PropertyStream.h>
 #include <ripple/core/Stoppable.h>
 #include <ripple/json/json_value.h>
@@ -72,7 +73,7 @@ public:
         explicit Setup() = default;
 
         std::shared_ptr<boost::asio::ssl::context> context;
-        beast::IP::Address public_ip;
+        boost::asio::ip::address public_ip;
         int ipLimit = 0;
         std::uint32_t crawlOptions = 0;
         boost::optional<std::uint32_t> networkID;
@@ -95,7 +96,7 @@ public:
         performed asynchronously.
     */
     virtual void
-    connect(beast::IP::Endpoint const& address) = 0;
+    connect(boost::asio::ip::tcp::endpoint const& ep) = 0;
 
     /** Returns the maximum number of peers we are configured to allow. */
     virtual int

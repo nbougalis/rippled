@@ -46,7 +46,7 @@ public:
         boost::system::error_code error;
 
         // list of fetched endpoints
-        IPAddresses addresses;
+        std::vector<boost::asio::ip::tcp::endpoint> addresses;
     };
 
     virtual ~Source()

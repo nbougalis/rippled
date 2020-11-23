@@ -25,6 +25,7 @@
 #include <ripple/server/WSSession.h>
 #include <ripple/server/Writer.h>
 #include <boost/beast/http/message.hpp>
+#include <boost/asio/ip/tcp.hpp>
 #include <functional>
 #include <memory>
 #include <ostream>
@@ -61,7 +62,7 @@ public:
     port() = 0;
 
     /** Returns the remote address of the connection. */
-    virtual beast::IP::Endpoint
+    virtual boost::asio::ip::tcp::endpoint const&
     remoteAddress() = 0;
 
     /** Returns the current HTTP request. */

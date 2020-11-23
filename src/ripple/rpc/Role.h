@@ -20,11 +20,11 @@
 #ifndef RIPPLE_SERVER_ROLE_H_INCLUDED
 #define RIPPLE_SERVER_ROLE_H_INCLUDED
 
-#include <ripple/beast/net/IPEndpoint.h>
 #include <ripple/json/json_value.h>
 #include <ripple/resource/ResourceManager.h>
 #include <ripple/server/Handoff.h>
 #include <ripple/server/Port.h>
+#include <boost/asio/ip/tcp.hpp>
 #include <boost/utility/string_view.hpp>
 #include <string>
 #include <vector>
@@ -52,13 +52,13 @@ requestRole(
     Role const& required,
     Port const& port,
     Json::Value const& params,
-    beast::IP::Endpoint const& remoteIp,
+    boost::asio::ip::tcp::endpoint const& remote,
     boost::string_view const& user);
 
 Resource::Consumer
 requestInboundEndpoint(
     Resource::Manager& manager,
-    beast::IP::Endpoint const& remoteAddress,
+    boost::asio::ip::tcp::endpoint const& remoteAddress,
     Role const& role,
     boost::string_view const& user,
     boost::string_view const& forwardedFor);
@@ -78,8 +78,8 @@ isUnlimited(Role const& role);
  */
 bool
 ipAllowed(
-    beast::IP::Address const& remoteIp,
-    std::vector<beast::IP::Address> const& adminIp);
+    boost::asio::ip::address const& remoteIp,
+    std::vector<boost::asio::ip::address> const& adminIp);
 
 boost::string_view
 forwardedFor(http_request_type const& request);

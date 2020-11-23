@@ -120,7 +120,9 @@ public:
     */
     template <class Handler>
     void
-    async_connect(beast::IP::Endpoint const& endpoint, Handler&& handler);
+    async_connect(
+        boost::asio::ip::tcp::endpoint const& endpoint,
+        Handler&& handler);
 
 private:
     void
@@ -205,7 +207,7 @@ template <class Protocol>
 template <class Handler>
 void
 Checker<Protocol>::async_connect(
-    beast::IP::Endpoint const& endpoint,
+    boost::asio::ip::tcp::endpoint const& endpoint,
     Handler&& handler)
 {
     auto const op = std::make_shared<async_op<Handler>>(
@@ -215,7 +217,7 @@ Checker<Protocol>::async_connect(
         list_.push_back(*op);
     }
     op->socket_.async_connect(
-        beast::IPAddressConversion::to_asio_endpoint(endpoint),
+        endpoint,
         std::bind(&basic_async_op::operator(), op, std::placeholders::_1));
 }
 

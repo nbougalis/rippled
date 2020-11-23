@@ -21,9 +21,8 @@
 #define BEAST_INSIGHT_STATSDCOLLECTOR_H_INCLUDED
 
 #include <ripple/beast/insight/Collector.h>
-
-#include <ripple/beast/net/IPEndpoint.h>
 #include <ripple/beast/utility/Journal.h>
+#include <boost/asio/ip/udp.hpp>
 
 namespace beast {
 namespace insight {
@@ -43,7 +42,7 @@ public:
         @param journal Destination for logging output.
     */
     static std::shared_ptr<StatsDCollector>
-    New(IP::Endpoint const& address,
+    New(boost::asio::ip::udp::endpoint const& address,
         std::string const& prefix,
         Journal journal);
 };

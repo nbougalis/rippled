@@ -109,7 +109,7 @@ private:
 
     // Updated at each stage of the connection process to reflect
     // the current conditions as closely as possible.
-    beast::IP::Endpoint const remote_address_;
+    boost::asio::ip::tcp::endpoint const remote_address_;
 
     // These are up here to prevent warnings about order of initializations
     //
@@ -304,7 +304,7 @@ public:
     void
     sendEndpoints(FwdIt first, FwdIt last);
 
-    beast::IP::Endpoint
+    boost::asio::ip::tcp::endpoint const&
     getRemoteAddress() const override
     {
         return remote_address_;
@@ -471,7 +471,7 @@ private:
     makeResponse(
         bool crawl,
         http_request_type const& req,
-        beast::IP::Address remote_ip,
+        boost::asio::ip::address remote_ip,
         uint256 const& sharedValue);
 
     void
@@ -631,7 +631,7 @@ PeerImp::PeerImp(
     , stream_(*stream_ptr_)
     , strand_(socket_.get_executor())
     , timer_(waitable_timer{socket_.get_executor()})
-    , remote_address_(slot->remote_endpoint())
+    , remote_address_(beast::IP::to_asio_endpoint(slot->remote_endpoint()))
     , overlay_(overlay)
     , m_inbound(false)
     , protocol_(protocol)
@@ -663,7 +663,7 @@ PeerImp::sendEndpoints(FwdIt first, FwdIt last)
     while (first != last)
     {
         auto& tme2(*tm.add_endpoints_v2());
-        tme2.set_endpoint(first->address.to_string());
+        tme2.set_endpoint(to_string(first->address));
         tme2.set_hops(first->hops);
         first++;
     }

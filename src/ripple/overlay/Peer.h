@@ -21,10 +21,10 @@
 #define RIPPLE_OVERLAY_PEER_H_INCLUDED
 
 #include <ripple/basics/base_uint.h>
-#include <ripple/beast/net/IPEndpoint.h>
 #include <ripple/json/json_value.h>
 #include <ripple/overlay/Message.h>
 #include <ripple/protocol/PublicKey.h>
+#include <boost/asio/ip/tcp.hpp>
 
 namespace ripple {
 
@@ -61,7 +61,7 @@ public:
     virtual void
     send(std::shared_ptr<Message> const& m) = 0;
 
-    virtual beast::IP::Endpoint
+    virtual boost::asio::ip::tcp::endpoint const&
     getRemoteAddress() const = 0;
 
     /** Adjust this peer's load balance based on the type of load imposed. */

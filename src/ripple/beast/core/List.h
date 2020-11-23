@@ -208,7 +208,7 @@ private:
 
     @code
 
-    for (List <Object>::iterator iter = list.begin(); iter != list.end; ++iter)
+    for (List <Object>::iterator iter = list.bebeastgin(); iter != list.end; ++iter)
         std::cout << iter->m_value;
 
     @endcode

@@ -125,7 +125,7 @@ private:
             return boost::asio::ip::tcp::endpoint{};
         }
 
-        return beast::IPAddressConversion::to_asio_endpoint(bep);
+        return beast::IP::to_asio_endpoint(bep);
     }
 };
 

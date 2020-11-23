@@ -96,7 +96,8 @@ public:
             if (!list.empty())
             {
                 BEAST_EXPECT(list.size() == 1);
-                auto const slot = logic.new_outbound_slot(list.front());
+                auto const slot =
+                    logic.new_outbound_slot(beast::IP::from_asio(list.front()));
                 BEAST_EXPECT(logic.onConnected(
                     slot, beast::IP::Endpoint::from_string("65.0.0.2:5")));
                 logic.on_closed(slot);
@@ -137,7 +138,8 @@ public:
             if (!list.empty())
             {
                 BEAST_EXPECT(list.size() == 1);
-                auto const slot = logic.new_outbound_slot(list.front());
+                auto const slot =
+                    logic.new_outbound_slot(beast::IP::from_asio(list.front()));
                 if (!BEAST_EXPECT(logic.onConnected(
                         slot, beast::IP::Endpoint::from_string("65.0.0.2:5"))))
                     return;
