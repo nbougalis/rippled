@@ -67,8 +67,8 @@ $(function() {
 <div class="header">
   <div class="summary">
 <a href="#pub-methods">Public Member Functions</a> &#124;
-<a href="#pro-methods">Protected Member Functions</a> &#124;
-<a href="#pro-attribs">Protected Attributes</a> &#124;
+<a href="#pri-methods">Private Member Functions</a> &#124;
+<a href="#pri-attribs">Private Attributes</a> &#124;
 <a href="classripple_1_1AmendmentTableImpl-members.html">List of all members</a>  </div>
   <div class="headertitle">
 <div class="title">ripple::AmendmentTableImpl Class Reference<span class="mlabels"><span class="mlabel">final</span></span></div>  </div>
@@ -91,81 +91,86 @@ Collaboration diagram for ripple::AmendmentTableImpl:</div>
 <div class="dyncontent">
 <div class="center"><img src="classripple_1_1AmendmentTableImpl__coll__graph.png" border="0" usemap="#ripple_1_1AmendmentTableImpl_coll__map" alt="Collaboration graph"/></div>
 <map name="ripple_1_1AmendmentTableImpl_coll__map" id="ripple_1_1AmendmentTableImpl_coll__map">
-<area shape="rect" title="Track the list of &quot;amendments&quot;." alt="" coords="1740,177,1951,204"/>
-<area shape="rect" href="classripple_1_1AmendmentTable.html" title="The amendment table stores the list of enabled and potential amendments." alt="" coords="1411,5,1592,32"/>
+<area shape="rect" title="Track the list of &quot;amendments&quot;." alt="" coords="2548,172,2759,199"/>
+<area shape="rect" href="classripple_1_1AmendmentTable.html" title="The amendment table stores the list of enabled and potential amendments." alt="" coords="2219,5,2400,32"/>
 <area shape="rect" href="http://en.cppreference.com/w/cpp/types/integer.html" title=" " alt="" coords="5,136,108,163"/>
-<area shape="rect" href="http://en.cppreference.com/w/cpp/container/array.html" title=" " alt="" coords="221,217,389,258"/>
-<area shape="rect" href="http://en.cppreference.com/w/cpp/chrono/duration.html" title=" " alt="" coords="1424,236,1579,263"/>
-<area shape="rect" href="http://en.cppreference.com/w/cpp/memory/unique_ptr.html" title=" " alt="" coords="1416,170,1587,211"/>
-<area shape="rect" href="structripple_1_1AmendmentSet.html" title="The status of all amendments requested in a given window." alt="" coords="1077,191,1245,217"/>
-<area shape="rect" href="http://en.cppreference.com/w/cpp/container/unordered_map.html" title=" " alt="" coords="805,197,957,253"/>
-<area shape="rect" href="classripple_1_1base__uint.html" title=" " alt="" coords="507,186,648,227"/>
-<area shape="rect" href="http://en.cppreference.com/w/cpp/container/unordered_map.html" title=" " alt="" coords="781,117,981,173"/>
-<area shape="rect" href="http://en.cppreference.com/w/cpp/types/size_t.html" title=" " alt="" coords="261,165,349,192"/>
-<area shape="rect" href="http://en.cppreference.com/w/cpp/thread/mutex.html" title="STL class." alt="" coords="1455,287,1547,313"/>
-<area shape="rect" href="classbeast_1_1Journal.html" title="A generic endpoint for log messages." alt="" coords="1446,337,1557,364"/>
-<area shape="rect" href="classbeast_1_1Journal_1_1Sink.html" title="Abstraction for the underlying message destination." alt="" coords="1088,337,1235,364"/>
-<area shape="rect" href="structripple_1_1AmendmentState.html" title="Current state of an amendment." alt="" coords="487,117,668,144"/>
-<area shape="rect" href="http://en.cppreference.com/w/cpp/string/basic_string.html" title="STL class." alt="" coords="262,111,349,137"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/container/array.html" title=" " alt="" coords="221,213,389,254"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/chrono/duration.html" title=" " alt="" coords="2232,231,2387,257"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/memory/unique_ptr.html" title=" " alt="" coords="2224,165,2395,206"/>
+<area shape="rect" href="classripple_1_1AmendmentSet.html" title="The status of all amendments requested in a given window." alt="" coords="1951,191,2119,217"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/container/unordered_map.html" title=" " alt="" coords="1012,176,1164,232"/>
+<area shape="rect" href="classripple_1_1base__uint.html" title="Integers of any length that is a multiple of 32&#45;bits." alt="" coords="507,197,648,238"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/container/unordered_set.html" title=" " alt="" coords="781,323,988,379"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/container/unordered_set.html" title=" " alt="" coords="810,243,959,299"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/container/unordered_map.html" title=" " alt="" coords="785,107,985,163"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/types/size_t.html" title=" " alt="" coords="261,161,349,188"/>
+<area shape="rect" href="classripple_1_1Rules.html" title="Rules controlling protocol behavior." alt="" coords="1749,245,1851,272"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/memory/shared_ptr.html" title=" " alt="" coords="1481,253,1652,294"/>
+<area shape="rect" href="classripple_1_1Rules_1_1Impl.html" title=" " alt="" coords="1188,260,1327,287"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/thread/mutex.html" title="STL class." alt="" coords="2263,281,2355,308"/>
+<area shape="rect" href="classbeast_1_1Journal.html" title="A generic endpoint for log messages." alt="" coords="2254,332,2365,359"/>
+<area shape="rect" href="classbeast_1_1Journal_1_1Sink.html" title="Abstraction for the underlying message destination." alt="" coords="1961,332,2108,359"/>
+<area shape="rect" href="structripple_1_1AmendmentState.html" title="Current state of an amendment." alt="" coords="487,107,668,133"/>
+<area shape="rect" href="http://en.cppreference.com/w/cpp/string/basic_string.html" title="STL class." alt="" coords="262,107,349,133"/>
 </map>
 <center><span class="legend">[<a href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a581fd38cd1e5d835a348a16b6d8ae367"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a581fd38cd1e5d835a348a16b6d8ae367">AmendmentTableImpl</a> (<a class="elRef" href="http://en.cppreference.com/w/cpp/chrono/duration.html">std::chrono::seconds</a> majorityTime, int majorityFraction, <a class="el" href="classripple_1_1Section.html">Section</a> const &amp;supported, <a class="el" href="classripple_1_1Section.html">Section</a> const &amp;enabled, <a class="el" href="classripple_1_1Section.html">Section</a> const &amp;vetoed, <a class="el" href="classbeast_1_1Journal.html">beast::Journal</a> journal)</td></tr>
-<tr class="separator:a581fd38cd1e5d835a348a16b6d8ae367"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ace2d7b48d3c09c617705ab9137bfcf74"><td class="memItemLeft" align="right" valign="top"><a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#ace2d7b48d3c09c617705ab9137bfcf74">find</a> (<a class="elRef" href="http://en.cppreference.com/w/cpp/string/basic_string.html">std::string</a> const &amp;name) override</td></tr>
-<tr class="separator:ace2d7b48d3c09c617705ab9137bfcf74"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae45ed06f16d0de5d2315daa222aae054"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#ae45ed06f16d0de5d2315daa222aae054">AmendmentTableImpl</a> (<a class="elRef" href="http://en.cppreference.com/w/cpp/chrono/duration.html">std::chrono::seconds</a> majorityTime, <a class="el" href="classripple_1_1Section.html">Section</a> const &amp;supported, <a class="el" href="classripple_1_1Section.html">Section</a> const &amp;enabled, <a class="el" href="classripple_1_1Section.html">Section</a> const &amp;vetoed, <a class="el" href="classbeast_1_1Journal.html">beast::Journal</a> journal)</td></tr>
+<tr class="separator:ae45ed06f16d0de5d2315daa222aae054"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0ce3359d4362a4d0fdd0b84c39b6ff95"><td class="memItemLeft" align="right" valign="top"><a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a0ce3359d4362a4d0fdd0b84c39b6ff95">find</a> (<a class="elRef" href="http://en.cppreference.com/w/cpp/string/basic_string.html">std::string</a> const &amp;name) const override</td></tr>
+<tr class="separator:a0ce3359d4362a4d0fdd0b84c39b6ff95"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3ed0fa478f3811768ffa240db7effeed"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a3ed0fa478f3811768ffa240db7effeed">veto</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment) override</td></tr>
 <tr class="separator:a3ed0fa478f3811768ffa240db7effeed"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0d1704ba32d8c87761c27236cde40f88"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a0d1704ba32d8c87761c27236cde40f88">unVeto</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment) override</td></tr>
 <tr class="separator:a0d1704ba32d8c87761c27236cde40f88"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a195a61b5c9f813b5c275ae50a7b40e25"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a195a61b5c9f813b5c275ae50a7b40e25">enable</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment) override</td></tr>
 <tr class="separator:a195a61b5c9f813b5c275ae50a7b40e25"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:add86959a39f8701193ebcae668625b84"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#add86959a39f8701193ebcae668625b84">disable</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment) override</td></tr>
-<tr class="separator:add86959a39f8701193ebcae668625b84"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae0b06884f618ebd3229036d8ee516648"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#ae0b06884f618ebd3229036d8ee516648">isEnabled</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment) override</td></tr>
-<tr class="separator:ae0b06884f618ebd3229036d8ee516648"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a050c2e88c91f8b93f3b207f374c0dd9e"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a050c2e88c91f8b93f3b207f374c0dd9e">isSupported</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment) override</td></tr>
-<tr class="separator:a050c2e88c91f8b93f3b207f374c0dd9e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5fb1177981191b80977eb40a3178be89"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a5fb1177981191b80977eb40a3178be89">hasUnsupportedEnabled</a> () override</td></tr>
-<tr class="memdesc:a5fb1177981191b80977eb40a3178be89"><td class="mdescLeft">&#160;</td><td class="mdescRight">returns true if one or more amendments on the network have been enabled that this server does not support  <a href="classripple_1_1AmendmentTableImpl.html#a5fb1177981191b80977eb40a3178be89">More...</a><br /></td></tr>
-<tr class="separator:a5fb1177981191b80977eb40a3178be89"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0c79fb0ae659e16fa96bb9c45fcf855f"><td class="memItemLeft" align="right" valign="top">boost::optional&lt; <a class="el" href="classripple_1_1NetClock.html#a4c2428e178dca6689fa3fb4be0657107">NetClock::time_point</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a0c79fb0ae659e16fa96bb9c45fcf855f">firstUnsupportedExpected</a> () override</td></tr>
-<tr class="separator:a0c79fb0ae659e16fa96bb9c45fcf855f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a646a113ce49de65c03413431448241e9"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classJson_1_1Value.html">Json::Value</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a646a113ce49de65c03413431448241e9">getJson</a> (int) override</td></tr>
-<tr class="separator:a646a113ce49de65c03413431448241e9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a40e7f545c357d58a6d3a0621631a071c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classJson_1_1Value.html">Json::Value</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a40e7f545c357d58a6d3a0621631a071c">getJson</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;) override</td></tr>
-<tr class="memdesc:a40e7f545c357d58a6d3a0621631a071c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a <a class="el" href="namespaceJson.html#a7d654b75c16a57007925868e38212b4eae8386dcfc36d1ae897745f7b4f77a1f6" title="object value (collection of name/value pairs).">Json::objectValue</a>.  <a href="classripple_1_1AmendmentTableImpl.html#a40e7f545c357d58a6d3a0621631a071c">More...</a><br /></td></tr>
-<tr class="separator:a40e7f545c357d58a6d3a0621631a071c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a70da36c8f95045e23d2d9aa35746dbf3"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a70da36c8f95045e23d2d9aa35746dbf3">needValidatedLedger</a> (<a class="el" href="namespaceripple.html#a12af8e98b794e8ee3b4dbecaed2a4efd">LedgerIndex</a> seq) override</td></tr>
-<tr class="memdesc:a70da36c8f95045e23d2d9aa35746dbf3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called to determine whether the amendment logic needs to process a new validated ledger.  <a href="classripple_1_1AmendmentTableImpl.html#a70da36c8f95045e23d2d9aa35746dbf3">More...</a><br /></td></tr>
-<tr class="separator:a70da36c8f95045e23d2d9aa35746dbf3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a630f159b4f3029034ac3c5b91b48e08c"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a630f159b4f3029034ac3c5b91b48e08c">isEnabled</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment) const override</td></tr>
+<tr class="separator:a630f159b4f3029034ac3c5b91b48e08c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adce6a4a3f12e891ffdb1a59a547ea11a"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#adce6a4a3f12e891ffdb1a59a547ea11a">isSupported</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment) const override</td></tr>
+<tr class="separator:adce6a4a3f12e891ffdb1a59a547ea11a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab6e23bf02b70c350ab4597605b235a15"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#ab6e23bf02b70c350ab4597605b235a15">hasUnsupportedEnabled</a> () const override</td></tr>
+<tr class="memdesc:ab6e23bf02b70c350ab4597605b235a15"><td class="mdescLeft">&#160;</td><td class="mdescRight">returns true if one or more amendments on the network have been enabled that this server does not support  <a href="classripple_1_1AmendmentTableImpl.html#ab6e23bf02b70c350ab4597605b235a15">More...</a><br /></td></tr>
+<tr class="separator:ab6e23bf02b70c350ab4597605b235a15"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a954558c94ea6976d05d20e136f7251e5"><td class="memItemLeft" align="right" valign="top">boost::optional&lt; <a class="el" href="classripple_1_1NetClock.html#a4c2428e178dca6689fa3fb4be0657107">NetClock::time_point</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a954558c94ea6976d05d20e136f7251e5">firstUnsupportedExpected</a> () const override</td></tr>
+<tr class="separator:a954558c94ea6976d05d20e136f7251e5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9c84b0a42b131a8c6392a993bc4b4c4c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classJson_1_1Value.html">Json::Value</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a9c84b0a42b131a8c6392a993bc4b4c4c">getJson</a> () const override</td></tr>
+<tr class="separator:a9c84b0a42b131a8c6392a993bc4b4c4c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8780f13856e21995bfa5001959d5bff4"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classJson_1_1Value.html">Json::Value</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a8780f13856e21995bfa5001959d5bff4">getJson</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;) const override</td></tr>
+<tr class="memdesc:a8780f13856e21995bfa5001959d5bff4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns a <a class="el" href="namespaceJson.html#a7d654b75c16a57007925868e38212b4eae8386dcfc36d1ae897745f7b4f77a1f6" title="object value (collection of name/value pairs).">Json::objectValue</a>.  <a href="classripple_1_1AmendmentTableImpl.html#a8780f13856e21995bfa5001959d5bff4">More...</a><br /></td></tr>
+<tr class="separator:a8780f13856e21995bfa5001959d5bff4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a203420f15319808ab19dbc3903a32444"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a203420f15319808ab19dbc3903a32444">needValidatedLedger</a> (<a class="el" href="namespaceripple.html#a12af8e98b794e8ee3b4dbecaed2a4efd">LedgerIndex</a> seq) const override</td></tr>
+<tr class="memdesc:a203420f15319808ab19dbc3903a32444"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called to determine whether the amendment logic needs to process a new validated ledger.  <a href="classripple_1_1AmendmentTableImpl.html#a203420f15319808ab19dbc3903a32444">More...</a><br /></td></tr>
+<tr class="separator:a203420f15319808ab19dbc3903a32444"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5a1de10b5b7e51cc4f20f2636503c2e6"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a5a1de10b5b7e51cc4f20f2636503c2e6">doValidatedLedger</a> (<a class="el" href="namespaceripple.html#a12af8e98b794e8ee3b4dbecaed2a4efd">LedgerIndex</a> seq, <a class="elRef" href="http://en.cppreference.com/w/cpp/container/set.html">std::set</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt; const &amp;enabled, <a class="el" href="namespaceripple.html#a9722ac6213471ba4b92259afc6edc2b1">majorityAmendments_t</a> const &amp;majority) override</td></tr>
 <tr class="separator:a5a1de10b5b7e51cc4f20f2636503c2e6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af0904a2a84102ca9615d05706d6c0bed"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/container/vector.html">std::vector</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#af0904a2a84102ca9615d05706d6c0bed">doValidation</a> (<a class="elRef" href="http://en.cppreference.com/w/cpp/container/set.html">std::set</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt; const &amp;enabledAmendments) override</td></tr>
-<tr class="separator:af0904a2a84102ca9615d05706d6c0bed"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a850d551b59a16bc03d7ab964cfd85111"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/container/vector.html">std::vector</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a850d551b59a16bc03d7ab964cfd85111">getDesired</a> () override</td></tr>
-<tr class="separator:a850d551b59a16bc03d7ab964cfd85111"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a41864d1f10a3572d5f5a3cb203beb546"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/container/map.html">std::map</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a>, <a class="elRef" href="http://en.cppreference.com/w/cpp/types/integer.html">std::uint32_t</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a41864d1f10a3572d5f5a3cb203beb546">doVoting</a> (<a class="el" href="classripple_1_1NetClock.html#a4c2428e178dca6689fa3fb4be0657107">NetClock::time_point</a> closeTime, <a class="elRef" href="http://en.cppreference.com/w/cpp/container/set.html">std::set</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt; const &amp;enabledAmendments, <a class="el" href="namespaceripple.html#a9722ac6213471ba4b92259afc6edc2b1">majorityAmendments_t</a> const &amp;majorityAmendments, <a class="elRef" href="http://en.cppreference.com/w/cpp/container/vector.html">std::vector</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/memory/shared_ptr.html">std::shared_ptr</a>&lt; <a class="el" href="classripple_1_1STValidation.html">STValidation</a> &gt;&gt; const &amp;validations) override</td></tr>
-<tr class="separator:a41864d1f10a3572d5f5a3cb203beb546"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a941314eb1dff68fb625f7a44378845b9"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/container/vector.html">std::vector</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a941314eb1dff68fb625f7a44378845b9">doValidation</a> (<a class="elRef" href="http://en.cppreference.com/w/cpp/container/set.html">std::set</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt; const &amp;enabledAmendments) const override</td></tr>
+<tr class="separator:a941314eb1dff68fb625f7a44378845b9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a38055e674ea217fa366b5bf954d4cd72"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/container/vector.html">std::vector</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a38055e674ea217fa366b5bf954d4cd72">getDesired</a> () const override</td></tr>
+<tr class="separator:a38055e674ea217fa366b5bf954d4cd72"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4eac7bf3be538741f7fa066c18b04fae"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/container/map.html">std::map</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a>, <a class="elRef" href="http://en.cppreference.com/w/cpp/types/integer.html">std::uint32_t</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a4eac7bf3be538741f7fa066c18b04fae">doVoting</a> (<a class="el" href="classripple_1_1Rules.html">Rules</a> const &amp;rules, <a class="el" href="classripple_1_1NetClock.html#a4c2428e178dca6689fa3fb4be0657107">NetClock::time_point</a> closeTime, <a class="elRef" href="http://en.cppreference.com/w/cpp/container/set.html">std::set</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt; const &amp;enabledAmendments, <a class="el" href="namespaceripple.html#a9722ac6213471ba4b92259afc6edc2b1">majorityAmendments_t</a> const &amp;majorityAmendments, <a class="elRef" href="http://en.cppreference.com/w/cpp/container/vector.html">std::vector</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/memory/shared_ptr.html">std::shared_ptr</a>&lt; <a class="el" href="classripple_1_1STValidation.html">STValidation</a> &gt;&gt; const &amp;validations) override</td></tr>
+<tr class="separator:a4eac7bf3be538741f7fa066c18b04fae"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac721ac20262609226483f1436b0df02f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTable.html#ac721ac20262609226483f1436b0df02f">doValidatedLedger</a> (<a class="elRef" href="http://en.cppreference.com/w/cpp/memory/shared_ptr.html">std::shared_ptr</a>&lt; <a class="el" href="classripple_1_1ReadView.html">ReadView</a> const &gt; const &amp;lastValidatedLedger)</td></tr>
 <tr class="memdesc:ac721ac20262609226483f1436b0df02f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Called when a new fully-validated ledger is accepted.  <a href="classripple_1_1AmendmentTable.html#ac721ac20262609226483f1436b0df02f">More...</a><br /></td></tr>
 <tr class="separator:ac721ac20262609226483f1436b0df02f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae4402ab8248766bc7556bdbb93225943"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTable.html#ae4402ab8248766bc7556bdbb93225943">doVoting</a> (<a class="elRef" href="http://en.cppreference.com/w/cpp/memory/shared_ptr.html">std::shared_ptr</a>&lt; <a class="el" href="classripple_1_1ReadView.html">ReadView</a> const &gt; const &amp;lastClosedLedger, <a class="elRef" href="http://en.cppreference.com/w/cpp/container/vector.html">std::vector</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/memory/shared_ptr.html">std::shared_ptr</a>&lt; <a class="el" href="classripple_1_1STValidation.html">STValidation</a> &gt;&gt; const &amp;parentValidations, <a class="elRef" href="http://en.cppreference.com/w/cpp/memory/shared_ptr.html">std::shared_ptr</a>&lt; <a class="el" href="classripple_1_1SHAMap.html">SHAMap</a> &gt; const &amp;initialPosition)</td></tr>
 <tr class="separator:ae4402ab8248766bc7556bdbb93225943"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-methods"></a>
-Protected Member Functions</h2></td></tr>
-<tr class="memitem:a89e2a7a13c05c5234d21980bb6e3ffcd"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a89e2a7a13c05c5234d21980bb6e3ffcd">add</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment)</td></tr>
-<tr class="separator:a89e2a7a13c05c5234d21980bb6e3ffcd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aac90ea05290f2e3a87459bf28121c820"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#aac90ea05290f2e3a87459bf28121c820">get</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment)</td></tr>
-<tr class="separator:aac90ea05290f2e3a87459bf28121c820"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1807326240ba0949b038f30ef955e191"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a1807326240ba0949b038f30ef955e191">setJson</a> (<a class="el" href="classJson_1_1Value.html">Json::Value</a> &amp;v, <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment, const <a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> &amp;)</td></tr>
-<tr class="separator:a1807326240ba0949b038f30ef955e191"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pri-methods"></a>
+Private Member Functions</h2></td></tr>
+<tr class="memitem:a9e0672ccb959b90939cc4bd16b26c70c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a9e0672ccb959b90939cc4bd16b26c70c">add</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment, <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/lock_guard.html">std::lock_guard</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/mutex.html">std::mutex</a> &gt; const &amp;sl)</td></tr>
+<tr class="separator:a9e0672ccb959b90939cc4bd16b26c70c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a475df432a61ed2500f3086dacd6147ac"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a475df432a61ed2500f3086dacd6147ac">get</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment, <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/lock_guard.html">std::lock_guard</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/mutex.html">std::mutex</a> &gt; const &amp;sl)</td></tr>
+<tr class="separator:a475df432a61ed2500f3086dacd6147ac"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afb300868b5eee76fb5e895a685b43997"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> const  *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#afb300868b5eee76fb5e895a685b43997">get</a> (<a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment, <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/lock_guard.html">std::lock_guard</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/mutex.html">std::mutex</a> &gt; const &amp;sl) const</td></tr>
+<tr class="separator:afb300868b5eee76fb5e895a685b43997"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a69ed0b52e07e03af2ff135446564831c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a69ed0b52e07e03af2ff135446564831c">injectJson</a> (<a class="el" href="classJson_1_1Value.html">Json::Value</a> &amp;v, <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;amendment, <a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> const &amp;state, <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/lock_guard.html">std::lock_guard</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/mutex.html">std::mutex</a> &gt; const &amp;sl) const</td></tr>
+<tr class="separator:a69ed0b52e07e03af2ff135446564831c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-attribs"></a>
-Protected Attributes</h2></td></tr>
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pri-attribs"></a>
+Private Attributes</h2></td></tr>
 <tr class="memitem:a08ceef79750994d25c0b416c378eecc0"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/thread/mutex.html">std::mutex</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a08ceef79750994d25c0b416c378eecc0">mutex_</a></td></tr>
 <tr class="separator:a08ceef79750994d25c0b416c378eecc0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7cca5bba8dff04a84023969c1499160f"><td class="memItemLeft" align="right" valign="top"><a class="el" href="namespaceripple.html#a46c521271235f4e2715d7fa8b68940ca">hash_map</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a>, <a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a7cca5bba8dff04a84023969c1499160f">amendmentMap_</a></td></tr>
@@ -174,9 +179,7 @@ Protected Attributes</h2></td></tr>
 <tr class="separator:aefbfbe13885b57244364ab17906ebb8c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9c9272ffee37521dc61aa8baab7b8c10"><td class="memItemLeft" align="right" valign="top">const <a class="elRef" href="http://en.cppreference.com/w/cpp/chrono/duration.html">std::chrono::seconds</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a9c9272ffee37521dc61aa8baab7b8c10">majorityTime_</a></td></tr>
 <tr class="separator:a9c9272ffee37521dc61aa8baab7b8c10"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae3822147a3cca220902d3bdf352e6ccf"><td class="memItemLeft" align="right" valign="top">const int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#ae3822147a3cca220902d3bdf352e6ccf">majorityFraction_</a></td></tr>
-<tr class="separator:ae3822147a3cca220902d3bdf352e6ccf"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a51e688abb62a1f399751971156723aae"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/memory/unique_ptr.html">std::unique_ptr</a>&lt; <a class="el" href="structripple_1_1AmendmentSet.html">AmendmentSet</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a51e688abb62a1f399751971156723aae">lastVote_</a></td></tr>
+<tr class="memitem:a51e688abb62a1f399751971156723aae"><td class="memItemLeft" align="right" valign="top"><a class="elRef" href="http://en.cppreference.com/w/cpp/memory/unique_ptr.html">std::unique_ptr</a>&lt; <a class="el" href="classripple_1_1AmendmentSet.html">AmendmentSet</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#a51e688abb62a1f399751971156723aae">lastVote_</a></td></tr>
 <tr class="separator:a51e688abb62a1f399751971156723aae"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac17353f2946a09f26809d15b3c24cc48"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classripple_1_1AmendmentTableImpl.html#ac17353f2946a09f26809d15b3c24cc48">unsupportedEnabled_</a></td></tr>
 <tr class="separator:ac17353f2946a09f26809d15b3c24cc48"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -189,10 +192,10 @@ Protected Attributes</h2></td></tr>
 <div class="textblock"><p>Track the list of "amendments". </p>
 <p>An "amendment" is an option that can affect transaction processing rules. Amendments are proposed and then adopted or rejected by the network. An Amendment is uniquely identified by its AmendmentID, a 256-bit key. </p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00139">139</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00198">198</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 </div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="a581fd38cd1e5d835a348a16b6d8ae367"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a581fd38cd1e5d835a348a16b6d8ae367">&#9670;&nbsp;</a></span>AmendmentTableImpl()</h2>
+<a id="ae45ed06f16d0de5d2315daa222aae054"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae45ed06f16d0de5d2315daa222aae054">&#9670;&nbsp;</a></span>AmendmentTableImpl()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -202,12 +205,6 @@ Protected Attributes</h2></td></tr>
           <td>(</td>
           <td class="paramtype"><a class="elRef" href="http://en.cppreference.com/w/cpp/chrono/duration.html">std::chrono::seconds</a>&#160;</td>
           <td class="paramname"><em>majorityTime</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>majorityFraction</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -241,13 +238,13 @@ Protected Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00240">240</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00303">303</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a id="a89e2a7a13c05c5234d21980bb6e3ffcd"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a89e2a7a13c05c5234d21980bb6e3ffcd">&#9670;&nbsp;</a></span>add()</h2>
+<a id="a9e0672ccb959b90939cc4bd16b26c70c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9e0672ccb959b90939cc4bd16b26c70c">&#9670;&nbsp;</a></span>add()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -259,23 +256,33 @@ Protected Attributes</h2></td></tr>
           <td class="memname"><a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> * ripple::AmendmentTableImpl::add </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;&#160;</td>
-          <td class="paramname"><em>amendment</em></td><td>)</td>
+          <td class="paramname"><em>amendment</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype"><a class="elRef" href="http://en.cppreference.com/w/cpp/thread/lock_guard.html">std::lock_guard</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/mutex.html">std::mutex</a> &gt; const &amp;&#160;</td>
+          <td class="paramname"><em>sl</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00300">300</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00359">359</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="aac90ea05290f2e3a87459bf28121c820"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aac90ea05290f2e3a87459bf28121c820">&#9670;&nbsp;</a></span>get()</h2>
+<a id="a475df432a61ed2500f3086dacd6147ac"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a475df432a61ed2500f3086dacd6147ac">&#9670;&nbsp;</a></span>get() <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -287,23 +294,33 @@ Protected Attributes</h2></td></tr>
           <td class="memname"><a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> * ripple::AmendmentTableImpl::get </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;&#160;</td>
-          <td class="paramname"><em>amendment</em></td><td>)</td>
+          <td class="paramname"><em>amendment</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype"><a class="elRef" href="http://en.cppreference.com/w/cpp/thread/lock_guard.html">std::lock_guard</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/mutex.html">std::mutex</a> &gt; const &amp;&#160;</td>
+          <td class="paramname"><em>sl</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00307">307</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00368">368</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="a1807326240ba0949b038f30ef955e191"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1807326240ba0949b038f30ef955e191">&#9670;&nbsp;</a></span>setJson()</h2>
+<a id="afb300868b5eee76fb5e895a685b43997"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afb300868b5eee76fb5e895a685b43997">&#9670;&nbsp;</a></span>get() <span class="overload">[2/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -312,7 +329,45 @@ Protected Attributes</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">void ripple::AmendmentTableImpl::setJson </td>
+          <td class="memname"><a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> const  * ripple::AmendmentTableImpl::get </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;&#160;</td>
+          <td class="paramname"><em>amendment</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="elRef" href="http://en.cppreference.com/w/cpp/thread/lock_guard.html">std::lock_guard</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/mutex.html">std::mutex</a> &gt; const &amp;&#160;</td>
+          <td class="paramname"><em>sl</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00378">378</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+
+</div>
+</div>
+<a id="a69ed0b52e07e03af2ff135446564831c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a69ed0b52e07e03af2ff135446564831c">&#9670;&nbsp;</a></span>injectJson()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void ripple::AmendmentTableImpl::injectJson </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="classJson_1_1Value.html">Json::Value</a> &amp;&#160;</td>
           <td class="paramname"><em>v</em>, </td>
@@ -326,28 +381,34 @@ Protected Attributes</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> &amp;&#160;</td>
-          <td class="paramname"><em>fs</em>&#160;</td>
+          <td class="paramtype"><a class="el" href="structripple_1_1AmendmentState.html">AmendmentState</a> const &amp;&#160;</td>
+          <td class="paramname"><em>state</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="elRef" href="http://en.cppreference.com/w/cpp/thread/lock_guard.html">std::lock_guard</a>&lt; <a class="elRef" href="http://en.cppreference.com/w/cpp/thread/mutex.html">std::mutex</a> &gt; const &amp;&#160;</td>
+          <td class="paramname"><em>sl</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
           <td>)</td>
-          <td></td><td></td>
+          <td></td><td> const</td>
         </tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00594">594</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00633">633</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="ace2d7b48d3c09c617705ab9137bfcf74"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ace2d7b48d3c09c617705ab9137bfcf74">&#9670;&nbsp;</a></span>find()</h2>
+<a id="a0ce3359d4362a4d0fdd0b84c39b6ff95"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0ce3359d4362a4d0fdd0b84c39b6ff95">&#9670;&nbsp;</a></span>find()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -360,7 +421,7 @@ Protected Attributes</h2></td></tr>
           <td>(</td>
           <td class="paramtype"><a class="elRef" href="http://en.cppreference.com/w/cpp/string/basic_string.html">std::string</a> const &amp;&#160;</td>
           <td class="paramname"><em>name</em></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -370,9 +431,9 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#adc2e5f3d711b40208ee7b27af6dcb451">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#aca7fd10cd15869ffea10ee5d769ad744">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00319">319</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00392">392</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -402,7 +463,7 @@ Protected Attributes</h2></td></tr>
 
 <p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a5a0a3c98955ce15af2458780544edb71">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00333">333</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00406">406</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -432,7 +493,7 @@ Protected Attributes</h2></td></tr>
 
 <p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#ad57021ddc7e6f87d04dd57fba582eb31">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00345">345</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00418">418</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -462,42 +523,12 @@ Protected Attributes</h2></td></tr>
 
 <p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#ac9e23d71814bcf7c601f37e0b9323b1a">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00357">357</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00430">430</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="add86959a39f8701193ebcae668625b84"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#add86959a39f8701193ebcae668625b84">&#9670;&nbsp;</a></span>disable()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">bool ripple::AmendmentTableImpl::disable </td>
-          <td>(</td>
-          <td class="paramtype"><a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;&#160;</td>
-          <td class="paramname"><em>amendment</em></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a2f163c02ecd10e7f108023f97840bc2c">ripple::AmendmentTable</a>.</p>
-
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00378">378</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
-
-</div>
-</div>
-<a id="ae0b06884f618ebd3229036d8ee516648"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae0b06884f618ebd3229036d8ee516648">&#9670;&nbsp;</a></span>isEnabled()</h2>
+<a id="a630f159b4f3029034ac3c5b91b48e08c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a630f159b4f3029034ac3c5b91b48e08c">&#9670;&nbsp;</a></span>isEnabled()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -510,7 +541,7 @@ Protected Attributes</h2></td></tr>
           <td>(</td>
           <td class="paramtype"><a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;&#160;</td>
           <td class="paramname"><em>amendment</em></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -520,14 +551,14 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a190291d07831f18a0ce7847000c24f17">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#ade548ac91394d89376f0a8bfb1ebd903">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00391">391</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00451">451</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="a050c2e88c91f8b93f3b207f374c0dd9e"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a050c2e88c91f8b93f3b207f374c0dd9e">&#9670;&nbsp;</a></span>isSupported()</h2>
+<a id="adce6a4a3f12e891ffdb1a59a547ea11a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#adce6a4a3f12e891ffdb1a59a547ea11a">&#9670;&nbsp;</a></span>isSupported()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -540,7 +571,7 @@ Protected Attributes</h2></td></tr>
           <td>(</td>
           <td class="paramtype"><a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;&#160;</td>
           <td class="paramname"><em>amendment</em></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -550,14 +581,14 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a97273230ec904afe57818bb55aeecb02">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a5fce75b79a87e541918be639a28f3c87">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00399">399</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00459">459</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="a5fb1177981191b80977eb40a3178be89"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a5fb1177981191b80977eb40a3178be89">&#9670;&nbsp;</a></span>hasUnsupportedEnabled()</h2>
+<a id="ab6e23bf02b70c350ab4597605b235a15"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab6e23bf02b70c350ab4597605b235a15">&#9670;&nbsp;</a></span>hasUnsupportedEnabled()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -569,7 +600,7 @@ Protected Attributes</h2></td></tr>
           <td class="memname">bool ripple::AmendmentTableImpl::hasUnsupportedEnabled </td>
           <td>(</td>
           <td class="paramname"></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -582,14 +613,14 @@ Protected Attributes</h2></td></tr>
 <p>returns true if one or more amendments on the network have been enabled that this server does not support </p>
 <dl class="section return"><dt>Returns</dt><dd>true if an unsupported feature is enabled on the network </dd></dl>
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#af0cddda279245d76de0710efeb41fa25">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a8eee69252a4b7961d0d8cd411896eeb9">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00407">407</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00467">467</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="a0c79fb0ae659e16fa96bb9c45fcf855f"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0c79fb0ae659e16fa96bb9c45fcf855f">&#9670;&nbsp;</a></span>firstUnsupportedExpected()</h2>
+<a id="a954558c94ea6976d05d20e136f7251e5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a954558c94ea6976d05d20e136f7251e5">&#9670;&nbsp;</a></span>firstUnsupportedExpected()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -601,7 +632,7 @@ Protected Attributes</h2></td></tr>
           <td class="memname">boost::optional&lt; <a class="el" href="classripple_1_1NetClock.html#a4c2428e178dca6689fa3fb4be0657107">NetClock::time_point</a> &gt; ripple::AmendmentTableImpl::firstUnsupportedExpected </td>
           <td>(</td>
           <td class="paramname"></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -611,14 +642,14 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#abb11e40ced20aa1704b9b07b878bc3a0">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a1f446677c34bd26566000b9989d3c278">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00414">414</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00474">474</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="a646a113ce49de65c03413431448241e9"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a646a113ce49de65c03413431448241e9">&#9670;&nbsp;</a></span>getJson() <span class="overload">[1/2]</span></h2>
+<a id="a9c84b0a42b131a8c6392a993bc4b4c4c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9c84b0a42b131a8c6392a993bc4b4c4c">&#9670;&nbsp;</a></span>getJson() <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -629,9 +660,8 @@ Protected Attributes</h2></td></tr>
         <tr>
           <td class="memname"><a class="el" href="classJson_1_1Value.html">Json::Value</a> ripple::AmendmentTableImpl::getJson </td>
           <td>(</td>
-          <td class="paramtype">int&#160;</td>
           <td class="paramname"></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -641,14 +671,14 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a281bb75a522f82954bb6d50f1fc02785">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#ac63a31d38346fba5d5ca78c4894af31a">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00624">624</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00661">661</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="a40e7f545c357d58a6d3a0621631a071c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a40e7f545c357d58a6d3a0621631a071c">&#9670;&nbsp;</a></span>getJson() <span class="overload">[2/2]</span></h2>
+<a id="a8780f13856e21995bfa5001959d5bff4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8780f13856e21995bfa5001959d5bff4">&#9670;&nbsp;</a></span>getJson() <span class="overload">[2/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -660,8 +690,8 @@ Protected Attributes</h2></td></tr>
           <td class="memname"><a class="el" href="classJson_1_1Value.html">Json::Value</a> ripple::AmendmentTableImpl::getJson </td>
           <td>(</td>
           <td class="paramtype"><a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> const &amp;&#160;</td>
-          <td class="paramname"></td><td>)</td>
-          <td></td>
+          <td class="paramname"><em>amendment</em></td><td>)</td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -673,14 +703,14 @@ Protected Attributes</h2></td></tr>
 
 <p>Returns a <a class="el" href="namespaceJson.html#a7d654b75c16a57007925868e38212b4eae8386dcfc36d1ae897745f7b4f77a1f6" title="object value (collection of name/value pairs).">Json::objectValue</a>. </p>
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a2688f49a7c1e3d51e4f769d2d5230300">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a679a2a34193d9788688eb8456631bc49">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00639">639</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00679">679</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="a70da36c8f95045e23d2d9aa35746dbf3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a70da36c8f95045e23d2d9aa35746dbf3">&#9670;&nbsp;</a></span>needValidatedLedger()</h2>
+<a id="a203420f15319808ab19dbc3903a32444"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a203420f15319808ab19dbc3903a32444">&#9670;&nbsp;</a></span>needValidatedLedger()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -693,7 +723,7 @@ Protected Attributes</h2></td></tr>
           <td>(</td>
           <td class="paramtype"><a class="el" href="namespaceripple.html#a12af8e98b794e8ee3b4dbecaed2a4efd">LedgerIndex</a>&#160;</td>
           <td class="paramname"><em>seq</em></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -706,9 +736,9 @@ Protected Attributes</h2></td></tr>
 <p>Called to determine whether the amendment logic needs to process a new validated ledger. </p>
 <p>(If it could have changed things.) </p>
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a06e29d55d53a9d5f1e2b4b7e4cc2c5e9">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#ae37ca6d253d452ae23a6e160d9180e05">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00550">550</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00585">585</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -754,12 +784,12 @@ Protected Attributes</h2></td></tr>
 
 <p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a48f050b47af8f00cafd237e2cddb2929">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00561">561</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00596">596</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="af0904a2a84102ca9615d05706d6c0bed"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#af0904a2a84102ca9615d05706d6c0bed">&#9670;&nbsp;</a></span>doValidation()</h2>
+<a id="a941314eb1dff68fb625f7a44378845b9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a941314eb1dff68fb625f7a44378845b9">&#9670;&nbsp;</a></span>doValidation()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -772,7 +802,7 @@ Protected Attributes</h2></td></tr>
           <td>(</td>
           <td class="paramtype"><a class="elRef" href="http://en.cppreference.com/w/cpp/container/set.html">std::set</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt; const &amp;&#160;</td>
           <td class="paramname"><em>enabledAmendments</em></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -782,14 +812,14 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#ad4448eeba600656f25e54dfcd18138af">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#af8412c322ac2c2f3410548358630c9d7">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00421">421</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00481">481</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="a850d551b59a16bc03d7ab964cfd85111"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a850d551b59a16bc03d7ab964cfd85111">&#9670;&nbsp;</a></span>getDesired()</h2>
+<a id="a38055e674ea217fa366b5bf954d4cd72"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a38055e674ea217fa366b5bf954d4cd72">&#9670;&nbsp;</a></span>getDesired()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -801,7 +831,7 @@ Protected Attributes</h2></td></tr>
           <td class="memname"><a class="elRef" href="http://en.cppreference.com/w/cpp/container/vector.html">std::vector</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a> &gt; ripple::AmendmentTableImpl::getDesired </td>
           <td>(</td>
           <td class="paramname"></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -811,14 +841,14 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#afefe2dd72c35d616baa3acfc43832179">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#ac12013d542d0fc1638f9ab4220896580">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00447">447</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00507">507</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
-<a id="a41864d1f10a3572d5f5a3cb203beb546"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a41864d1f10a3572d5f5a3cb203beb546">&#9670;&nbsp;</a></span>doVoting() <span class="overload">[1/2]</span></h2>
+<a id="a4eac7bf3be538741f7fa066c18b04fae"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4eac7bf3be538741f7fa066c18b04fae">&#9670;&nbsp;</a></span>doVoting() <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -829,6 +859,12 @@ Protected Attributes</h2></td></tr>
         <tr>
           <td class="memname"><a class="elRef" href="http://en.cppreference.com/w/cpp/container/map.html">std::map</a>&lt; <a class="el" href="namespaceripple.html#a356c68147333a9a48a344718038576d9">uint256</a>, <a class="elRef" href="http://en.cppreference.com/w/cpp/types/integer.html">std::uint32_t</a> &gt; ripple::AmendmentTableImpl::doVoting </td>
           <td>(</td>
+          <td class="paramtype"><a class="el" href="classripple_1_1Rules.html">Rules</a> const &amp;&#160;</td>
+          <td class="paramname"><em>rules</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
           <td class="paramtype"><a class="el" href="classripple_1_1NetClock.html#a4c2428e178dca6689fa3fb4be0657107">NetClock::time_point</a>&#160;</td>
           <td class="paramname"><em>closeTime</em>, </td>
         </tr>
@@ -863,9 +899,9 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#a879dd1b8a9991c7c281fbaf377e425e1">ripple::AmendmentTable</a>.</p>
+<p>Implements <a class="el" href="classripple_1_1AmendmentTable.html#ab69ef448949faf9d80e80760d6574381">ripple::AmendmentTable</a>.</p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00454">454</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00514">514</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -895,7 +931,7 @@ Protected Attributes</h2></td></tr>
 
 <p>Called when a new fully-validated ledger is accepted. </p>
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8h_source.html#l00077">77</a> of file <a class="el" href="AmendmentTable_8h_source.html">AmendmentTable.h</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8h_source.html#l00076">76</a> of file <a class="el" href="AmendmentTable_8h_source.html">AmendmentTable.h</a>.</p>
 
 </div>
 </div>
@@ -959,12 +995,12 @@ Protected Attributes</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">mutable</span><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00142">142</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00201">201</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -983,12 +1019,12 @@ Protected Attributes</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00144">144</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00203">203</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -1007,12 +1043,12 @@ Protected Attributes</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00145">145</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00204">204</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -1031,36 +1067,12 @@ Protected Attributes</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00148">148</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
-
-</div>
-</div>
-<a id="ae3822147a3cca220902d3bdf352e6ccf"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae3822147a3cca220902d3bdf352e6ccf">&#9670;&nbsp;</a></span>majorityFraction_</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">const int ripple::AmendmentTableImpl::majorityFraction_</td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00152">152</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00207">207</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -1074,17 +1086,17 @@ Protected Attributes</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="elRef" href="http://en.cppreference.com/w/cpp/memory/unique_ptr.html">std::unique_ptr</a>&lt;<a class="el" href="structripple_1_1AmendmentSet.html">AmendmentSet</a>&gt; ripple::AmendmentTableImpl::lastVote_</td>
+          <td class="memname"><a class="elRef" href="http://en.cppreference.com/w/cpp/memory/unique_ptr.html">std::unique_ptr</a>&lt;<a class="el" href="classripple_1_1AmendmentSet.html">AmendmentSet</a>&gt; ripple::AmendmentTableImpl::lastVote_</td>
         </tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00156">156</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00211">211</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -1103,12 +1115,12 @@ Protected Attributes</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00159">159</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00214">214</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -1127,12 +1139,12 @@ Protected Attributes</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00163">163</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00219">219</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
@@ -1151,12 +1163,12 @@ Protected Attributes</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
-<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00165">165</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
+<p class="definition">Definition at line <a class="el" href="AmendmentTable_8cpp_source.html#l00221">221</a> of file <a class="el" href="AmendmentTable_8cpp_source.html">AmendmentTable.cpp</a>.</p>
 
 </div>
 </div>
