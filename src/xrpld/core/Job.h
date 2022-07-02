@@ -21,25 +21,25 @@
 #define RIPPLE_CORE_JOB_H_INCLUDED
 
 #include <xrpld/core/ClosureCounter.h>
-#include <xrpld/core/LoadMonitor.h>
+#include <xrpld/core/LoadEvent.h>
 #include <xrpl/basics/CountedObject.h>
-#include <functional>
+#include <xrpl/beast/core/CurrentThreadName.h>
 
 #include <functional>
 
 namespace ripple {
 
-// Note that this queue should only be used for CPU-bound jobs
-// It is primarily intended for signature checking
+/** Job type identifiers
 
-enum JobType {
-    // Special type indicating an invalid job - will go away soon.
-    jtINVALID = -1,
+    The position of a job type in this enum indicates the type's relative
+    priority (a.k.a. importance) with respect to earlier jobs, with lower
+    values indicating lower priority.
 
-    // Job types - the position in this enum indicates the job priority with
-    // earlier jobs having lower priority than later jobs. If you wish to
-    // insert a job at a specific priority, simply add it at the right location.
-
+    Please leave specific priority levels numerically unspecified. If you
+    wish to insert a job at a specific priority then simply add it at the
+    right relative location.
+ */
+enum JobType : std::uint16_t {
     jtPACK,               // Make a fetch pack for a peer
     jtPUBOLDLEDGER,       // An old ledger has been accepted
     jtCLIENT,             // A placeholder for the priority of all jtCLIENT jobs
@@ -97,59 +97,97 @@ class Job : public CountedObject<Job>
 public:
     using clock_type = std::chrono::steady_clock;
 
-    /** Default constructor.
+    Job() = delete;
 
-        Allows Job to be used as a container type.
-
-        This is used to allow things like jobMap [key] = value.
-    */
-    // VFALCO NOTE I'd prefer not to have a default constructed object.
-    //             What is the semantic meaning of a Job with no associated
-    //             function? Having the invariant "all Job objects refer to
-    //             a job" would reduce the number of states.
-    //
-    Job();
-
-    Job(JobType type, std::uint64_t index);
-
-    // VFALCO TODO try to remove the dependency on LoadMonitor.
     Job(JobType type,
-        std::string const& name,
-        std::uint64_t index,
-        LoadMonitor& lm,
-        std::function<void()> const& job);
+        std::string name,
+        std::reference_wrapper<LoadSampler const> sampler,
+        std::function<void()> job)
+        : type_(type)
+        , queued_(clock_type::now())
+        , work_(std::move(job))
+        , loadEvent_(sampler, std::move(name), false)
+    {
+    }
 
-    JobType
-    getType() const;
+    Job(Job const&) = delete;
+
+    Job&
+    operator=(Job const&) = delete;
+
+    Job(Job&&) = delete;
+
+    Job&
+    operator=(Job&&) = delete;
+
+    [[nodiscard]] JobType
+    getType() const
+    {
+        return type_;
+    }
 
     /** Returns the time when the job was queued. */
-    clock_type::time_point const&
-    queue_time() const;
+    [[nodiscard]] clock_type::time_point const&
+    queue_time() const
+    {
+        return queued_;
+    }
+
+    /** A description of this specific job.
+
+        Unlike the name associated with the type of this job, which is fixed,
+        the description may include additional information or context that
+        distinguishes this from other jobs of the same type.
+     */
+    [[maybe_unused]] std::string const&
+    description() const
+    {
+        return loadEvent_.name();
+    }
 
     void
-    doJob();
+    execute()
+    {
+        loadEvent_.start();
 
-    // These comparison operators make the jobs sort in priority order
-    // in the job set
-    bool
-    operator<(const Job& j) const;
-    bool
-    operator>(const Job& j) const;
-    bool
-    operator<=(const Job& j) const;
-    bool
-    operator>=(const Job& j) const;
+        work_();
+
+        // Destroy the lambda, otherwise we won't include
+        // its duration in the time measurement
+        work_ = nullptr;
+    }
+
+    void
+    chain(Job* job) noexcept
+    {
+        XRPL_ASSERT(next == nullptr, "ripple::Job::chain : already chained");
+        XRPL_ASSERT(job != nullptr, "ripple::Job::chain : no job");
+
+        next = job;
+    }
+
+    /** The next job in the type's queue, or nullptr.
+
+        Links the intrusive FIFO rooted at JobQueue::Data::head. This
+        field is owned by the JobQueue itself, which sets it when the
+        job is appended and when its predecessor is dispatched; it is
+        meaningless once this job itself has been dispatched.
+     */
+    Job* next = nullptr;
 
 private:
-    JobType mType;
-    std::uint64_t mJobIndex;
-    std::function<void()> mJob;
-    std::shared_ptr<LoadEvent> m_loadEvent;
-    std::string mName;
-    clock_type::time_point m_queue_time;
-};
+    /** The job's underlying type. */
+    JobType const type_;
 
-using JobCounter = ClosureCounter<void>;
+    /** The time when the job was queued. */
+    clock_type::time_point const queued_;
+
+    /** The work that this job will perform, when executed. */
+    std::function<void()> work_;
+
+    /** Tracking job performance. */
+    LoadEvent loadEvent_;
+};
 
 }  // namespace ripple
 

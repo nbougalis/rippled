@@ -22,202 +22,260 @@
 
 #include <xrpl/basics/Log.h>
 #include <atomic>
-#include <condition_variable>
-#include <mutex>
+#include <chrono>
+#include <concepts>
+#include <cstdint>
 #include <optional>
 #include <type_traits>
+#include <utility>
 
 namespace ripple {
 
-/**
- * The role of a `ClosureCounter` is to assist in shutdown by letting callers
- * wait for the completion of closures (of a specific type signature) that they
- * previously registered. These closures are typically callbacks for
- * asynchronous operations. The lifetime of a `ClosureCounter` consists of two
- * phases: the initial expanding "fork" phase, and the subsequent shrinking
- * "join" phase.
- *
- * In the fork phase, callers register a closure by passing the closure and
- * receiving a substitute in return. The substitute has the same callable
- * interface as the closure, and it informs the `ClosureCounter` whenever it
- * is copied or destroyed, so that it can keep an accurate count of copies.
- *
- * The transition to the join phase is made by a call to `join`. In this
- * phase, every substitute returned going forward will be null, signaling to
- * the caller that they should drop the closure and cancel their operation.
- * `join` blocks until all existing closure substitutes are destroyed.
- *
- * \tparam Ret_t The return type of the closure.
- * \tparam Args_t The argument types of the closure.
+/** Tracks in-flight closures so that shutdown can wait for their completion.
+
+    This class lets callers register closures (completion handlers for
+    asynchronous operations) and, later, block on them until every one
+    has been destroyed.
+
+    The lifetime of a ClosureCounter has two distinct phases:
+
+    - The initial phase begins with a caller registering a closure by
+      passing it to @ref wrap. This produces a substitute object that
+      handles reference counting and can be invoked with the same set
+      of parameters as the original.
+
+    - The next phase begins when @ref join is called; the call blocks
+      until the reference count drops to zero. During this phase, any
+      calls to @ref wrap will return `std::nullopt`.
+
+    All operations are lock-free and can be called concurrently. The
+    only exception is `join` itself, which blocks by design.
+
+    @note Destroying the counter performs a join, which will block
+          until all substitutes referencing the counter finish.
+
+    @tparam Return  The return type of the closure.
+    @tparam Arguments The argument types of the closure.
  */
-template <typename Ret_t, typename... Args_t>
+template <typename Return, typename... Arguments>
 class ClosureCounter
 {
-private:
-    std::mutex mutable mutex_{};
-    std::condition_variable allClosuresDoneCond_{};  // guard with mutex_
-    bool waitForClosures_{false};                    // guard with mutex_
-    std::atomic<int> closureCount_{0};
+    /** The contract a wrapped closure must satisfy.
 
-    // Increment the count.
-    ClosureCounter&
-    operator++()
-    {
-        ++closureCount_;
-        return *this;
-    }
+        Substitute stores the closure by value and invokes it as an lvalue,
+        so that is the invocation we check: the closure has to be callable
+        as an lvalue with Arguments... and yield Return.
 
-    // Decrement the count.  If we're stopping and the count drops to zero
-    // notify allClosuresDoneCond_.
-    ClosureCounter&
-    operator--()
-    {
-        // Even though closureCount_ is atomic, we decrement its value under
-        // a lock.  This removes a small timing window that occurs if the
-        // waiting thread is handling a spurious wakeup when closureCount_
-        // drops to zero.
-        std::lock_guard lock{mutex_};
-
-        // Update closureCount_.  Notify if stopping and closureCount_ == 0.
-        if ((--closureCount_ == 0) && waitForClosures_)
-            allClosuresDoneCond_.notify_all();
-        return *this;
-    }
-
-    // A private template class that helps count the number of closures
-    // in flight. This allows callers to block until all their postponed
-    // closures are dispatched.
+        Note that a functor which is invocable only as an rvalue (i.e.
+        operator()() &&) does not qualify.
+     */
     template <typename Closure>
-    class Substitute
+    static constexpr bool suitable_v = std::is_invocable_r_v<
+        Return,
+        std::remove_reference_t<Closure>&,
+        Arguments...>;
+
+    /** The state of this counter.
+
+        The high bit is the join indicator. The remaining bits are
+        the in-flight closure counter.
+
+        @note we explicitly use a 32-bit unsigned integer type for
+              this so that we can leverage glibc's use of futex on
+              Linux.
+     */
+    std::atomic<std::uint32_t> state_{0};
+
+    static constexpr std::uint32_t joined_flag = 0x80000000;
+    static constexpr std::uint32_t count_mask = joined_flag - 1;
+
+    void
+    decrement() noexcept
     {
-    private:
-        ClosureCounter& counter_;
+        // Release: the joiner's acquire load must observe everything
+        // the closure wrote before it died.
+        auto const prev = state_.fetch_sub(1, std::memory_order::acq_rel);
+        XRPL_ASSERT(
+            (prev & count_mask) != 0,
+            "ripple::ClosureCounter::decrement : count was 0");
+
+        // If the closure has been joined and we were the last count, it
+        // is our responsibility to wake anyone waiting for the count to
+        // drop to zero.
+        if (prev == joined_flag + 1)
+            state_.notify_all();
+    }
+
+    /** Ownership of one unit of a ClosureCounter's in-flight count.
+
+        Every live, non-inert substitute holds exactly one count, and this
+        base class is where that ownership lives. Its special members define
+        the complete count discipline:
+
+        - The adopting constructor takes a count the caller has already paid
+          for (@ref wrap increments as its gate check and hands the count to
+          the substitute it constructs). It does not increment.
+        - The copy constructor pays for its own count.
+        - The move constructor transfers ownership; the moved-from instance
+          becomes inert and does not decrements (and should also not permit
+          invocation).
+        - The destructor releases the count, if one is held.
+
+        This is a base class instead of a member to ensure that the decrement
+        only happens AFTER the closure's destructor has completed, since join
+        must not return while any part of a closure, including its destructor
+        which may release captured resources, is still executing.
+
+        A null counter pointer denotes an inert holder: one that was moved
+        from, or a copy of one. Inert holders take no part in counting.
+     */
+    class CountHolder
+    {
+    protected:
+        ClosureCounter* counter_;
+
+        explicit CountHolder(ClosureCounter* c) noexcept : counter_(c)
+        {
+        }
+
+        CountHolder(CountHolder const& o) noexcept : counter_(o.counter_)
+        {
+            if (counter_)
+                counter_->state_.fetch_add(1, std::memory_order::relaxed);
+        }
+
+        CountHolder(CountHolder&& o) noexcept
+            : counter_(std::exchange(o.counter_, nullptr))
+        {
+        }
+
+        CountHolder&
+        operator=(CountHolder&& other) = delete;
+
+        CountHolder&
+        operator=(CountHolder const& other) = delete;
+
+        ~CountHolder()
+        {
+            if (counter_)
+                counter_->decrement();
+        }
+    };
+
+    template <typename Closure>
+        requires suitable_v<Closure>
+    class Substitute : CountHolder
+    {
         std::remove_reference_t<Closure> closure_;
 
-        static_assert(
-            std::is_same<decltype(closure_(std::declval<Args_t>()...)), Ret_t>::
-                value,
-            "Closure arguments don't match ClosureCounter Ret_t or Args_t");
-
     public:
-        Substitute() = delete;
-
-        Substitute(Substitute const& rhs)
-            : counter_(rhs.counter_), closure_(rhs.closure_)
+        Substitute(ClosureCounter& counter, Closure&& closure) noexcept(
+            std::is_nothrow_constructible_v<decltype(closure_), Closure&&>)
+            : CountHolder(&counter), closure_(std::forward<Closure>(closure))
         {
-            ++counter_;
         }
 
-        Substitute(Substitute&& rhs) noexcept(
-            std::is_nothrow_move_constructible<Closure>::value)
-            : counter_(rhs.counter_), closure_(std::move(rhs.closure_))
-        {
-            ++counter_;
-        }
-
-        Substitute(ClosureCounter& counter, Closure&& closure)
-            : counter_(counter), closure_(std::forward<Closure>(closure))
-        {
-            ++counter_;
-        }
-
+        Substitute(Substitute const&) = default;
         Substitute&
-        operator=(Substitute const& rhs) = delete;
+        operator=(Substitute const&) = delete;
+
+        Substitute(Substitute&&) = default;
         Substitute&
-        operator=(Substitute&& rhs) = delete;
+        operator=(Substitute&&) = delete;
 
-        ~Substitute()
+        Return
+        operator()(Arguments... args) noexcept(std::is_nothrow_invocable_r_v<
+                                               Return,
+                                               decltype(closure_)&,
+                                               Arguments...>)
         {
-            --counter_;
-        }
-
-        // Note that Args_t is not deduced, it is explicit.  So Args_t&&
-        // would be an rvalue reference, not a forwarding reference.  We
-        // want to forward exactly what the user declared.
-        Ret_t
-        operator()(Args_t... args)
-        {
-            return closure_(std::forward<Args_t>(args)...);
+            XRPL_ASSERT(
+                this->counter_,
+                "ripple::ClosureCounter::Substitute::operator() : not inert");
+            return closure_(std::forward<Arguments>(args)...);
         }
     };
 
 public:
     ClosureCounter() = default;
-    // Not copyable or movable.  Outstanding counts would be hard to sort out.
     ClosureCounter(ClosureCounter const&) = delete;
-
     ClosureCounter&
     operator=(ClosureCounter const&) = delete;
 
-    /** Destructor verifies all in-flight closures are complete. */
     ~ClosureCounter()
     {
-        using namespace std::chrono_literals;
-        join("ClosureCounter", 1s, debugLog());
+        join("ClosureCounter", std::chrono::seconds(1), debugLog());
     }
 
-    /** Returns once all counted in-flight closures are destroyed.
+    std::chrono::milliseconds
+    join() noexcept
+    {
+        auto s = state_.fetch_or(joined_flag, std::memory_order::acq_rel);
 
-        @param name Name reported if join time exceeds wait.
-        @param wait If join() exceeds this duration report to Journal.
-        @param j Journal written to if wait is exceeded.
-     */
-    void
+        if ((s & count_mask) == 0)
+            return {};
+
+        auto const start = std::chrono::steady_clock::now();
+
+        // fetch_or returns the value the atomic previously held, which may
+        // not have had the flag set. We normalize the result to match that
+        // or the first wait() would compare against a value the atomic no
+        // longer holds and return immediately.
+        s |= joined_flag;
+
+        do
+        {
+            state_.wait(s, std::memory_order::acquire);
+
+            s = state_.load(std::memory_order::acquire);
+        } while (s & count_mask);
+
+        return std::chrono::ceil<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start);
+    }
+
+    [[deprecated]] void
     join(char const* name, std::chrono::milliseconds wait, beast::Journal j)
     {
-        std::unique_lock<std::mutex> lock{mutex_};
-        waitForClosures_ = true;
-        if (closureCount_ > 0)
+        if (auto const elapsed = join(); elapsed >= wait)
         {
-            if (!allClosuresDoneCond_.wait_for(
-                    lock, wait, [this] { return closureCount_ == 0; }))
-            {
-                if (auto stream = j.error())
-                    stream << name << " waiting for ClosureCounter::join().";
-                allClosuresDoneCond_.wait(
-                    lock, [this] { return closureCount_ == 0; });
-            }
+            if (auto stream = j.error())
+                stream << name << " took " << elapsed.count()
+                       << "ms in ClosureCounter::join().";
         }
     }
 
-    /** Wrap the passed closure with a reference counter.
-
-        @param closure Closure that accepts Args_t parameters and returns Ret_t.
-        @return If join() has been called returns std::nullopt.  Otherwise
-                returns a std::optional that wraps closure with a
-                reference counter.
-    */
-    template <class Closure>
+    template <typename Closure>
+        requires suitable_v<Closure>
     std::optional<Substitute<Closure>>
     wrap(Closure&& closure)
     {
-        std::optional<Substitute<Closure>> ret;
+        // Optimistically increment; the same RMW tells us whether the
+        // gate is closed. Relaxed is fine: we do not publish anything
+        // here.
+        if (auto const prev = state_.fetch_add(1, std::memory_order::relaxed);
+            prev & joined_flag)
+        {
+            // Roll back through the normal path, because our transient
+            // increment above may be what a joiner is waiting on.
+            decrement();
+            return std::nullopt;
+        }
 
-        std::lock_guard lock{mutex_};
-        if (!waitForClosures_)
-            ret.emplace(*this, std::forward<Closure>(closure));
-
-        return ret;
+        return std::optional<Substitute<Closure>>(
+            std::in_place, *this, std::forward<Closure>(closure));
     }
 
-    /** Current number of Closures outstanding.  Only useful for testing. */
-    int
-    count() const
+    [[nodiscard]] std::uint32_t
+    count() const noexcept
     {
-        return closureCount_;
+        return state_.load(std::memory_order::relaxed) & count_mask;
     }
 
-    /** Returns true if this has been joined.
-
-        Even if true is returned, counted closures may still be in flight.
-        However if (joined() && (count() == 0)) there should be no more
-        counted closures in flight.
-    */
-    bool
-    joined() const
+    [[nodiscard]] bool
+    joined() const noexcept
     {
-        std::lock_guard lock{mutex_};
-        return waitForClosures_;
+        return (state_.load(std::memory_order::relaxed) & joined_flag) != 0;
     }
 };
 

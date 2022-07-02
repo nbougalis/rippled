@@ -140,12 +140,81 @@ class JobQueue_test : public beast::unit_test::suite
         BEAST_EXPECT(coro == nullptr);
     }
 
+    void
+    testJobOrdering()
+    {
+        jtx::Env env{*this};
+        JobQueue& jq = env.app().getJobQueue();
+
+        // Hold all workers while we enqueue, so jobs accumulate in the
+        // queue rather than executing as they arrive.
+        std::atomic<unsigned> gate{jq.thread_count() + 1};
+
+        auto pass = [&gate]() {
+            if (gate.fetch_sub(1, std::memory_order_acq_rel) == 1)
+            {
+                gate.notify_all();
+                return;
+            }
+
+            auto v = gate.load(std::memory_order_acquire);
+
+            while (v != 0)
+            {
+                gate.wait(v, std::memory_order_acquire);
+                v = gate.load(std::memory_order_acquire);
+            }
+        };
+
+        for (unsigned i = 0; i < jq.thread_count(); ++i)
+            jq.addJob(jtADMIN, "gate", pass);
+
+        // Sprinkle jobs across several types, interleaved, tagged with
+        // their per-type sequence number.
+        std::mutex m;
+        std::map<JobType, std::vector<int>> order;
+
+        auto record = [&](JobType t, int seq) {
+            return [&, t, seq]() {
+                std::lock_guard l(m);
+                order[t].push_back(seq);
+            };
+        };
+
+        constexpr JobType types[] = {
+            jtPACK, jtSWEEP, jtTRANSACTION, jtLEDGER_DATA, jtACCEPT};
+        constexpr int perType = 20;
+
+        std::map<JobType, int> seq;
+
+        for (int i = 0; i < perType; ++i)
+            for (auto const t : types)
+                jq.addJob(t, "ordered", record(t, seq[t]++));
+
+        pass();
+        jq.rendezvous();
+
+        {
+            std::lock_guard l(m);
+            for (auto const t : types)
+            {
+                if (!BEAST_EXPECT(order[t].size() == perType))
+                    continue;
+                BEAST_EXPECT(std::is_sorted(order[t].begin(), order[t].end()));
+                // Strictly increasing 0..perType-1, i.e. exactly FIFO:
+                BEAST_EXPECT(order[t].front() == 0);
+                BEAST_EXPECT(order[t].back() == perType - 1);
+            }
+        }
+    }
+
 public:
     void
     run() override
     {
         testAddJob();
         testPostCoro();
+        testJobOrdering();
     }
 };
 

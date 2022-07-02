@@ -73,9 +73,10 @@
 #include <xrpl/resource/ResourceManager.h>
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/asio/steady_timer.hpp>
-#include <exception>
+#include <boost/stacktrace.hpp>
 
 #include <algorithm>
+#include <exception>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -1161,7 +1162,7 @@ NetworkOPsImp::processTransaction(
     bool bLocal,
     FailHard failType)
 {
-    auto ev = m_job_queue.makeLoadEvent(jtTXN_PROC, "ProcessTXN");
+    auto ev = m_job_queue.createLoadEvent(jtTXN_PROC, "ProcessTXN");
 
     auto const view = m_ledgerMaster.getCurrentLedger();
 
@@ -1253,8 +1254,9 @@ NetworkOPsImp::doTransactionAsync(
 
     if (mDispatchState == DispatchState::none)
     {
-        if (m_job_queue.addJob(
-                jtBATCH, "transactionBatch", [this]() { transactionBatch(); }))
+        if (m_job_queue.addJob(jtBATCH, "transactionBatch (async)", [this]() {
+                transactionBatch();
+            }))
         {
             mDispatchState = DispatchState::scheduled;
         }
@@ -1301,12 +1303,13 @@ NetworkOPsImp::doTransactionSync(
         {
             apply(lock);
 
-            if (mTransactions.size())
+            if (!mTransactions.empty())
             {
                 // More transactions need to be applied, but by another job.
-                if (m_job_queue.addJob(jtBATCH, "transactionBatch", [this]() {
-                        transactionBatch();
-                    }))
+                if (m_job_queue.addJob(
+                        jtBATCH, "transactionBatch (sync)", [this]() {
+                            transactionBatch();
+                        }))
                 {
                     mDispatchState = DispatchState::scheduled;
                 }
@@ -1318,14 +1321,21 @@ NetworkOPsImp::doTransactionSync(
 void
 NetworkOPsImp::transactionBatch()
 {
-    std::unique_lock<std::mutex> lock(mMutex);
-
-    if (mDispatchState == DispatchState::running)
-        return;
-
-    while (mTransactions.size())
+    try
     {
-        apply(lock);
+        std::unique_lock<std::mutex> lock(mMutex);
+
+        if (mDispatchState != DispatchState::running)
+        {
+            while (!mTransactions.empty())
+                apply(lock);
+        }
+    }
+    catch (std::exception const& ex)
+    {
+        JLOG(m_journal.error())
+            << "NetworkOPsImp::transactionBatch exception: " << ex.what();
+        JLOG(m_journal.error()) << boost::stacktrace::stacktrace();
     }
 }
 
