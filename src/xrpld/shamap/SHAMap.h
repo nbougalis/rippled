@@ -45,7 +45,7 @@ class SHAMapNodeID;
 class SHAMapSyncFilter;
 
 /** Describes the current state of a given SHAMap */
-enum class SHAMapState {
+enum class SHAMapState : std::uint8_t {
     /** The map is in flux and objects can be added and removed.
 
         Example: map underlying the open ledger.

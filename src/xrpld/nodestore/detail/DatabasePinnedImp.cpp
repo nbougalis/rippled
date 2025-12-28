@@ -247,25 +247,24 @@ DatabasePinnedImp::likelyPinned(std::uint32_t ledgerSeq) const
 std::shared_ptr<NodeObject>
 DatabasePinnedImp::tryPersistent(uint256 const& hash, FetchReport& fetchReport)
 {
-    std::shared_ptr<NodeObject> nodeObject;
-    Status status;
     try
     {
-        status = persistent_->fetch(hash.data(), &nodeObject);
+        std::shared_ptr<NodeObject> obj;
+
+        if (persistent_->fetch(hash.data(), &obj) == ok && obj)
+        {
+            fetchReport.wasFound = true;
+            // Note: We do NOT copy pinned data to rotating storage even if
+            // duplicate=true. Pinned data stays in persistent storage.
+        }
+
+        return obj;
     }
     catch (std::exception const& e)
     {
         JLOG(j_.fatal()) << "Exception fetching from persistent: " << e.what();
-        Rethrow();
+        throw;
     }
-
-    if (status == ok && nodeObject)
-    {
-        fetchReport.wasFound = true;
-        // Note: We do NOT copy pinned data to rotating storage even if
-        // duplicate=true. Pinned data stays in persistent storage.
-    }
-    return nodeObject;
 }
 
 }  // namespace NodeStore

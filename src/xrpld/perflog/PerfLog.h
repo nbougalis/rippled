@@ -29,6 +29,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace beast {
 class Journal;
@@ -183,7 +184,7 @@ template <typename Func, class Rep, class Period>
 auto
 measureDurationAndLog(
     Func&& func,
-    const std::string& actionDescription,
+    std::string_view actionDescription,
     std::chrono::duration<Rep, Period> maxDelay,
     const beast::Journal& journal)
 {

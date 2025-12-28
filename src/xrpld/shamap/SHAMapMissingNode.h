@@ -29,7 +29,7 @@
 
 namespace ripple {
 
-enum class SHAMapType {
+enum class SHAMapType : std::uint8_t {
     TRANSACTION = 1,  // A tree of transactions
     STATE = 2,        // A tree of state nodes
     FREE = 3,         // A tree not part of a ledger
