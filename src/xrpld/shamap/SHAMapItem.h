@@ -28,6 +28,8 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include <cassert>
+
 namespace ripple {
 
 // an item stored in a SHAMap
@@ -37,14 +39,14 @@ class SHAMapItem : public CountedObject<SHAMapItem>
     // These functions are used internally by boost::intrusive_ptr to handle
     // lifetime management.
     friend void
-    intrusive_ptr_add_ref(SHAMapItem const* x);
+    intrusive_ptr_add_ref(SHAMapItem const* x) noexcept;
 
     friend void
-    intrusive_ptr_release(SHAMapItem const* x);
+    intrusive_ptr_release(SHAMapItem const* x) noexcept;
 
     // This is the interface for creating new instances of this class.
-    friend boost::intrusive_ptr<SHAMapItem>
-    make_shamapitem(uint256 const& tag, Slice data);
+    friend boost::intrusive_ptr<SHAMapItem const>
+    make_shamapitem(uint256 const& tag, Slice data) noexcept;
 
 private:
     uint256 const tag_;
@@ -61,9 +63,11 @@ private:
     // the only way to properly create one is to first allocate enough memory
     // so we limit this constructor to codepaths that do this right and limit
     // arbitrary construction.
-    SHAMapItem(uint256 const& tag, Slice data)
+    SHAMapItem(uint256 const& tag, Slice data) noexcept
         : tag_(tag), size_(static_cast<std::uint32_t>(data.size()))
     {
+        assert(data.size() != 0);
+
         std::memcpy(
             reinterpret_cast<std::uint8_t*>(this) + sizeof(*this),
             data.data(),
@@ -84,25 +88,25 @@ public:
     operator=(SHAMapItem&&) = delete;
 
     uint256 const&
-    key() const
+    key() const noexcept
     {
         return tag_;
     }
 
     std::size_t
-    size() const
+    size() const noexcept
     {
         return size_;
     }
 
     void const*
-    data() const
+    data() const noexcept
     {
         return reinterpret_cast<std::uint8_t const*>(this) + sizeof(*this);
     }
 
     Slice
-    slice() const
+    slice() const noexcept
     {
         return {data(), size()};
     }
@@ -111,77 +115,67 @@ public:
 namespace detail {
 
 // clang-format off
-// The slab cutoffs and the number of megabytes per allocation are customized
-// based on the number of objects of each size we expect to need at any point
-// in time and with an eye to minimize the number of slack bytes in a block.
-inline SlabAllocatorSet<SHAMapItem> slabber({
-    {  128, megabytes(std::size_t(60)) },
-    {  192, megabytes(std::size_t(46)) },
-    {  272, megabytes(std::size_t(60)) },
-    {  384, megabytes(std::size_t(56)) },
-    {  564, megabytes(std::size_t(40)) },
-    {  772, megabytes(std::size_t(46)) },
-    { 1052, megabytes(std::size_t(60)) },
-});
+// The number of items per allocation and the bucket sizes are customized
+// based on profiling data, with an eye on minimizing the number of slack
+// bytes in a block.
+inline constinit slab::allocator_t<SHAMapItem, slab::heap_fallback,
+    slab::config<1000000, 128>,
+    slab::config<1000000, 296>,
+    slab::config<125000, 392>,
+    slab::config<125000, 520>,
+    slab::config<62500, 760>,
+    slab::config<62500, 856>,
+    slab::config<31250, 1048>
+> slabber;
 // clang-format on
 
 }  // namespace detail
 
 inline void
-intrusive_ptr_add_ref(SHAMapItem const* x)
+intrusive_ptr_add_ref(SHAMapItem const* x) noexcept
 {
-    // This can only happen if someone releases the last reference to the
-    // item while we were trying to increment the refcount.
+    assert(x);
+
+    // In order to call this, we must already have an intrusive pointer
+    // to this item, so its reference count should be at least 1.
     if (x->refcount_++ == 0)
         LogicError("SHAMapItem: the reference count is 0!");
 }
 
 inline void
-intrusive_ptr_release(SHAMapItem const* x)
+intrusive_ptr_release(SHAMapItem const* x) noexcept
 {
+    assert(x);
+
     if (--x->refcount_ == 0)
     {
-        auto p = reinterpret_cast<std::uint8_t const*>(x);
+        auto const size = x->size();
 
-        // The SHAMapItem constuctor isn't trivial (because the destructor
-        // for CountedObject isn't) so we can't avoid calling it here, but
-        // plan for a future where we might not need to.
+        // We need to invoke the destructor for this object before we
+        // release the memory.
         if constexpr (!std::is_trivially_destructible_v<SHAMapItem>)
             std::destroy_at(x);
 
-        // If the slabber doens't claim this pointer, it was allocated
-        // manually, so we free it manually.
-        if (!detail::slabber.deallocate(const_cast<std::uint8_t*>(p)))
-            delete[] p;
+        if (!detail::slabber.deallocate(x, size)) [[unlikely]]
+            LogicError("SHAMapItem: failed to deallocate memory!");
     }
 }
 
-inline boost::intrusive_ptr<SHAMapItem>
-make_shamapitem(uint256 const& tag, Slice data)
+inline boost::intrusive_ptr<SHAMapItem const>
+make_shamapitem(uint256 const& tag, Slice data) noexcept
 {
-    XRPL_ASSERT(
-        data.size() <= megabytes<std::size_t>(16),
-        "ripple::make_shamapitem : maximum input size");
-
-    std::uint8_t* raw = detail::slabber.allocate(data.size());
-
-    // If we can't grab memory from the slab allocators, we fall back to
-    // the standard library and try to grab a precisely-sized memory block:
-    if (raw == nullptr)
-        raw = new std::uint8_t[sizeof(SHAMapItem) + data.size()];
+    assert(data.size() != 0 && data.size() <= megabytes<std::size_t>(8));
 
     // We do not increment the reference count here on purpose: the
-    // constructor of SHAMapItem explicitly sets it to 1. We use the fact
-    // that the refcount can never be zero before incrementing as an
-    // invariant.
-    return {new (raw) SHAMapItem{tag, data}, false};
+    // constructor of SHAMapItem explicitly sets it to 1.
+    if (auto raw = detail::slabber.allocate(data.size())) [[likely]]
+        return {new (raw) SHAMapItem{tag, data}, false};
+
+    return nullptr;
 }
 
-static_assert(alignof(SHAMapItem) != 40);
-static_assert(alignof(SHAMapItem) == 8 || alignof(SHAMapItem) == 4);
-
-inline boost::intrusive_ptr<SHAMapItem>
-make_shamapitem(SHAMapItem const& other)
+inline boost::intrusive_ptr<SHAMapItem const>
+make_shamapitem(SHAMapItem const& other) noexcept
 {
     return make_shamapitem(other.key(), other.slice());
 }
