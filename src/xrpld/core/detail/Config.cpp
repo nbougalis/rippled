@@ -698,12 +698,12 @@ Config::loadFromString(std::string const& fileContents)
 
     if (getSingleSection(secConfig, SECTION_WORKERS, strTemp, j_))
     {
-        WORKERS = beast::lexicalCastThrow<int>(strTemp);
+        WORKERS = beast::lexicalCastThrow<std::size_t>(strTemp);
 
-        if (WORKERS < 1 || WORKERS > 1024)
+        if (WORKERS < 1 || WORKERS > 64)
             Throw<std::runtime_error>(
                 "Invalid " SECTION_WORKERS
-                ": must be between 1 and 1024 inclusive.");
+                ": must be between 1 and 64 inclusive.");
     }
 
     if (getSingleSection(secConfig, SECTION_IO_WORKERS, strTemp, j_))

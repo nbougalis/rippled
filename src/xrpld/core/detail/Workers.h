@@ -20,65 +20,50 @@
 #ifndef RIPPLE_CORE_WORKERS_H_INCLUDED
 #define RIPPLE_CORE_WORKERS_H_INCLUDED
 
-#include <xrpld/core/detail/semaphore.h>
-#include <xrpl/beast/core/LockFreeStack.h>
+#include <xrpl/basics/safe_cast.h>
+
 #include <atomic>
-#include <condition_variable>
-#include <mutex>
-#include <string>
-#include <thread>
+#include <exception>
+#include <memory>
+#include <string_view>
+#include <vector>
 
 namespace ripple {
 
-namespace perf {
-class PerfLog;
-}
+/** A simple thread pool.
 
-/**
- * `Workers` is effectively a thread pool. The constructor takes a "callback"
- * that has a `void processTask(int instance)` method, and a number of
- * workers. It creates that many `Worker`s and then waits for calls to
- * `Workers::addTask()`. It holds a semaphore that counts the number of
- * pending "tasks", and a condition variable for the event when the last
- * worker pauses itself.
- *
- * A "task" is just a call to the callback's `processTask` method.
- * "Adding a task" means calling that method now, or remembering to call it in
- * the future.
- * This is implemented with a semaphore.
- * If there are any workers waiting when a task is added, then one will be
- * woken to claim the task.
- * If not, then the next worker to wait on the semaphore will claim the task.
- *
- * Creating a `Worker` creates a thread that calls `Worker::run()`. When that
- * thread enters `Worker::run`, it increments the count of active workers in
- * the parent `Workers` object and then tries to claim a task, which blocks if
- * there are none pending.
- * It will be unblocked whenever the semaphore is notified (i.e. when the
- * number of pending tasks is incremented).
- * That only happens in two circumstances: (1) when
- * `Workers::addTask` is called and (2) when `Workers` wants to pause some
- * workers ("pause one worker" is considered one task), which happens when
- * someone wants to stop the workers or shrink the threadpool. No worker
- * threads are ever destroyed until `Workers` is destroyed; it merely pauses
- * workers until then.
- *
- * When a waiting worker is woken, it checks whether `Workers` is trying to
- * pause workers. If so, it changes its status from active to paused and
- * blocks on
- * its own condition variable. If not, then it calls `processTask` on the
- * "callback" held by `Workers`.
- *
- * When a paused worker is woken, it checks whether it should exit. The signal
- * to exit is only set in the destructor of `Worker`, which unblocks the
- * paused thread and waits for it to exit. A `Worker::run` thread checks
- * whether it needs to exit only when it is woken from a pause (not when it is
- * woken from waiting). This is why the destructor for `Workers` pauses all
- * the workers before destroying them.
+    This class is a simple, fixed-sized thread pool. The pool only tracks
+    the number of outstanding tasks, and dispatches work. When it detects
+    that there is no work to be done, it puts threads to sleep.
+
+    The pool does not decide which task to run; a callback, that the pool
+    invokes, handles that. This makes it possible to implement a dispatch
+    strategy (e.g. FIFO or priority queues) without requiring any changes
+    to the thread pool itself.
+
+    The threads will run (or sleep) until stop() is called explicitly, or
+    automatically by the pool's destructor.
+
+    Stopping takes priority over servicing new tasks. Once a stop request
+    has been made, no new tasks will be serviced, which means that queued
+    work may be potentially left unfinished. Tasks already dispatched and
+    running under a worker thread will complete before the pool stops.
  */
 class Workers
 {
 public:
+    enum class WakePolicy {
+        // Wake a sleeper only when the backlog exceeds the number of
+        // awake workers. Assumes tasks are short and running workers
+        // will return to the claim loop soon. Right for CPU-bound work.
+        lazy,
+
+        // Wake a sleeper whenever one exists and a task is unclaimed.
+        // Right for tasks that block (e.g. in I/O), where an "awake"
+        // worker may not revisit the claim loop for milliseconds.
+        eager
+    };
+
     /** Called to perform tasks as needed. */
     struct Callback
     {
@@ -88,60 +73,79 @@ public:
         Callback&
         operator=(Callback const&) = delete;
 
-        /** Perform a task.
+        /** Select and perform a task.
 
-            The call is made on a thread owned by Workers. It is important
-            that you only process one task from inside your callback. Each
-            call to addTask will result in exactly one call to processTask.
+            The function is invoked precisely once for every call to the
+            thread pool's addTask method. It executes on one of pool's threads.
+
+            This function should process precisely one task.
 
             @param instance The worker thread instance.
+
+            @throws This function should NOT throw an exception; if it does
+                    the exception will be captured and passed to the
+                    uncaughtException callback.
 
             @see Workers::addTask
         */
         virtual void
-        processTask(int instance) = 0;
+        processTask(unsigned int instance) = 0;
+
+        /** Indicates that processTask threw an unexpected exception.
+
+            @param instance The worker thread instance.
+            @param eptr The exception that was thrown.
+         * */
+        virtual void
+        uncaughtException(unsigned int instance, std::exception_ptr eptr)
+        {
+            // Default implementation does nothing
+        }
     };
 
-    /** Create the object.
+    /** Create a new thread pool with the given number of worker threads.
 
-        A number of initial threads may be optionally specified. The
-        default is to create one thread per CPU.
+        The pool starts its threads immediately, and they go to sleep,
+        waiting for work to arrive via @ref addTask.
 
-        @param threadNames The name given to each created worker thread.
-    */
+        @param callback The task selection and execution algorithm.
+        @param name The name for this pool (used to name its threads).
+        @param count The number of threads for this pool. Must be non-zero.
+
+        @throws std::logic_error if count is zero; other std::exception
+                                 derived exceptions if thread creation
+                                 or memory allocation fails.
+     */
     explicit Workers(
         Callback& callback,
-        perf::PerfLog* perfLog,
-        std::string const& threadNames = "Worker",
-        int numberOfThreads =
-            static_cast<int>(std::thread::hardware_concurrency()));
+        std::string_view name,
+        unsigned int count,
+        WakePolicy wakePolicy = WakePolicy::lazy);
 
     ~Workers();
 
-    /** Retrieve the desired number of threads.
+    /** Retrieve the number of threads in the thread pool. */
+    [[nodiscard]] unsigned int
+    count() const noexcept
+    {
+        return unsafe_cast<unsigned int>(workers_.size());
+    }
 
-        This just returns the number of active threads that were requested. If
-        there was a recent call to setNumberOfThreads, the actual number of
-       active threads may be temporarily different from what was last requested.
+    /** Stop all threads and wait until they exit.
 
-        @note This function is not thread-safe.
-    */
-    int
-    getNumberOfThreads() const noexcept;
+        Pool threads will complete any currently executing tasks before
+        exiting. Tasks that were queued but have not been dispatched by
+        the pool yet will be discarded. Once stopped, the pool will not
+        restart.
 
-    /** Set the desired number of threads.
-        @note This function is not thread-safe.
-    */
-    void
-    setNumberOfThreads(int numberOfThreads);
+        @note This function is thread-safe and can be invoked multiple
+              times, including multiple times concurrently. Calls will
+              block until the pool has stopped and worker threads have
+              exited.
 
-    /** Pause all threads and wait until they are paused.
-
-        If a thread is processing a task it will pause as soon as the task
-        completes. There may still be tasks signaled even after all threads
-        have paused.
-
-        @note This function is not thread-safe.
+        @warning This function cannot be called from a worker thread
+                 owned by this pool. Doing so can result in either a
+                 deadlock or a call to std::terminate.
     */
     void
     stop();
@@ -155,81 +159,99 @@ public:
         @note This function is thread-safe.
     */
     void
-    addTask();
-
-    /** Get the number of currently executing calls of Callback::processTask.
-        While this function is thread-safe, the value may not stay
-        accurate for very long. It's mainly for diagnostic purposes.
-    */
-    int
-    numberOfCurrentlyRunningTasks() const noexcept;
-
-    //--------------------------------------------------------------------------
+    addTask() noexcept;
 
 private:
-    struct PausedTag
-    {
-        explicit PausedTag() = default;
-    };
+    /** The type we use for fast atomics.
 
-    /*  A Worker executes tasks on its provided thread.
+        Note that this is deliberately using a 32-bit type so that
+        we can leverage glibc's futex support on Linux.
+     */
+    using futex_t = std::uint32_t;
 
-        These are the states:
+    /** The current state of a worker thread. */
+    static constexpr futex_t worker_asleep = 0;
+    static constexpr futex_t worker_active = 1;
 
-        Active: Running the task processing loop.
-        Idle:   Active, but blocked on waiting for a task.
-        Paused: Blocked waiting to exit or become active.
-    */
-    class Worker : public beast::LockFreeStack<Worker>::Node,
-                   public beast::LockFreeStack<Worker, PausedTag>::Node
-    {
-    public:
-        Worker(
-            Workers& workers,
-            std::string const& threadName,
-            int const instance);
+    /** The current state of the pool, as a whole. */
+    static constexpr futex_t pool_running = 1;
+    static constexpr futex_t pool_stopped = 0;
 
-        ~Worker();
+    /** Required forward reference. */
+    struct Worker;
 
-        void
-        notify();
+    // Note that we are very deliberate with the memory layout of the
+    // members of this class, to limit cache invalidations because of
+    // writes.
+    //
+    // First, we have data which is read very frequently, but is only
+    // rarely written to. These occupy their own cache line.
+    //
+    // Next, we have 3 groups of "hot" data, each on a dedicated cache
+    // line:
+    //
+    // - Line 1: The dormitory pointer and its lock. We colocate them
+    //           because they are dirtied together. The flag used for
+    //           pool shutdown is also included in this block.
+    // - Line 2: The head counter, which only producers write to.
+    // - Line 3: The tail counter, which only consumers write to.
 
-    private:
-        void
-        run();
+    /** The list of worker objects */
+    std::vector<std::unique_ptr<Worker>> workers_;
 
-    private:
-        Workers& m_workers;
-        std::string const threadName_;
-        int const instance_;
+    /** The job-handling callback, provided by our parent. */
+    Callback& callback_;
 
-        std::thread thread_;
-        std::mutex mutex_;
-        std::condition_variable wakeup_;
-        int wakeCount_;  // how many times to un-pause
-        bool shouldExit_;
-    };
+    /** The wake policy for this pool. */
+    WakePolicy const wakePolicy_;
 
-private:
-    static void
-    deleteWorkers(beast::LockFreeStack<Worker>& stack);
+    /** The dormitory for worker threads. */
+    alignas(64) Worker* dormitory_ = nullptr;
 
-private:
-    Callback& m_callback;
-    perf::PerfLog* perfLog_;
-    std::string m_threadNames;     // The name to give each thread
-    std::condition_variable m_cv;  // signaled when all threads paused
-    std::mutex m_mut;
-    bool m_allPaused;
-    semaphore m_semaphore;           // each pending task is 1 resource
-    int m_numberOfThreads;           // how many we want active now
-    std::atomic<int> m_activeCount;  // to know when all are paused
-    std::atomic<int> m_pauseCount;   // how many threads need to pause now
-    std::atomic<int>
-        m_runningTaskCount;  // how many calls to processTask() active
-    beast::LockFreeStack<Worker> m_everyone;  // holds all created workers
-    beast::LockFreeStack<Worker, PausedTag>
-        m_paused;  // holds just paused workers
+    /** Number of workers currently sleeping in the dormitory.
+
+        This is guarded by lock_. Incremented by a worker as it enrolls
+        itself and decremented ONLY by a waker as it pops a worker; The
+        wake-gating argument in addTask() depends on this:
+
+        (workers_.size() - sleeping_) only grows via an explicit wake decision,
+        which is what makes the backlog ramp self-limiting.
+     */
+    std::size_t sleeping_ = 0;
+
+    /** The lock for manipulating the dormitory. */
+    std::atomic<futex_t> lock_ = 0;
+
+    /** Running indicator.
+
+        This is used to coordinate multiple concurrent calls to @ref stop
+        and ensure that calls block until all workers have exited.
+     */
+    std::atomic<futex_t> running_ = pool_running;
+
+    /** Queued task tracking:
+
+        We track the total number of tasks added, and total number of tasks
+        dispatched. The key insight is that, during normal operation, these
+        counters are only ever incremented. This constraint allows us avoid
+        using locking when we are pushing or popping tasks onto the stack.
+
+        The choice of std::uint64_t is deliberate: at a rate of 1,000 tasks
+        per second, a std::uint32_t would overflow in a little less than 50
+        days. An std::uint64_t, on the other hand, is good for well over 50
+        years even at a rate of 1,000,000,000 tasks per second. By then, we
+        are really due for a reboot.
+     */
+
+    /** The total number of tasks that have been queued since startup. */
+    alignas(64) std::atomic<std::uint64_t> head_ = 1;
+
+    /** The total number of tasks that have been dispatched for processing. */
+    alignas(64) std::atomic<std::uint64_t> tail_ = 1;
+
+    /** The function that worker threads run. */
+    void
+    run(Worker& me) noexcept;
 };
 
 }  // namespace ripple

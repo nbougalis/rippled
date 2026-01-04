@@ -253,7 +253,11 @@ public:
     std::chrono::seconds AMENDMENT_MAJORITY_TIME = defaultAmendmentMajorityTime;
 
     // Thread pool configuration (0 = choose for me)
-    int WORKERS = 0;           // jobqueue thread count. default: upto 6
+
+    // jobqueue thread count. default: automatic, based on number
+    // of cores available and NODE_SIZE.
+    std::size_t WORKERS = 0;
+
     int IO_WORKERS = 0;        // io svc thread count. default: 2
     int PREFETCH_WORKERS = 0;  // prefetch thread count. default: 4
 

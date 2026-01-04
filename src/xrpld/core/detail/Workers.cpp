@@ -18,265 +18,340 @@
 //==============================================================================
 
 #include <xrpld/core/detail/Workers.h>
-#include <xrpld/perflog/PerfLog.h>
+#include <xrpl/basics/spinlock.h>
 #include <xrpl/beast/core/CurrentThreadName.h>
 #include <xrpl/beast/utility/instrumentation.h>
 
+#include <thread>
+#include <utility>
+
 namespace ripple {
+
+struct alignas(64) Workers::Worker
+{
+    unsigned int const instance;
+
+    /** Wakeup signal for this worker.
+
+        This is a stateful flag, not a pulse: a worker arms it by setting
+        it to @ref worker_asleep before entering the dorm and waiting for
+        someone to set it to @ref worker_active and notify.
+
+        A wake that lands in the window between the worker releasing the
+        lock and reaching wait() is not lost, because the observed value
+        will be @ref worker_active and fall through immediately.
+
+        Note that a worker does not draw any conclusion from being woken
+        and will re-read head_ and tail_ and re-run the claim loop. This
+        makes spurious wakes harmless by construction, and means a waker
+        does not have to guarantee that the work being queued will still
+        exist by the time the worker actually runs.
+     */
+    std::atomic<futex_t> signal = worker_active;
+
+    /** The last job identifier processed by this worker.
+
+        This is a debugging aid, representing the last tail value that
+        this worker claimed. It is written, but not read or exposed.
+     */
+    std::uint64_t last = 0;
+
+    /** A pointer to the next sleeping worker, if any.
+
+        This is read and written only while holding the lock_. The
+        owning thread writes it during enrollment; a puller reads
+        it during pop. It is meaningless while the worker is awake.
+     */
+    Worker* next = nullptr;
+
+    /** The name we assign to this thread.
+
+        This is just a debugging aid, so that threads shows up with
+        the right name in the debugger.
+     */
+    std::string name;
+
+    /** The thread that this worker is running on.
+
+        @note This MUST be the last member, so that every other member of
+              the class is initialized before it, and the function we are
+              going to run in the thread can never observe an object that
+              is partially-constructed.
+     */
+    std::thread thread;
+
+    Worker(unsigned int i, Workers& parent, std::string_view n)
+        : instance(i)
+        , name(std::string(n) + ":" + std::to_string(i))
+        , thread([&parent, this] {
+            beast::setCurrentThreadName(name);
+            parent.run(*this);
+        })
+    {
+    }
+
+    /** Wake this worker.
+
+        This is safe to call regardless of the state the worker is in. The
+        waker does not promise that any work will be available.
+     */
+    void
+    wake() noexcept
+    {
+        signal.store(worker_active, std::memory_order::release);
+        signal.notify_one();
+    }
+};
 
 Workers::Workers(
     Callback& callback,
-    perf::PerfLog* perfLog,
-    std::string const& threadNames,
-    int numberOfThreads)
-    : m_callback(callback)
-    , perfLog_(perfLog)
-    , m_threadNames(threadNames)
-    , m_allPaused(true)
-    , m_semaphore(0)
-    , m_numberOfThreads(0)
-    , m_activeCount(0)
-    , m_pauseCount(0)
-    , m_runningTaskCount(0)
+    std::string_view name,
+    unsigned int count,
+    WakePolicy wakePolicy)
+    : callback_(callback), wakePolicy_(wakePolicy)
 {
-    setNumberOfThreads(numberOfThreads);
+    if (count == 0)
+        throw std::logic_error("A non-zero number of threads is required.");
+
+    try
+    {
+        workers_.reserve(count);
+
+        for (unsigned int i = 0; i != count; ++i)
+            workers_.push_back(std::make_unique<Worker>(i, *this, name));
+    }
+    catch (...)
+    {
+        // We cannot allow exceptions to escape uncontrolled from here
+        // because we are not yet fully constructed and our destructor
+        // will not be invoked. But our members are, and the automatic
+        // unwinding will invoke their destructors. If any workers are
+        // created, the destruction of the worker's thread will invoke
+        // std::terminate unconditionally.
+        if (!workers_.empty())
+            stop();
+
+        throw;
+    }
 }
 
 Workers::~Workers()
 {
-    stop();
-
-    deleteWorkers(m_everyone);
-}
-
-int
-Workers::getNumberOfThreads() const noexcept
-{
-    return m_numberOfThreads;
-}
-
-// VFALCO NOTE if this function is called quickly to reduce then
-//             increase the number of threads, it could result in
-//             more paused threads being created than expected.
-//
-void
-Workers::setNumberOfThreads(int numberOfThreads)
-{
-    static int instance{0};
-    if (m_numberOfThreads == numberOfThreads)
-        return;
-
-    if (perfLog_)
-        perfLog_->resizeJobs(numberOfThreads);
-
-    if (numberOfThreads > m_numberOfThreads)
-    {
-        // Increasing the number of working threads
-        int const amount = numberOfThreads - m_numberOfThreads;
-
-        for (int i = 0; i < amount; ++i)
-        {
-            // See if we can reuse a paused worker
-            Worker* worker = m_paused.pop_front();
-
-            if (worker != nullptr)
-            {
-                // If we got here then the worker thread is at [1]
-                // This will unblock their call to wait()
-                //
-                worker->notify();
-            }
-            else
-            {
-                worker = new Worker(*this, m_threadNames, instance++);
-                m_everyone.push_front(worker);
-            }
-        }
-    }
-    else
-    {
-        // Decreasing the number of working threads
-        int const amount = m_numberOfThreads - numberOfThreads;
-
-        for (int i = 0; i < amount; ++i)
-        {
-            ++m_pauseCount;
-
-            // Pausing a thread counts as one "internal task"
-            m_semaphore.notify();
-        }
-    }
-
-    m_numberOfThreads = numberOfThreads;
+    if (!workers_.empty())
+        stop();
 }
 
 void
 Workers::stop()
 {
-    setNumberOfThreads(0);
-
-    std::unique_lock<std::mutex> lk{m_mut};
-    m_cv.wait(lk, [this] { return m_allPaused; });
-    lk.unlock();
-
-    XRPL_ASSERT(
-        numberOfCurrentlyRunningTasks() == 0,
-        "ripple::Workers::stop : zero running tasks");
-}
-
-void
-Workers::addTask()
-{
-    m_semaphore.notify();
-}
-
-int
-Workers::numberOfCurrentlyRunningTasks() const noexcept
-{
-    return m_runningTaskCount.load();
-}
-
-void
-Workers::deleteWorkers(beast::LockFreeStack<Worker>& stack)
-{
-    for (;;)
+    // Signal workers to stop. Any workers in the process of going to the
+    // dorm will either make it or they will find that the dorm is closed
+    // and exit.
+    //
+    // Stopping takes priority over new work: queued tasks which have not
+    // been dispatched will be discarded.
+    if (auto const h = head_.exchange(0, std::memory_order::release); h != 0)
     {
-        Worker* const worker = stack.pop_front();
+        // Unlink all sleeping threads, and wake them, one at a time.
+        auto* chain = [this]() {
+            spinlock sl(lock_);
+            std::lock_guard lock(sl);
 
-        if (worker != nullptr)
+            // Bulk form of the waker-side decrement: the dormitory is now
+            // closed and everyone sleeping there is evicted.
+            sleeping_ = 0;
+
+            return std::exchange(dormitory_, nullptr);
+        }();
+
+        while (chain != nullptr)
         {
-            // This call blocks until the thread orderly exits
-            delete worker;
+            // We need to read the next link before waking the worker.
+            auto* next = std::exchange(chain->next, nullptr);
+            chain->wake();
+            chain = next;
         }
-        else
+
+        for (auto& w : workers_)
         {
-            break;
+            if (w->thread.joinable())
+                w->thread.join();
         }
-    }
-}
 
-//------------------------------------------------------------------------------
-
-Workers::Worker::Worker(
-    Workers& workers,
-    std::string const& threadName,
-    int const instance)
-    : m_workers{workers}
-    , threadName_{threadName}
-    , instance_{instance}
-    , wakeCount_{0}
-    , shouldExit_{false}
-{
-    thread_ = std::thread{&Workers::Worker::run, this};
-}
-
-Workers::Worker::~Worker()
-{
-    {
-        std::lock_guard lock{mutex_};
-        ++wakeCount_;
-        shouldExit_ = true;
+        // We are done with the cleanup:
+        running_.store(pool_stopped, std::memory_order::release);
+        running_.notify_all();
     }
 
-    wakeup_.notify_one();
-    thread_.join();
+    // If this was not the stop that performed the cleanup, this will loop
+    // until the cleanup has been completed:
+    running_.wait(pool_running);
 }
 
 void
-Workers::Worker::notify()
+Workers::addTask() noexcept
 {
-    std::lock_guard lock{mutex_};
-    ++wakeCount_;
-    wakeup_.notify_one();
-}
+    // Bump the task count, unless the pool is stopping. We intentionally
+    // use release ordering in the compare_exchange_strong, extending the
+    // release sequence of head_; this ensures that workers whose acquire
+    // load observes this (or any later) value for head_ will synchronize
+    // with us and, therefore, see everything we wrote prior to this call.
+    // The ordering enforces the payload-publication guarantee; it cannot
+    // be weakened.
+    auto h = head_.load(std::memory_order::relaxed);
 
-void
-Workers::Worker::run()
-{
-    bool shouldExit = true;
     do
     {
-        // Increment the count of active workers, and if
-        // we are the first one then reset the "all paused" event
+        // A zero head_ is the stop sentinel and must never be revived.
+        if (h == 0)
+            return;
+    } while (!head_.compare_exchange_strong(
+        h, h + 1, std::memory_order::release, std::memory_order::relaxed));
+
+    // Our task is number h+1. If tail_ has already reached past it, it means
+    // that a worker claimed it since our CAS above; there is no backlog that
+    // is attributable to us, which means that no wake is needed.
+    if (auto const t = tail_.load(std::memory_order::relaxed); t <= h)
+    {
+        // Wake a sleeper. If the pool has the "lazy" policy, we will only
+        // wake a thread if the backlog exceeds the number of workers that
+        // are awake; otherwise, we bet that an already active worker will
+        // return to the claim loop soon and absorb this task. This bet is
+        // self-correcting: the backlog is strictly increasing against the
+        // fixed number of workers, so it eventually triggers and wakes up
+        // another thread. The ramp continues until we either catch up, or
+        // the dormitory is empty (i.e. all our threads are running).
         //
-        if (++m_workers.m_activeCount == 1)
+        // The eager policy skips the backlog calculation and always wakes
+        // a sleeper if one exists. It is intended for workloads that have
+        // long blocking tasks (e.g. in I/O), and an "active" worker might
+        // not return to the claim loop for a long time.
+        //
+        // Regardless of the policy, wakes remain bounded: at most one per
+        // unclaimed task, since the tail_ check above gates entry here.
+        //
+        // Suppressing a wake cannot strand a task: workers only complete
+        // enrollment in the dormitory via the recheck under lock_; since
+        // our CAS on head_ happens before we take that same lock, either
+        // the worker enrolled first (so sleeping_ counted it) or its own
+        // recheck ran after our critical section, saw that there was new
+        // work and refused to sleep.
+        //
+        // Note that outstanding is computed from t, which could be stale
+        // by the time we grab the lock. This is safe: the error can only
+        // be high, so this errs toward waking; the woken worker may find
+        // no work queued which is fine.
+        if (auto* w = [this, outstanding = h + 1 - t]() -> Worker* {
+                spinlock sl(lock_);
+                std::lock_guard lock(sl);
+
+                if (dormitory_ == nullptr)
+                    return nullptr;
+
+                if (wakePolicy_ == WakePolicy::lazy &&
+                    (outstanding <= workers_.size() - sleeping_))
+                    return nullptr;
+
+                --sleeping_;
+                return std::exchange(dormitory_, dormitory_->next);
+            }())
         {
-            std::lock_guard lk{m_workers.m_mut};
-            m_workers.m_allPaused = false;
+            w->next = nullptr;
+            w->wake();
         }
+    }
+}
 
-        for (;;)
+void
+Workers::run(Worker& me) noexcept
+{
+    while (true)
+    {
+        // observing tail_ == t will synchronize with the claimer of
+        // task t, whose own head_ read saw at least t; by read-read
+        // coherence our head_ load below then also sees >= t.
+        auto t = tail_.load(std::memory_order::acquire);
+
+        // Join head_'s release sequence, so everything any producer
+        // wrote before an addTask() we observe is visible before we
+        // go looking for its task.
+        auto h = head_.load(std::memory_order::acquire);
+
+        // A zero head is the stop sentinel: no tasks will be dispatched
+        // and we need to exit.
+        if (h == 0)
+            break;
+
+        XRPL_ASSERT(h >= t, "ripple::Workers::run : head >= tail");
+
+        if (h > t)
         {
-            // Put the name back in case the callback changed it
-            beast::setCurrentThreadName(threadName_);
-
-            // Acquire a task or "internal task."
-            //
-            m_workers.m_semaphore.wait();
-
-            // See if there's a pause request. This
-            // counts as an "internal task."
-            //
-            int pauseCount = m_workers.m_pauseCount.load();
-
-            if (pauseCount > 0)
+            if (tail_.compare_exchange_strong(
+                    t,
+                    t + 1,
+                    std::memory_order::release,
+                    std::memory_order::relaxed))
             {
-                // Try to decrement
-                pauseCount = --m_workers.m_pauseCount;
+                me.last = t;
 
-                if (pauseCount >= 0)
+                try
                 {
-                    // We got paused
-                    break;
+                    callback_.processTask(me.instance);
                 }
-                else
+                catch (...)
                 {
-                    // Undo our decrement
-                    ++m_workers.m_pauseCount;
+                    callback_.uncaughtException(
+                        me.instance, std::current_exception());
                 }
             }
 
-            // We couldn't pause so we must have gotten
-            // unblocked in order to process a task.
-            //
-            ++m_workers.m_runningTaskCount;
-            m_workers.m_callback.processTask(instance_);
-            --m_workers.m_runningTaskCount;
+            continue;
         }
 
-        // Any worker that goes into the paused list must
-        // guarantee that it will eventually block on its
-        // event object.
-        //
-        m_workers.m_paused.push_front(this);
+        static constexpr std::size_t spin_iterations = 30;
 
-        // Decrement the count of active workers, and if we
-        // are the last one then signal the "all paused" event.
-        //
-        if (--m_workers.m_activeCount == 0)
+        if constexpr (spin_iterations != 0)
         {
-            std::lock_guard lk{m_workers.m_mut};
-            m_workers.m_allPaused = true;
-            m_workers.m_cv.notify_all();
+            detail::spin_pause();
+
+            for (std::size_t i = 0; i != spin_iterations; ++i)
+            {
+                if (head_.load(std::memory_order::relaxed) !=
+                    tail_.load(std::memory_order::relaxed))
+                    break;
+
+                detail::spin_pause();
+            }
+
+            if (head_.load(std::memory_order::acquire) !=
+                tail_.load(std::memory_order::relaxed))
+                continue;
         }
 
-        // Set inactive thread name.
-        beast::setCurrentThreadName("(" + threadName_ + ")");
+        // There was no task, so we are about to try and go sleep. This
+        // store happens before we go into the dormitory, which happens
+        // under the lock.
+        me.signal.store(worker_asleep, std::memory_order::relaxed);
 
-        // [1] We will be here when the paused list is popped
-        //
-        // We block on our condition_variable, wakeup_, a requirement of being
-        // put into the paused list.
-        //
-        // wakeup_ will get signaled by either Worker::notify() or ~Worker.
         {
-            std::unique_lock<std::mutex> lock{mutex_};
-            wakeup_.wait(lock, [this] { return this->wakeCount_ > 0; });
+            spinlock sl(lock_);
+            std::lock_guard lock(sl);
 
-            shouldExit = shouldExit_;
-            --wakeCount_;
+            if (head_.load(std::memory_order::relaxed) !=
+                tail_.load(std::memory_order::relaxed))
+                continue;
+
+            me.next = std::exchange(dormitory_, &me);
+
+            // One more sleeping thread.
+            ++sleeping_;
         }
-    } while (!shouldExit);
+
+        // Acquire matches the wakers' release stores, but it is not needed
+        // per se. We use it because this is the convention expected from a
+        // wait/notify pair.
+        me.signal.wait(worker_asleep, std::memory_order::acquire);
+    }
 }
 
 }  // namespace ripple
