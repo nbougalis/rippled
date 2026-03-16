@@ -6,7 +6,7 @@ find_package(Boost 1.86 REQUIRED
     coroutine
     date_time
     filesystem
-    json
+        interprocess
     json
     program_options
     regex

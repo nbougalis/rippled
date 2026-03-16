@@ -62,7 +62,6 @@
 #include <xrpl/beast/utility/rngfill.h>
 #include <xrpl/crypto/RFC1751.h>
 #include <xrpl/crypto/csprng.h>
-#include <xrpl/json/to_string.h>
 #include <xrpl/protocol/BuildInfo.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/MultiApiJson.h>
@@ -1705,8 +1704,7 @@ NetworkOPsImp::checkLastClosedLedger(
     // Determine preferred last closed ledger
 
     auto& validations = app_.getValidations();
-    JLOG(m_journal.debug())
-        << "ValidationTrie " << Json::Compact(validations.getJsonTrie());
+    JLOG(m_journal.debug()) << "ValidationTrie " << validations.getJsonTrie();
 
     // Will rely on peer LCL if no trusted validations exist
     hash_map<uint256, std::uint32_t> peerCounts;
@@ -3151,7 +3149,8 @@ NetworkOPsImp::transJson(
 
             if constexpr (Version > 1)
             {
-                jvTx[jss::tx_json] = jvTx.removeMember(jss::transaction);
+                jvTx[jss::tx_json] = jvTx.removeMember(jss::transaction)
+                                         .value_or(Json::nullValue);
                 jvTx[jss::hash] = hash;
             }
             else

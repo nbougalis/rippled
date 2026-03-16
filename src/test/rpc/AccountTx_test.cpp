@@ -39,21 +39,21 @@ class AccountTx_test : public beast::unit_test::suite
     struct NodeSanity
     {
         int const index;
-        Json::StaticString const& txType;
-        boost::container::flat_set<std::string> created;
-        boost::container::flat_set<std::string> deleted;
-        boost::container::flat_set<std::string> modified;
+        Json::StaticString txType;
+        boost::container::flat_set<std::string_view> created;
+        boost::container::flat_set<std::string_view> deleted;
+        boost::container::flat_set<std::string_view> modified;
 
         NodeSanity(
             int idx,
-            Json::StaticString const& t,
-            std::initializer_list<char const*> c,
-            std::initializer_list<char const*> d,
-            std::initializer_list<char const*> m)
+            Json::StaticString t,
+            std::initializer_list<std::string_view> c,
+            std::initializer_list<std::string_view> d,
+            std::initializer_list<std::string_view> m)
             : index(idx), txType(t)
         {
             auto buildSet = [](auto&& init) {
-                boost::container::flat_set<std::string> r;
+                boost::container::flat_set<std::string_view> r;
                 r.reserve(init.size());
                 for (auto&& s : init)
                     r.insert(s);
@@ -76,9 +76,9 @@ class AccountTx_test : public beast::unit_test::suite
             sane.txType);
 
         // Make sure all of the expected node types are present.
-        boost::container::flat_set<std::string> createdNodes;
-        boost::container::flat_set<std::string> deletedNodes;
-        boost::container::flat_set<std::string> modifiedNodes;
+        boost::container::flat_set<std::string_view> createdNodes;
+        boost::container::flat_set<std::string_view> deletedNodes;
+        boost::container::flat_set<std::string_view> modifiedNodes;
 
         for (Json::Value const& metaNode :
              txNode[jss::meta][sfAffectedNodes.jsonName])
@@ -86,17 +86,18 @@ class AccountTx_test : public beast::unit_test::suite
             if (metaNode.isMember(sfCreatedNode.jsonName))
                 createdNodes.insert(
                     metaNode[sfCreatedNode.jsonName][sfLedgerEntryType.jsonName]
-                        .asString());
+                        .asStringView());
 
             else if (metaNode.isMember(sfDeletedNode.jsonName))
                 deletedNodes.insert(
                     metaNode[sfDeletedNode.jsonName][sfLedgerEntryType.jsonName]
-                        .asString());
+                        .asStringView());
 
             else if (metaNode.isMember(sfModifiedNode.jsonName))
-                modifiedNodes.insert(metaNode[sfModifiedNode.jsonName]
-                                             [sfLedgerEntryType.jsonName]
-                                                 .asString());
+                modifiedNodes.insert(
+                    metaNode[sfModifiedNode.jsonName]
+                            [sfLedgerEntryType.jsonName]
+                                .asStringView());
 
             else
                 fail(
@@ -945,8 +946,7 @@ public:
     void
     run() override
     {
-        forAllApiVersions(
-            std::bind_front(&AccountTx_test::testParameters, this));
+        forAllApiVersions([this](auto version) { testParameters(version); });
         testContents();
         testAccountDelete();
     }

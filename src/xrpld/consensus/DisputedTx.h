@@ -24,7 +24,7 @@
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Serializer.h>
 #include <xrpl/protocol/UintTypes.h>
 #include <boost/container/flat_map.hpp>
@@ -241,14 +241,14 @@ DisputedTx<Tx_t, NodeID_t>::updateVote(
         JLOG(j_.debug()) << "No change (" << (ourVote_ ? "YES" : "NO")
                          << ") : weight " << weight << ", percent "
                          << percentTime;
-        JLOG(j_.trace()) << Json::Compact{getJson()};
+        JLOG(j_.trace()) << getJson();
         return false;
     }
 
     ourVote_ = newPosition;
     JLOG(j_.debug()) << "We now vote " << (ourVote_ ? "YES" : "NO") << " on "
                      << tx_.id();
-    JLOG(j_.trace()) << Json::Compact{getJson()};
+    JLOG(j_.trace()) << getJson();
     return true;
 }
 

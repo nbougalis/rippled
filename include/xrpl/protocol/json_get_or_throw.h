@@ -4,7 +4,7 @@
 #include <xrpl/basics/Buffer.h>
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/contract.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/SField.h>
 
 #include <charconv>

@@ -93,8 +93,8 @@ accountFromString(AccountID& result, std::string const& strIdent, bool bStrict)
     error_code_i code = accountFromStringWithCode(result, strIdent, bStrict);
     if (code != rpcSUCCESS)
         return rpcError(code);
-    else
-        return Json::objectValue;
+
+    return Json::objectValue;
 }
 
 std::uint64_t
@@ -449,14 +449,16 @@ ledgerFromRequest(T& ledger, JsonContext& context)
     auto indexValue = params[jss::ledger_index];
     auto hashValue = params[jss::ledger_hash];
 
-    // We need to support the legacy "ledger" field.
-    auto& legacyLedger = params[jss::ledger];
-    if (legacyLedger)
+    // We need to support the legacy "ledger" field. Note that this
+    // code can override the "ledger_index" or "ledger_hash" fields
+    // if they are present, replacing one of them with the value
+    // "ledger" field, based on that field's data.
+    if (auto tmp = params.get(jss::ledger); tmp.type() != Json::nullValue)
     {
-        if (legacyLedger.asString().size() > 12)
-            hashValue = legacyLedger;
+        if (tmp.asString().size() > 12)
+            hashValue = tmp;
         else
-            indexValue = legacyLedger;
+            indexValue = tmp;
     }
 
     if (hashValue)
@@ -464,26 +466,36 @@ ledgerFromRequest(T& ledger, JsonContext& context)
         if (!hashValue.isString())
             return {rpcINVALID_PARAMS, "ledgerHashNotString"};
 
-        uint256 ledgerHash;
-        if (!ledgerHash.parseHex(hashValue.asString()))
-            return {rpcINVALID_PARAMS, "ledgerHashMalformed"};
-        return getLedger(ledger, ledgerHash, context);
+        if (uint256 val; val.parseHex(hashValue.asStringView()))
+            return getLedger(ledger, val, context);
+
+        return {rpcINVALID_PARAMS, "ledgerHashMalformed"};
     }
 
-    auto const index = indexValue.asString();
+    // This will handle the index as a string or as an integer value
+    if (auto val = to_integer<std::uint32_t>(indexValue))
+        return getLedger(ledger, val.value(), context);
 
-    if (index == "current" || index.empty())
-        return getLedger(ledger, LedgerShortcut::CURRENT, context);
+    // Previous versions used `asString` so if jss::ledger_index was an
+    // object or array, this would throw an exception; if it was a bool
+    // or a double the resulting string would be non-empty but it would
+    // never match one of the keywords below; a null value would, since
+    // asString would return an empty string, which we explicitly allow
+    // here. We do not emulate this behavior fully, since we will never
+    // throw, but we try to do the right thing:
+    if (indexValue.isNull() || indexValue.isString())
+    {
+        auto const index = indexValue.asStringView();
 
-    if (index == "validated")
-        return getLedger(ledger, LedgerShortcut::VALIDATED, context);
+        if (index == "current" || index.empty())
+            return getLedger(ledger, LedgerShortcut::CURRENT, context);
 
-    if (index == "closed")
-        return getLedger(ledger, LedgerShortcut::CLOSED, context);
+        if (index == "validated")
+            return getLedger(ledger, LedgerShortcut::VALIDATED, context);
 
-    std::uint32_t iVal;
-    if (beast::lexicalCastChecked(iVal, index))
-        return getLedger(ledger, iVal, context);
+        if (index == "closed")
+            return getLedger(ledger, LedgerShortcut::CLOSED, context);
+    }
 
     return {rpcINVALID_PARAMS, "ledgerIndexMalformed"};
 }
@@ -1058,7 +1070,7 @@ chooseLedgerEntryType(Json::Value const& params)
     if (params.isMember(jss::type))
     {
         static constexpr auto types = std::to_array<
-            std::tuple<char const*, char const*, LedgerEntryType>>({
+            std::tuple<std::string_view, std::string_view, LedgerEntryType>>({
 #pragma push_macro("LEDGER_ENTRY")
 #undef LEDGER_ENTRY
 
@@ -1129,22 +1141,30 @@ beast::SemanticVersion const lastVersion("1.0.0");
 unsigned int
 getAPIVersionNumber(Json::Value const& jv, bool betaEnabled)
 {
-    static Json::Value const minVersion(RPC::apiMinimumSupportedVersion);
-    static Json::Value const invalidVersion(RPC::apiInvalidVersion);
+    static_assert(apiInvalidVersion < apiMinimumSupportedVersion);
 
-    Json::Value const maxVersion(
-        betaEnabled ? RPC::apiBetaVersion : RPC::apiMaximumSupportedVersion);
-    Json::Value requestedVersion(RPC::apiVersionIfUnspecified);
-    if (jv.isObject())
-    {
-        requestedVersion = jv.get(jss::api_version, requestedVersion);
-    }
-    if (!(requestedVersion.isInt() || requestedVersion.isUInt()) ||
-        requestedVersion < minVersion || requestedVersion > maxVersion)
-    {
-        requestedVersion = invalidVersion;
-    }
-    return requestedVersion.asUInt();
+    auto const minVersion = RPC::apiMinimumSupportedVersion;
+    auto const maxVersion =
+        betaEnabled ? RPC::apiBetaVersion : RPC::apiMaximumSupportedVersion;
+
+    // Note: The Value::get API will return whatever you specify as the default
+    //       if the value it is invoked against is: (a) an object that does not
+    //       contain the requested key; or (b) it is not an object at all. This
+    //       makes sensible error detection impossible, so we manually check if
+    //       the requested entry is an object or not.
+    auto reqv = to_integer<unsigned>([&jv]() {
+        Json::Value requestedVersion(RPC::apiVersionIfUnspecified);
+
+        if (jv.isObject())
+            requestedVersion = jv.get(jss::api_version, requestedVersion);
+
+        return requestedVersion;
+    }());
+
+    if (reqv && (reqv < minVersion || reqv > maxVersion))
+        reqv.reset();
+
+    return reqv.value_or(apiInvalidVersion);
 }
 
 std::variant<std::shared_ptr<Ledger const>, Json::Value>

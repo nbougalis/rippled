@@ -55,9 +55,9 @@ class Transaction_test : public beast::unit_test::suite
 
         const char* COMMAND = jss::tx.c_str();
         const char* BINARY = jss::binary.c_str();
-        const char* NOT_FOUND = RPC::get_error_info(rpcTXN_NOT_FOUND).token;
-        const char* INVALID = RPC::get_error_info(rpcINVALID_LGR_RANGE).token;
-        const char* EXCESSIVE =
+        auto const NOT_FOUND = RPC::get_error_info(rpcTXN_NOT_FOUND).token;
+        auto const INVALID = RPC::get_error_info(rpcINVALID_LGR_RANGE).token;
+        auto const EXCESSIVE =
             RPC::get_error_info(rpcEXCESSIVE_LGR_RANGE).token;
 
         Env env{*this, features};
@@ -305,9 +305,9 @@ class Transaction_test : public beast::unit_test::suite
 
         const char* COMMAND = jss::tx.c_str();
         const char* BINARY = jss::binary.c_str();
-        const char* NOT_FOUND = RPC::get_error_info(rpcTXN_NOT_FOUND).token;
-        const char* INVALID = RPC::get_error_info(rpcINVALID_LGR_RANGE).token;
-        const char* EXCESSIVE =
+        auto const NOT_FOUND = RPC::get_error_info(rpcTXN_NOT_FOUND).token;
+        auto const INVALID = RPC::get_error_info(rpcINVALID_LGR_RANGE).token;
+        auto const EXCESSIVE =
             RPC::get_error_info(rpcEXCESSIVE_LGR_RANGE).token;
 
         Env env{*this, makeNetworkConfig(11111)};
@@ -919,13 +919,17 @@ public:
     run() override
     {
         using namespace test::jtx;
-        forAllApiVersions(std::bind_front(
-            &Transaction_test::testBinaryRequest,
-            this,
-            supported_amendments() - featureXahauGenesis - fixHookAPI20251128));
-        return;
-        FeatureBitset const all{supported_amendments()};
-        testWithFeats(all);
+
+        auto const features =
+            supported_amendments() - featureXahauGenesis - fixHookAPI20251128;
+
+        forAllApiVersions([this, &features](auto version) {
+            testBinaryRequest(features, version);
+        });
+
+        // This test was after a 'return' statement, so it would not
+        // execute.
+        // testWithFeats(supported_amendments());
     }
 
     void
@@ -935,10 +939,10 @@ public:
         testRangeCTIDRequest(features);
         testCTIDValidation(features);
         testCTIDRPC(features);
-        forAllApiVersions(std::bind_front(
-            &Transaction_test::testRequest,
-            this,
-            features - featureXahauGenesis - featureTouch));
+
+        forAllApiVersions([this, &features](auto version) {
+            testRequest(features - featureXahauGenesis - featureTouch, version);
+        });
     }
 };
 

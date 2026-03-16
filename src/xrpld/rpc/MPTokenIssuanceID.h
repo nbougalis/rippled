@@ -21,7 +21,7 @@
 #define RIPPLE_RPC_MPTOKENISSUANCEID_H_INCLUDED
 
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/json/json_forwards.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/STTx.h>
 #include <xrpl/protocol/TxMeta.h>
 

@@ -34,8 +34,6 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <iostream>
 
-#include <xrpl/json/json_reader.h>
-
 namespace ripple {
 void
 SHAMapStoreImp::SavedStateDB::init(

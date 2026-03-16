@@ -23,8 +23,7 @@
 #include <xrpld/app/ledger/LedgerMaster.h>
 #include <xrpld/app/tx/detail/SetHook.h>
 #include <xrpl/hook/Enum.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/TxFlags.h>
 #include <xrpl/protocol/jss.h>
 #include <unordered_map>
@@ -113,8 +112,10 @@ public:
         using namespace jtx;
 
         Json::Value jsonValue;
-        Json::Reader reader;
-        std::string base_genesis = R"json({
+
+        BEAST_EXPECT(
+            Json::load(
+                R"json({
         "ledger": {
             "accepted": true,
             "accountState": [
@@ -207,8 +208,8 @@ public:
         "ledger_current_index": 0,
         "status": "success",
         "validated": true
-        })json";
-        reader.parse(base_genesis, jsonValue);
+        })json",
+                jsonValue));
 
         foreachFeature(features, [&](uint256 const& feature) {
             std::string featureName = featureToName(feature);
@@ -228,7 +229,7 @@ public:
 
         return envconfig([&](std::unique_ptr<Config> cfg) {
             cfg->NETWORK_ID = networkID;
-            cfg->START_LEDGER = jsonValue.toStyledString();
+            cfg->START_LEDGER = to_compact_string(jsonValue);
             cfg->START_UP = Config::LOAD_JSON;
             Section config;
             config.append(
@@ -10802,8 +10803,7 @@ public:
                                                0, 0, 0, 0, 0, 0, 0, 1, 2, 3};
 
             auto const state2 = env.le(
-                ripple::keylet::hookState(
-                    aliceid, uint256(key2), beast::zero));
+                ripple::keylet::hookState(aliceid, uint256(key2), beast::zero));
 
             BEAST_REQUIRE(!!state2);
 

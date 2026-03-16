@@ -195,7 +195,7 @@ public:
     friend std::ostream&
     operator<<(std::ostream& strm, Oracle const& oracle)
     {
-        strm << oracle.ledgerEntry().toStyledString();
+        strm << to_compact_string(oracle.ledgerEntry());
         return strm;
     }
 };

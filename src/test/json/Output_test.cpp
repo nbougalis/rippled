@@ -18,8 +18,7 @@
 //==============================================================================
 
 #include <test/json/TestOutputSuite.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 
 namespace Json {
 
@@ -30,12 +29,12 @@ struct Output_test : ripple::test::TestOutputSuite
     {
         setup(name);
         Json::Value value;
-        BEAST_EXPECT(Json::Reader().parse(valueDesc, value));
+        BEAST_EXPECT(Json::load(valueDesc, value));
         auto out = stringOutput(output_);
         outputJson(value, out);
 
         // Compare with the original version.
-        auto expected = Json::FastWriter().write(value);
+        auto expected = to_compact_string(value);
         expectResult(expected);
         expectResult(valueDesc);
         expectResult(jsonAsString(value));

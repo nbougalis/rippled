@@ -28,7 +28,7 @@
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/beast/unit_test.h>
 #include <xrpl/hook/Enum.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/STXChainBridge.h>
@@ -280,8 +280,9 @@ class LedgerRPC_XChain_test : public beast::unit_test::suite,
             auto attest = r[sfXChainCreateAccountAttestations.jsonName];
             BEAST_EXPECT(attest.isArray());
             BEAST_EXPECT(attest.size() == 3);
-            BEAST_EXPECT(attest[Json::Value::UInt(0)].isMember(
-                sfXChainCreateAccountProofSig.jsonName));
+            BEAST_EXPECT(
+                attest[Json::Value::UInt(0)].isMember(
+                    sfXChainCreateAccountProofSig.jsonName));
             Json::Value a[num_attest];
             for (size_t i = 0; i < num_attest; ++i)
             {
@@ -362,14 +363,14 @@ public:
     {
         if (BEAST_EXPECT(jv.isMember(jss::status)))
             BEAST_EXPECT(jv[jss::status] == "error");
+
         if (BEAST_EXPECT(jv.isMember(jss::error)))
             BEAST_EXPECT(jv[jss::error] == err);
+
         if (msg.empty())
-        {
             BEAST_EXPECT(
                 jv[jss::error_message] == Json::nullValue ||
                 jv[jss::error_message] == "");
-        }
         else if (BEAST_EXPECT(jv.isMember(jss::error_message)))
             BEAST_EXPECT(jv[jss::error_message] == msg);
     }
@@ -377,11 +378,10 @@ public:
     // Corrupt a valid address by replacing the 10th character with '!'.
     // '!' is not part of the ripple alphabet.
     std::string
-    makeBadAddress(std::string good)
+    makeBadAddress(std::string str)
     {
-        std::string ret = std::move(good);
-        ret.replace(10, 1, 1, '!');
-        return ret;
+        str.replace(10, 1, 1, '!');
+        return str;
     }
 
     void
@@ -486,10 +486,10 @@ public:
 
         {
             // Request a ledger with a very large (double) sequence.
-            auto const ret =
-                env.rpc("json", "ledger", "{ \"ledger_index\" : 2e15 }");
+            auto const ret = env.rpc(
+                "json", "ledger", "{ \"ledger_index\" : 2e15 }")[jss::result];
             BEAST_EXPECT(RPC::contains_error(ret));
-            BEAST_EXPECT(ret[jss::error_message] == "Invalid parameters.");
+            BEAST_EXPECT(ret[jss::error_message] == "ledgerIndexMalformed");
         }
 
         {
@@ -2976,6 +2976,7 @@ public:
             else
                 checkErrorValue(jrr, "invalidParams", "");
         }
+
         // Fields that can handle objects just fine
         for (auto const& field : {
                  jss::directory,
@@ -3851,7 +3852,7 @@ public:
             BEAST_EXPECT(
                 strHex(keylet::permissionedDomain(alice, seq).key) == pdIdx);
 
-            params.clear();
+            params = Json::nullValue;
             params[jss::ledger_index] = jss::validated;
             params[jss::permissioned_domain] = pdIdx;
             jv = env.rpc("json", "ledger_entry", to_string(params));
@@ -3965,8 +3966,8 @@ public:
         testLedgerEntryCLI();
         testLedgerEntryPermissionedDomain();
 
-        forAllApiVersions(std::bind_front(
-            &LedgerRPC_test::testLedgerEntryInvalidParams, this));
+        forAllApiVersions(
+            [this](auto version) { testLedgerEntryInvalidParams(version); });
     }
 };
 

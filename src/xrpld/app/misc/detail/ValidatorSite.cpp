@@ -24,7 +24,7 @@
 #include <xrpld/app/misc/detail/WorkSSL.h>
 #include <xrpl/basics/Slice.h>
 #include <xrpl/basics/base64.h>
-#include <xrpl/json/json_reader.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/digest.h>
 #include <xrpl/protocol/jss.h>
 #include <algorithm>
@@ -370,20 +370,17 @@ ValidatorSite::onTimer(std::size_t siteIdx, error_code const& ec)
 
 void
 ValidatorSite::parseJsonResponse(
-    std::string const& res,
+    std::string_view res,
     std::size_t siteIdx,
     std::lock_guard<std::mutex> const& sites_lock)
 {
     Json::Value const body = [&res, siteIdx, this]() {
-        Json::Reader r;
-        Json::Value body;
-        if (!r.parse(res.data(), body))
-        {
-            JLOG(j_.warn()) << "Unable to parse JSON response from  "
-                            << sites_[siteIdx].activeResource->uri;
-            throw std::runtime_error{"bad json"};
-        }
-        return body;
+        if (Json::Value body; Json::load(res, body))
+            return body;
+
+        JLOG(j_.warn()) << "Unable to parse JSON response from  "
+                        << sites_[siteIdx].activeResource->uri;
+        throw std::runtime_error{"bad json"};
     }();
 
     auto const [valid, version, blobs] = [&body]() {
@@ -553,8 +550,9 @@ ValidatorSite::onSiteFetch(
                          << sites_[siteIdx].activeResource->uri << " "
                          << endpoint;
         auto onError = [&](std::string const& errMsg, bool retry) {
-            sites_[siteIdx].lastRefreshStatus.emplace(Site::Status{
-                clock_type::now(), ListDisposition::invalid, errMsg});
+            sites_[siteIdx].lastRefreshStatus.emplace(
+                Site::Status{
+                    clock_type::now(), ListDisposition::invalid, errMsg});
             if (retry)
                 sites_[siteIdx].nextRefresh =
                     clock_type::now() + error_retry_interval;
@@ -655,8 +653,9 @@ ValidatorSite::onTextFetch(
         {
             JLOG(j_.error())
                 << "Exception in " << __func__ << ": " << ex.what();
-            sites_[siteIdx].lastRefreshStatus.emplace(Site::Status{
-                clock_type::now(), ListDisposition::invalid, ex.what()});
+            sites_[siteIdx].lastRefreshStatus.emplace(
+                Site::Status{
+                    clock_type::now(), ListDisposition::invalid, ex.what()});
         }
         sites_[siteIdx].activeResource.reset();
     }

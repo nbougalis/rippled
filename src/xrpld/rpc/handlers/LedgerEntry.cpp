@@ -26,7 +26,7 @@
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/core/LexicalCast.h>
-#include <xrpl/json/json_errors.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/PublicKey.h>
@@ -71,14 +71,11 @@ parseAuthorizeCredentials(Json::Value const& jv)
 static std::optional<uint256>
 parseIndex(Json::Value const& params, Json::Value& jvResult)
 {
-    uint256 uNodeIndex;
-    if (!uNodeIndex.parseHex(params.asString()))
-    {
-        jvResult[jss::error] = "malformedRequest";
-        return std::nullopt;
-    }
+    if (uint256 uNodeIndex; uNodeIndex.parseHex(params.asString()))
+        return uNodeIndex;
 
-    return uNodeIndex;
+    jvResult[jss::error] = "malformedRequest";
+    return std::nullopt;
 }
 
 static std::optional<uint256>
@@ -97,14 +94,11 @@ parseAccountRoot(Json::Value const& params, Json::Value& jvResult)
 static std::optional<uint256>
 parseCheck(Json::Value const& params, Json::Value& jvResult)
 {
-    uint256 uNodeIndex;
-    if (!uNodeIndex.parseHex(params.asString()))
-    {
-        jvResult[jss::error] = "malformedRequest";
-        return std::nullopt;
-    }
+    if (uint256 uNodeIndex; uNodeIndex.parseHex(params.asString()))
+        return uNodeIndex;
 
-    return uNodeIndex;
+    jvResult[jss::error] = "malformedRequest";
+    return std::nullopt;
 }
 
 static std::optional<uint256>
@@ -123,11 +117,10 @@ parseDepositPreauth(Json::Value const& dp, Json::Value& jvResult)
 
     // clang-format off
     if (
-        (!dp.isMember(jss::owner) || !dp[jss::owner].isString()) ||
-        (dp.isMember(jss::authorized) == dp.isMember(jss::authorized_credentials)) ||
+        !dp.isMember(jss::owner) || !dp[jss::owner].isString() ||
+         dp.isMember(jss::authorized) == dp.isMember(jss::authorized_credentials) ||
         (dp.isMember(jss::authorized) && !dp[jss::authorized].isString()) ||
-        (dp.isMember(jss::authorized_credentials) && !dp[jss::authorized_credentials].isArray())
-        )
+        (dp.isMember(jss::authorized_credentials) && !dp[jss::authorized_credentials].isArray()))
     // clang-format on
     {
         jvResult[jss::error] = "malformedRequest";
@@ -183,13 +176,12 @@ parseDirectory(Json::Value const& params, Json::Value& jvResult)
 
     if (!params.isObject())
     {
-        uint256 uNodeIndex;
-        if (!uNodeIndex.parseHex(params.asString()))
-        {
-            jvResult[jss::error] = "malformedRequest";
-            return std::nullopt;
-        }
-        return uNodeIndex;
+        // Unfortunately, we depend on the throwing behavior of `asString`
+        if (uint256 index; index.parseHex(params.asString()))
+            return index;
+
+        jvResult[jss::error] = "malformedRequest";
+        return std::nullopt;
     }
 
     if (params.isMember(jss::sub_index) && !params[jss::sub_index].isIntegral())
@@ -1166,17 +1158,15 @@ doLedgerEntry(RPC::JsonContext& context)
             return jvResult;
         }
     }
-    catch (Json::error& e)
+    catch (Json::error const& e)
     {
-        if (context.apiVersion > 1u)
-        {
-            // For apiVersion 2 onwards, any parsing failures that throw this
-            // exception return an invalidParam error.
-            jvResult[jss::error] = "invalidParams";
-            return jvResult;
-        }
-        else
+        if (context.apiVersion <= 1)
             throw;
+
+        // For apiVersion 2 onwards, any parsing failures that throw this
+        // exception return an invalidParam error.
+        jvResult[jss::error] = "invalidParams";
+        return jvResult;
     }
 
     if (uNodeIndex.isZero())

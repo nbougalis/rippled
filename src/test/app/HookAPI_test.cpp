@@ -21,7 +21,7 @@
 #include <xrpld/app/hook/HookAPI.h>
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STAccount.h>
 #include <limits>
@@ -2671,7 +2671,7 @@ public:
         {
             // Success
             auto const xpopJson = import::loadXpop(ImportTCAccountSet::w_seed);
-            std::string xpopStr = Json::FastWriter().write(xpopJson);
+            std::string xpopStr = to_compact_string(xpopJson);
             STTx invokeTx = STTx(ttIMPORT, [&](STObject& obj) {
                 obj.setFieldVL(sfBlob, *strUnHex(strHex(xpopStr)));
             });

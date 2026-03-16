@@ -116,21 +116,21 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
 
                     if (vol == noisy)
                     {
-                        std::cout << state[i].toStyledString() << std::endl;
+                        std::cout << to_styled_string(state[i]) << std::endl;
                     }
                     else
                     {
                         if (tokenCount > 0)
                             std::cout << "first: "
-                                      << state[i][sfNFTokens.jsonName][0u]
-                                             .toStyledString()
+                                      << to_styled_string(
+                                             state[i][sfNFTokens.jsonName][0u])
                                       << std::endl;
                         if (tokenCount > 1)
-                            std::cout
-                                << "last: "
-                                << state[i][sfNFTokens.jsonName][tokenCount - 1]
-                                       .toStyledString()
-                                << std::endl;
+                            std::cout << "last: "
+                                      << to_styled_string(
+                                             state[i][sfNFTokens.jsonName]
+                                                  [tokenCount - 1])
+                                      << std::endl;
                     }
                 }
             }
@@ -195,8 +195,9 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
         while (alice.nfts.size() < 105)
         {
             std::uint16_t const xferFee = feeDist(engine);
-            alice.nfts.push_back(token::getNextID(
-                env, alice, 0u, tfTransferable | tfBurnable, xferFee));
+            alice.nfts.push_back(
+                token::getNextID(
+                    env, alice, 0u, tfTransferable | tfBurnable, xferFee));
             env(token::mint(alice),
                 txflags(tfTransferable | tfBurnable),
                 token::xferFee(xferFee));
@@ -207,8 +208,9 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
         while (minter.nfts.size() < 105)
         {
             std::uint16_t const xferFee = feeDist(engine);
-            minter.nfts.push_back(token::getNextID(
-                env, alice, 0u, tfTransferable | tfBurnable, xferFee));
+            minter.nfts.push_back(
+                token::getNextID(
+                    env, alice, 0u, tfTransferable | tfBurnable, xferFee));
             env(token::mint(minter),
                 txflags(tfTransferable | tfBurnable),
                 token::xferFee(xferFee),
@@ -488,15 +490,17 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
 
             uint256 const middleNFTokenPageIndex =
                 lastNFTokenPage->at(sfPreviousPageMin);
-            auto middleNFTokenPage = env.le(keylet::nftpage(
-                keylet::nftpage_min(alice), middleNFTokenPageIndex));
+            auto middleNFTokenPage = env.le(
+                keylet::nftpage(
+                    keylet::nftpage_min(alice), middleNFTokenPageIndex));
             if (!BEAST_EXPECT(middleNFTokenPage))
                 return;
 
             uint256 const firstNFTokenPageIndex =
                 middleNFTokenPage->at(sfPreviousPageMin);
-            auto firstNFTokenPage = env.le(keylet::nftpage(
-                keylet::nftpage_min(alice), firstNFTokenPageIndex));
+            auto firstNFTokenPage = env.le(
+                keylet::nftpage(
+                    keylet::nftpage_min(alice), firstNFTokenPageIndex));
             if (!BEAST_EXPECT(firstNFTokenPage))
                 return;
 
@@ -540,14 +544,16 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
                     lastNFTokenPage->getFieldArray(sfNFTokens).size() == 32);
 
                 // The "middle" page should be gone.
-                middleNFTokenPage = env.le(keylet::nftpage(
-                    keylet::nftpage_min(alice), middleNFTokenPageIndex));
+                middleNFTokenPage = env.le(
+                    keylet::nftpage(
+                        keylet::nftpage_min(alice), middleNFTokenPageIndex));
                 BEAST_EXPECT(!middleNFTokenPage);
 
                 // The "first" page should still be present and linked to
                 // the last page.
-                firstNFTokenPage = env.le(keylet::nftpage(
-                    keylet::nftpage_min(alice), firstNFTokenPageIndex));
+                firstNFTokenPage = env.le(
+                    keylet::nftpage(
+                        keylet::nftpage_min(alice), firstNFTokenPageIndex));
                 BEAST_EXPECT(firstNFTokenPage);
                 BEAST_EXPECT(
                     !firstNFTokenPage->isFieldPresent(sfPreviousPageMin));
@@ -567,8 +573,9 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
 
                 // The "middle" page is still present, but has lost the
                 // NextPageMin field.
-                middleNFTokenPage = env.le(keylet::nftpage(
-                    keylet::nftpage_min(alice), middleNFTokenPageIndex));
+                middleNFTokenPage = env.le(
+                    keylet::nftpage(
+                        keylet::nftpage_min(alice), middleNFTokenPageIndex));
                 if (!BEAST_EXPECT(middleNFTokenPage))
                     return;
                 BEAST_EXPECT(
@@ -603,15 +610,17 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
 
             uint256 const middleNFTokenPageIndex =
                 lastNFTokenPage->at(sfPreviousPageMin);
-            auto middleNFTokenPage = env.le(keylet::nftpage(
-                keylet::nftpage_min(alice), middleNFTokenPageIndex));
+            auto middleNFTokenPage = env.le(
+                keylet::nftpage(
+                    keylet::nftpage_min(alice), middleNFTokenPageIndex));
             if (!BEAST_EXPECT(middleNFTokenPage))
                 return;
 
             uint256 const firstNFTokenPageIndex =
                 middleNFTokenPage->at(sfPreviousPageMin);
-            auto firstNFTokenPage = env.le(keylet::nftpage(
-                keylet::nftpage_min(alice), firstNFTokenPageIndex));
+            auto firstNFTokenPage = env.le(
+                keylet::nftpage(
+                    keylet::nftpage_min(alice), firstNFTokenPageIndex));
             if (!BEAST_EXPECT(firstNFTokenPage))
                 return;
 
@@ -626,8 +635,9 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
 
             // Verify that middle page is gone and the links in the two
             // remaining pages are correct.
-            middleNFTokenPage = env.le(keylet::nftpage(
-                keylet::nftpage_min(alice), middleNFTokenPageIndex));
+            middleNFTokenPage = env.le(
+                keylet::nftpage(
+                    keylet::nftpage_min(alice), middleNFTokenPageIndex));
             BEAST_EXPECT(!middleNFTokenPage);
 
             lastNFTokenPage = env.le(keylet::nftpage_max(alice));
@@ -636,8 +646,9 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
                 lastNFTokenPage->getFieldH256(sfPreviousPageMin) ==
                 firstNFTokenPageIndex);
 
-            firstNFTokenPage = env.le(keylet::nftpage(
-                keylet::nftpage_min(alice), firstNFTokenPageIndex));
+            firstNFTokenPage = env.le(
+                keylet::nftpage(
+                    keylet::nftpage_min(alice), firstNFTokenPageIndex));
             BEAST_EXPECT(
                 firstNFTokenPage->getFieldH256(sfNextPageMin) ==
                 keylet::nftpage_max(alice).key);
@@ -669,15 +680,17 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
 
             uint256 const middleNFTokenPageIndex =
                 lastNFTokenPage->at(sfPreviousPageMin);
-            auto middleNFTokenPage = env.le(keylet::nftpage(
-                keylet::nftpage_min(alice), middleNFTokenPageIndex));
+            auto middleNFTokenPage = env.le(
+                keylet::nftpage(
+                    keylet::nftpage_min(alice), middleNFTokenPageIndex));
             if (!BEAST_EXPECT(middleNFTokenPage))
                 return;
 
             uint256 const firstNFTokenPageIndex =
                 middleNFTokenPage->at(sfPreviousPageMin);
-            auto firstNFTokenPage = env.le(keylet::nftpage(
-                keylet::nftpage_min(alice), firstNFTokenPageIndex));
+            auto firstNFTokenPage = env.le(
+                keylet::nftpage(
+                    keylet::nftpage_min(alice), firstNFTokenPageIndex));
             if (!BEAST_EXPECT(firstNFTokenPage))
                 return;
 
@@ -691,13 +704,15 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
             }
 
             // Verify the first page is gone.
-            firstNFTokenPage = env.le(keylet::nftpage(
-                keylet::nftpage_min(alice), firstNFTokenPageIndex));
+            firstNFTokenPage = env.le(
+                keylet::nftpage(
+                    keylet::nftpage_min(alice), firstNFTokenPageIndex));
             BEAST_EXPECT(!firstNFTokenPage);
 
             // Check the links in the other two pages.
-            middleNFTokenPage = env.le(keylet::nftpage(
-                keylet::nftpage_min(alice), middleNFTokenPageIndex));
+            middleNFTokenPage = env.le(
+                keylet::nftpage(
+                    keylet::nftpage_min(alice), middleNFTokenPageIndex));
             if (!BEAST_EXPECT(middleNFTokenPage))
                 return;
             BEAST_EXPECT(!middleNFTokenPage->isFieldPresent(sfPreviousPageMin));
@@ -733,13 +748,15 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
                     lastNFTokenPage->getFieldArray(sfNFTokens).size() == 32);
 
                 // The "middle" page should be gone.
-                middleNFTokenPage = env.le(keylet::nftpage(
-                    keylet::nftpage_min(alice), middleNFTokenPageIndex));
+                middleNFTokenPage = env.le(
+                    keylet::nftpage(
+                        keylet::nftpage_min(alice), middleNFTokenPageIndex));
                 BEAST_EXPECT(!middleNFTokenPage);
 
                 // The "first" page should still be gone.
-                firstNFTokenPage = env.le(keylet::nftpage(
-                    keylet::nftpage_min(alice), firstNFTokenPageIndex));
+                firstNFTokenPage = env.le(
+                    keylet::nftpage(
+                        keylet::nftpage_min(alice), firstNFTokenPageIndex));
                 BEAST_EXPECT(!firstNFTokenPage);
             }
             else
@@ -752,8 +769,9 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
 
                 // The "middle" page is still present, but has lost the
                 // NextPageMin field.
-                middleNFTokenPage = env.le(keylet::nftpage(
-                    keylet::nftpage_min(alice), middleNFTokenPageIndex));
+                middleNFTokenPage = env.le(
+                    keylet::nftpage(
+                        keylet::nftpage_min(alice), middleNFTokenPageIndex));
                 if (!BEAST_EXPECT(middleNFTokenPage))
                     return;
                 BEAST_EXPECT(
@@ -860,9 +878,10 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
                 // Verify that the middle  page is present.
                 auto lastNFTokenPage =
                     ac.view().peek(keylet::nftpage_max(alice));
-                auto middleNFTokenPage = ac.view().peek(keylet::nftpage(
-                    keylet::nftpage_min(alice),
-                    lastNFTokenPage->getFieldH256(sfPreviousPageMin)));
+                auto middleNFTokenPage = ac.view().peek(
+                    keylet::nftpage(
+                        keylet::nftpage_min(alice),
+                        lastNFTokenPage->getFieldH256(sfPreviousPageMin)));
                 BEAST_EXPECT(middleNFTokenPage);
 
                 // Remove the NextMinPage link from the middle page to fire
@@ -1271,8 +1290,9 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
 
         uint256 const middleNFTokenPageIndex =
             lastNFTokenPage->at(sfPreviousPageMin);
-        auto middleNFTokenPage = env.le(keylet::nftpage(
-            keylet::nftpage_min(alice), middleNFTokenPageIndex));
+        auto middleNFTokenPage = env.le(
+            keylet::nftpage(
+                keylet::nftpage_min(alice), middleNFTokenPageIndex));
         if (!BEAST_EXPECT(middleNFTokenPage))
             return;
 
@@ -1311,8 +1331,9 @@ class NFTokenBurnBaseUtil_test : public beast::unit_test::suite
 
         // The "middle" page is still present, but has lost the
         // NextPageMin field.
-        middleNFTokenPage = env.le(keylet::nftpage(
-            keylet::nftpage_min(alice), middleNFTokenPageIndex));
+        middleNFTokenPage = env.le(
+            keylet::nftpage(
+                keylet::nftpage_min(alice), middleNFTokenPageIndex));
         if (!BEAST_EXPECT(middleNFTokenPage))
             return;
         BEAST_EXPECT(middleNFTokenPage->isFieldPresent(sfPreviousPageMin));

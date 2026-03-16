@@ -34,7 +34,6 @@
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/json/Object.h>
-#include <xrpl/json/to_string.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/RPCErr.h>
 #include <xrpl/protocol/jss.h>
@@ -208,6 +207,7 @@ callMethod(
     catch (std::exception& e)
     {
         perfLog.rpcError(name, curId);
+
         JLOG(context.j.info()) << "Caught throw: " << e.what();
 
         if (context.loadType == Resource::feeReferenceRPC)

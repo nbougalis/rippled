@@ -21,7 +21,7 @@
 #include <xrpld/overlay/detail/ConnectAttempt.h>
 #include <xrpld/overlay/detail/PeerImp.h>
 #include <xrpld/overlay/detail/ProtocolVersion.h>
-#include <xrpl/json/json_reader.h>
+#include <xrpl/json/json.h>
 
 namespace ripple {
 
@@ -301,36 +301,35 @@ ConnectAttempt::processResponse()
 {
     if (response_.result() == boost::beast::http::status::service_unavailable)
     {
-        Json::Value json;
-        Json::Reader r;
-        std::string s;
-        s.reserve(boost::asio::buffer_size(response_.body().data()));
-        for (auto const buffer : response_.body().data())
-            s.append(
-                boost::asio::buffer_cast<char const*>(buffer),
-                boost::asio::buffer_size(buffer));
-        auto const success = r.parse(s, json);
-        if (success)
+        auto json = Json::load([this]() {
+            std::string s;
+            s.reserve(boost::asio::buffer_size(response_.body().data()));
+            for (auto const buffer : response_.body().data())
+                s.append(
+                    boost::asio::buffer_cast<char const*>(buffer),
+                    boost::asio::buffer_size(buffer));
+            return s;
+        }());
+
+        if (json && json->isObject())
         {
-            if (json.isObject() && json.isMember("peer-ips"))
+            if (auto ips = json->removeMember("peer-ips");
+                ips.has_value() && ips->isArray())
             {
-                Json::Value const& ips = json["peer-ips"];
-                if (ips.isArray())
+                std::vector<boost::asio::ip::tcp::endpoint> eps;
+                eps.reserve(ips->size());
+
+                for (auto const& v : *ips)
                 {
-                    std::vector<boost::asio::ip::tcp::endpoint> eps;
-                    eps.reserve(ips.size());
-                    for (auto const& v : ips)
+                    if (v.isString())
                     {
-                        if (v.isString())
-                        {
-                            error_code ec;
-                            auto const ep = parse_endpoint(v.asString(), ec);
-                            if (!ec)
-                                eps.push_back(ep);
-                        }
+                        error_code ec;
+                        auto const ep = parse_endpoint(v.asString(), ec);
+                        if (!ec)
+                            eps.push_back(ep);
                     }
-                    overlay_.peerFinder().onRedirects(remote_endpoint_, eps);
                 }
+                overlay_.peerFinder().onRedirects(remote_endpoint_, eps);
             }
         }
     }

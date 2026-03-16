@@ -108,9 +108,6 @@ if [ -e src/ripple ]; then
     beast/utility/maybe_const.h
     beast/utility/temp_dir.h
 
-    # included by only json/impl/json_assert.h
-    json/json_errors.h
-
     protocol/PayChan.h
     protocol/RippleLedgerHash.h
     protocol/messages.h

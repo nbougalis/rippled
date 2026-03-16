@@ -20,8 +20,7 @@
 #include <test/jtx.h>
 #include <test/jtx/Env.h>
 #include <xrpld/rpc/detail/RPCHelpers.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 
 #include <functional>
@@ -198,7 +197,7 @@ class TransactionEntry_test : public beast::unit_test::suite
             if (!expected_json.empty())
             {
                 Json::Value expected;
-                Json::Reader().parse(expected_json, expected);
+                Json::load(expected_json, expected);
                 if (RPC::contains_error(expected))
                     Throw<std::runtime_error>(
                         "Internal JSONRPC_test error.  Bad test JSON.");

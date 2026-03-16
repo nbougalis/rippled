@@ -24,7 +24,7 @@
 #include <xrpl/basics/random.h>
 #include <xrpl/beast/unit_test.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_reader.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 
 #include <atomic>
@@ -504,7 +504,7 @@ public:
             }
 
             Json::Value parsedLastLine;
-            Json::Reader().parse(lastLine, parsedLastLine);
+            Json::load(lastLine, parsedLastLine);
             if (!BEAST_EXPECT(!RPC::contains_error(parsedLastLine)))
                 // Avoid cascade of failures
                 return;
@@ -847,7 +847,7 @@ public:
             }
 
             Json::Value parsedLastLine;
-            Json::Reader().parse(lastLine, parsedLastLine);
+            Json::load(lastLine, parsedLastLine);
             if (!BEAST_EXPECT(!RPC::contains_error(parsedLastLine)))
                 // Avoid cascade of failures
                 return;
@@ -984,7 +984,7 @@ public:
             }
 
             Json::Value parsedLastLine;
-            Json::Reader().parse(lastLine, parsedLastLine);
+            Json::load(lastLine, parsedLastLine);
             if (!BEAST_EXPECT(!RPC::contains_error(parsedLastLine)))
                 // Avoid cascade of failures
                 return;

@@ -17,7 +17,6 @@
 */
 //==============================================================================
 
-#include <xrpl/json/json_errors.h>
 #include <xrpl/protocol/MPTIssue.h>
 #include <xrpl/protocol/jss.h>
 
@@ -95,13 +94,10 @@ mptIssueFromJson(Json::Value const& v)
             "mptIssueFromJson MPTID must be a string Json value");
     }
 
-    MPTID id;
-    if (!id.parseHex(idStr.asString()))
-    {
-        Throw<Json::error>("mptIssueFromJson MPTID is invalid");
-    }
+    if (MPTID id; id.parseHex(idStr.asString()))
+        return MPTIssue{id};
 
-    return MPTIssue{id};
+    Throw<Json::error>("mptIssueFromJson MPTID is invalid");
 }
 
 }  // namespace ripple

@@ -21,7 +21,7 @@
 
 #include <test/jtx/Env.h>
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Quality.h>
 #include <xrpl/protocol/TxFlags.h>

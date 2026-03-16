@@ -23,7 +23,7 @@
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/base64.h>
-#include <xrpl/json/json_reader.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/PublicKey.h>
 #include <xrpl/protocol/Sign.h>
 
@@ -254,23 +254,19 @@ loadValidatorToken(std::vector<std::string> const& blob, beast::Journal journal)
     {
         std::string tokenStr;
 
-        tokenStr.reserve(std::accumulate(
-            blob.cbegin(),
-            blob.cend(),
-            std::size_t(0),
-            [](std::size_t init, std::string const& s) {
-                return init + s.size();
-            }));
+        tokenStr.reserve(
+            std::accumulate(
+                blob.cbegin(),
+                blob.cend(),
+                std::size_t(0),
+                [](std::size_t init, std::string const& s) {
+                    return init + s.size();
+                }));
 
         for (auto const& line : blob)
             tokenStr += boost::algorithm::trim_copy(line);
 
-        tokenStr = base64_decode(tokenStr);
-
-        Json::Reader r;
-        Json::Value token;
-
-        if (r.parse(tokenStr, token))
+        if (Json::Value token; Json::load(base64_decode(tokenStr), token))
         {
             auto const m = token.get("manifest", Json::Value{});
             auto const k = token.get("validation_secret_key", Json::Value{});
@@ -571,13 +567,14 @@ ManifestCache::load(
     if (!configRevocation.empty())
     {
         std::string revocationStr;
-        revocationStr.reserve(std::accumulate(
-            configRevocation.cbegin(),
-            configRevocation.cend(),
-            std::size_t(0),
-            [](std::size_t init, std::string const& s) {
-                return init + s.size();
-            }));
+        revocationStr.reserve(
+            std::accumulate(
+                configRevocation.cbegin(),
+                configRevocation.cend(),
+                std::size_t(0),
+                [](std::size_t init, std::string const& s) {
+                    return init + s.size();
+                }));
 
         for (auto const& line : configRevocation)
             revocationStr += boost::algorithm::trim_copy(line);

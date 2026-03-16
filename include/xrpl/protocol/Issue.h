@@ -21,7 +21,7 @@
 #define RIPPLE_PROTOCOL_ISSUE_H_INCLUDED
 
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/UintTypes.h>
 
 #include <functional>

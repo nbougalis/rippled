@@ -19,7 +19,6 @@
 
 #include <xrpl/protocol/Issue.h>
 
-#include <xrpl/json/json_errors.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/UintTypes.h>
 #include <xrpl/protocol/jss.h>

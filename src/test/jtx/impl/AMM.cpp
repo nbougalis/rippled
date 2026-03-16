@@ -71,10 +71,11 @@ AMM::AMM(
     , msig_(ms)
     , fee_(fee)
     , ammAccount_(create(tfee, flags, seq, ter))
-    , lptIssue_(ripple::ammLPTIssue(
-          asset1_.issue().currency,
-          asset2_.issue().currency,
-          ammAccount_))
+    , lptIssue_(
+          ripple::ammLPTIssue(
+              asset1_.issue().currency,
+              asset2_.issue().currency,
+              ammAccount_))
     , initialLPTokens_(initialTokens())
 {
 }
@@ -195,6 +196,7 @@ AMM::ammRpcInfo(
         (apiVersion == RPC::apiInvalidVersion
              ? env_.rpc("json", "amm_info", to_string(jv))
              : env_.rpc(apiVersion, "json", "amm_info", to_string(jv)));
+
     if (jr.isObject() && jr.isMember(jss::result) &&
         jr[jss::result].isMember(jss::status))
         return jr[jss::result];
@@ -729,7 +731,7 @@ AMM::submit(
     std::optional<ter> const& ter)
 {
     if (log_)
-        std::cout << jv.toStyledString();
+        std::cout << to_compact_string(jv);
     if (msig_)
     {
         if (seq && ter)

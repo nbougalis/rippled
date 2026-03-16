@@ -1379,7 +1379,7 @@ struct PayChan_test : public beast::unit_test::suite
             auto const rs = env.rpc(
                 "json",
                 "channel_authorize",
-                args.toStyledString())[jss::result];
+                to_compact_string(args))[jss::result];
             auto const error = apiVersion < 2u ? "invalidParams" : "badKeyType";
             BEAST_EXPECT(rs[jss::error] == error);
         });
@@ -1642,7 +1642,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
             }
             {
@@ -1654,7 +1654,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
             }
             {
@@ -1666,7 +1666,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
             }
             {
@@ -1680,7 +1680,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
             }
             {
@@ -1693,7 +1693,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "channelMalformed");
             }
             {
@@ -1706,7 +1706,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "channelAmtMalformed");
             }
             {
@@ -1719,7 +1719,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "channelAmtMalformed");
             }
             {
@@ -1732,7 +1732,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
             }
         }
     }
@@ -3910,19 +3910,19 @@ struct PayChan_test : public beast::unit_test::suite
             auto rs = env.rpc(
                 "json",
                 "channel_authorize",
-                args.toStyledString())[jss::result];
+                to_compact_string(args))[jss::result];
             BEAST_EXPECT(rs[jss::error] == "channelAmtMalformed");
             args[jss::amount][jss::value] = "x1000";
             rs = env.rpc(
                 "json",
                 "channel_authorize",
-                args.toStyledString())[jss::result];
+                to_compact_string(args))[jss::result];
             BEAST_EXPECT(rs[jss::error] == "channelAmtMalformed");
             args[jss::amount][jss::value] = "x";
             rs = env.rpc(
                 "json",
                 "channel_authorize",
-                args.toStyledString())[jss::result];
+                to_compact_string(args))[jss::result];
             BEAST_EXPECT(rs[jss::error] == "channelAmtMalformed");
             {
                 // Missing channel_id
@@ -3935,7 +3935,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
             }
             {
@@ -3947,7 +3947,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
             }
             {
@@ -3961,7 +3961,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
             }
             {
@@ -3977,7 +3977,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
             }
             {
@@ -3992,7 +3992,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "channelMalformed");
             }
             {
@@ -4007,7 +4007,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "channelAmtMalformed");
             }
             {
@@ -4022,7 +4022,7 @@ struct PayChan_test : public beast::unit_test::suite
                 rs = env.rpc(
                     "json",
                     "channel_authorize",
-                    args.toStyledString())[jss::result];
+                    to_compact_string(args))[jss::result];
             }
         }
     }

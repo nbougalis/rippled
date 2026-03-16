@@ -49,7 +49,7 @@ public:
 };
 
 Json::Value
-loadXpop(std::string content);
+loadXpop(std::string_view content);
 
 }  // namespace import
 

@@ -36,7 +36,6 @@
 #include <xrpld/net/RPCCall.h>
 #include <xrpl/basics/Slice.h>
 #include <xrpl/basics/contract.h>
-#include <xrpl/json/to_string.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/HashPrefix.h>
@@ -430,9 +429,9 @@ Env::postconditions(
         bad;
     if (bad)
     {
-        test.log << pretty(jt.jv) << std::endl;
+        test.log << to_styled_string(jt.jv) << std::endl;
         if (jr)
-            test.log << pretty(jr) << std::endl;
+            test.log << to_styled_string(jr) << std::endl;
         auto const& m = meta();
         if (m)
             test.log << *m << std::endl;
@@ -444,7 +443,7 @@ Env::postconditions(
     {
         if (trace_ > 0)
             --trace_;
-        test.log << pretty(jt.jv) << std::endl;
+        test.log << to_styled_string(jt.jv) << std::endl;
         auto const& m = meta();
         if (m)
             test.log << *m << std::endl;
@@ -518,9 +517,10 @@ Env::acct_autofill(JTx& jt, Account const& account)
     {
         autofill_sig(jt, account);
     }
-    catch (parse_error const&)
+    catch (parse_error const& pe)
     {
-        test.log << "parse failed:\n" << pretty(jv) << std::endl;
+        test.log << "parse failed: " << pe.what() << ":\n"
+                 << to_styled_string(jv) << std::endl;
         throw;
     }
 }
@@ -547,10 +547,12 @@ Env::autofill(JTx& jt)
         auto const account = lookup(jv[jss::Account].asString());
         autofill_sig(jt, account);
     }
-    catch (parse_error const&)
+    catch (parse_error const& pe)
     {
         if (!parseFailureExpected_)
-            test.log << "parse failed:\n" << pretty(jv) << std::endl;
+            test.log << "parse failed: " << pe.what() << "\n"
+                     << to_styled_string(jv) << std::endl;
+
         throw;
     }
 }
@@ -567,7 +569,8 @@ Env::st(JTx const& jt)
     }
     catch (jtx::parse_error const&)
     {
-        test.log << "Exception: parse_error\n" << pretty(jt.jv) << std::endl;
+        test.log << "Exception: parse_error\n"
+                 << to_styled_string(jt.jv) << std::endl;
         throw;
     }
 
@@ -577,8 +580,8 @@ Env::st(JTx const& jt)
     }
     catch (std::exception const&)
     {
+        return nullptr;
     }
-    return nullptr;
 }
 
 std::shared_ptr<STTx const>
@@ -593,7 +596,8 @@ Env::ust(JTx const& jt)
     }
     catch (jtx::parse_error const&)
     {
-        test.log << "Exception: parse_error\n" << pretty(jt.jv) << std::endl;
+        test.log << "Exception: parse_error\n"
+                 << to_styled_string(jt.jv) << std::endl;
         throw;
     }
 
@@ -622,6 +626,8 @@ Env::do_rpc(
         JLOG(journal.error())
             << "Env::do_rpc error, retrying, attempt #" << ctr + 1 << " ...";
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        JLOG(journal.error()) << "    response (" << response.first
+                              << "): " << response.second << "\n";
 
         response =
             rpcClient(args, app().config(), app().logs(), apiVersion, headers);

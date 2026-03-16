@@ -30,8 +30,7 @@ namespace detail {
 void
 LogThrow(std::string_view type, std::string_view what)
 {
-    JLOG(debugLog().warn())
-        << "Throwing exception of type " << type << ": " << what;
+    JLOG(debugLog().warn()) << "Throwing " << type << ": " << what;
 }
 
 }  // namespace detail
@@ -43,10 +42,9 @@ LogicError(std::string_view msg) noexcept
     std::cerr << "Logic error: " << msg << std::endl;
 
     // Use a non-standard contract naming here (without namespace) because
-    // it's the only location where various unrelated execution paths may
-    // register an error; this is also why the "message" parameter is passed
-    // here.
-    // For the above reasons, we want this contract to stand out.
+    // it is the only location where various unrelated execution paths may
+    // converge to register an error, so we want it to stand out; it's why
+    // the "message" parameter is passed here.
     UNREACHABLE("LogicError", {{"message", s}});
 
     std::abort();

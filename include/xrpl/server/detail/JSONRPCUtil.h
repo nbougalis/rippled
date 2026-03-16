@@ -21,7 +21,7 @@
 #define RIPPLE_SERVER_JSONRPCUTIL_H_INCLUDED
 
 #include <xrpl/json/Output.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 namespace ripple {
 

@@ -28,7 +28,7 @@
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/chrono.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <boost/logic/tribool.hpp>
 
 #include <chrono>
@@ -1112,12 +1112,10 @@ Consensus<Adaptor>::checkLedger(std::unique_ptr<std::stringstream> const& clog)
         std::stringstream ss;
         ss << "View of consensus changed during " << to_string(phase_)
            << " mode=" << to_string(mode_.get()) << ", " << prevLedgerID_
-           << " to " << netLgr << ", "
-           << Json::Compact{previousLedger_.getJson()} << ". ";
+           << " to " << netLgr << ", " << previousLedger_.getJson() << ". ";
         JLOG(j_.warn()) << ss.str();
         CLOG(clog) << ss.str();
-        CLOG(clog) << "State on consensus change "
-                   << Json::Compact{getJson(true)} << ". ";
+        CLOG(clog) << "State on consensus change " << getJson(true) << ". ";
         handleWrongLedger(netLgr, clog);
     }
     else if (previousLedger_.id() != prevLedgerID_)
@@ -1716,9 +1714,8 @@ Consensus<Adaptor>::haveConsensus(
     if (result_->state == ConsensusState::MovedOn)
     {
         JLOG(j_.error()) << "Unable to reach consensus";
-        JLOG(j_.error()) << Json::Compact{getJson(true)};
-        CLOG(clog) << "Unable to reach consensus "
-                   << Json::Compact{getJson(true)} << ". ";
+        JLOG(j_.error()) << getJson(true);
+        CLOG(clog) << "Unable to reach consensus " << getJson(true) << ". ";
     }
 
     CLOG(clog) << "Consensus has been reached. ";

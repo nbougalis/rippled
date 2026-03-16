@@ -452,11 +452,6 @@ HookAPI::prepare(Slice const& txBlob) const
         }
     }
 
-    // {
-    //     const std::string flat = Json::FastWriter().write(json);
-    //     std::cout << "intermediate: `" << flat << "`\n";
-    // }
-
     Blob tx_blob;
     {
         STParsedJSONObject parsed(std::string(jss::tx_json), json);

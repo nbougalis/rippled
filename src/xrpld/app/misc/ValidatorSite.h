@@ -26,7 +26,7 @@
 #include <xrpld/core/Config.h>
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/StringUtilities.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <boost/asio.hpp>
 
@@ -244,7 +244,7 @@ private:
     /// lock over sites_mutex_ required
     void
     parseJsonResponse(
-        std::string const& res,
+        std::string_view res,
         std::size_t siteIdx,
         std::lock_guard<std::mutex> const&);
 

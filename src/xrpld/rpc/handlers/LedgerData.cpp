@@ -89,9 +89,9 @@ doLedgerData(RPC::JsonContext& context)
     auto [rpcStatus, type] = RPC::chooseLedgerEntryType(params);
     if (rpcStatus)
     {
-        jvResult.clear();
-        rpcStatus.inject(jvResult);
-        return jvResult;
+        Json::Value ret;
+        rpcStatus.inject(ret);
+        return ret;
     }
     Json::Value& nodes = jvResult[jss::state];
     if (nodes.type() == Json::nullValue)

@@ -21,7 +21,7 @@
 
 #include <test/jtx/Env.h>
 #include <test/jtx/attester.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Issue.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STBase.h>

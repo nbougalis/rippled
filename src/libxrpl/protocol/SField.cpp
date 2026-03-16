@@ -30,18 +30,9 @@ SField::IsSigning const SField::notSigning;
 int SField::num = 0;
 std::map<int, SField const*> SField::knownCodeToField;
 
-// Give only this translation unit permission to construct SFields
-struct SField::private_access_tag_t
-{
-    explicit private_access_tag_t() = default;
-};
-
-static SField::private_access_tag_t access;
-
 template <class T>
 template <class... Args>
-TypedField<T>::TypedField(private_access_tag_t pat, Args&&... args)
-    : SField(pat, std::forward<Args>(args)...)
+TypedField<T>::TypedField(Args&&... args) : SField(std::forward<Args>(args)...)
 {
 }
 
@@ -54,28 +45,33 @@ TypedField<T>::TypedField(private_access_tag_t pat, Args&&... args)
 #pragma push_macro("TYPED_SFIELD")
 #undef TYPED_SFIELD
 
-#define UNTYPED_SFIELD(sfName, stiSuffix, fieldValue, ...) \
-    SField const sfName(                                   \
-        access,                                            \
-        STI_##stiSuffix,                                   \
-        fieldValue,                                        \
-        std::string_view(#sfName).substr(2).data(),        \
+// This is a weird way to define these macros. Instead of passing in
+// the text and using that to synthesize the name of the variable by
+// using the token-pasting operator, and the field name by using the
+// token pasting operator, we instantiate and manipulate string_view
+// instances inside a macro.
+#define UNTYPED_SFIELD(sfName, stiSuffix, fieldValue, ...)             \
+    SField const sfName(                                               \
+        Json::StaticString(true, std::string_view(#sfName).substr(2)), \
+        STI_##stiSuffix,                                               \
+        fieldValue,                                                    \
         ##__VA_ARGS__);
-#define TYPED_SFIELD(sfName, stiSuffix, fieldValue, ...) \
-    SF_##stiSuffix const sfName(                         \
-        access,                                          \
-        STI_##stiSuffix,                                 \
-        fieldValue,                                      \
-        std::string_view(#sfName).substr(2).data(),      \
+
+#define TYPED_SFIELD(sfName, stiSuffix, fieldValue, ...)               \
+    SF_##stiSuffix const sfName(                                       \
+        Json::StaticString(true, std::string_view(#sfName).substr(2)), \
+        STI_##stiSuffix,                                               \
+        fieldValue,                                                    \
         ##__VA_ARGS__);
 
 // SFields which, for historical reasons, do not follow naming conventions.
-SField const sfInvalid(access, -1);
-SField const sfGeneric(access, 0);
+SField const sfInvalid(-1);
+SField const sfGeneric(0);
+
 // The following two fields aren't used anywhere, but they break tests/have
 // downstream effects.
-SField const sfHash(access, STI_UINT256, 257, "hash");
-SField const sfIndex(access, STI_UINT256, 258, "index");
+SField const sfHash(Json::StaticString("hash"), STI_UINT256, 257);
+SField const sfIndex(Json::StaticString("index"), STI_UINT256, 258);
 
 #include <xrpl/protocol/detail/sfields.macro>
 
@@ -83,37 +79,6 @@ SField const sfIndex(access, STI_UINT256, 258, "index");
 #pragma pop_macro("TYPED_SFIELD")
 #undef UNTYPED_SFIELD
 #pragma pop_macro("UNTYPED_SFIELD")
-
-SField::SField(
-    private_access_tag_t,
-    SerializedTypeID tid,
-    int fv,
-    const char* fn,
-    int meta,
-    IsSigning signing)
-    : fieldCode(field_code(tid, fv))
-    , fieldType(tid)
-    , fieldValue(fv)
-    , fieldName(fn)
-    , fieldMeta(meta)
-    , fieldNum(++num)
-    , signingField(signing)
-    , jsonName(fieldName.c_str())
-{
-    knownCodeToField[fieldCode] = this;
-}
-
-SField::SField(private_access_tag_t, int fc)
-    : fieldCode(fc)
-    , fieldType(STI_UNKNOWN)
-    , fieldValue(0)
-    , fieldMeta(sMD_Never)
-    , fieldNum(++num)
-    , signingField(IsSigning::yes)
-    , jsonName(fieldName.c_str())
-{
-    knownCodeToField[fieldCode] = this;
-}
 
 SField const&
 SField::getField(int code)
@@ -144,7 +109,7 @@ SField::compare(SField const& f1, SField const& f2)
 }
 
 SField const&
-SField::getField(std::string const& fieldName)
+SField::getField(std::string_view fieldName)
 {
     for (auto const& [_, f] : knownCodeToField)
     {

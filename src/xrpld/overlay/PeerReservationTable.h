@@ -23,7 +23,7 @@
 #include <xrpl/beast/hash/hash_append.h>
 #include <xrpl/beast/hash/uhash.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_forwards.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/PublicKey.h>
 
 #include <mutex>
@@ -43,8 +43,8 @@ public:
     PublicKey nodeId;
     std::string description{};
 
-    auto
-    toJson() const -> Json::Value;
+    Json::Value
+    toJson() const;
 
     template <typename Hasher>
     friend void

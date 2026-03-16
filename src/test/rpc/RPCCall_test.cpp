@@ -20,7 +20,7 @@
 #include <xrpld/net/RPCCall.h>
 #include <xrpld/rpc/detail/RPCHelpers.h>
 #include <xrpl/beast/unit_test.h>
-#include <xrpl/json/json_reader.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 
 #include <boost/algorithm/string.hpp>
@@ -185,9 +185,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"account_channels: too few arguments.",
      __LINE__,
-     {
-         "account_channels",
-     },
+     {"account_channels"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "account_channels",
@@ -511,7 +509,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "params" : [
       {
          "api_version" : %API_VER%,
-         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
       }
     ]
     })"},
@@ -1123,7 +1121,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "params" : [
       {
          "api_version" : %API_VER%,
-         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
       }
     ]
     })"},
@@ -1804,7 +1802,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "can_delete",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -2620,7 +2618,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "feature",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -2713,7 +2711,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "fetch_info",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -2769,7 +2767,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "params" : [
       {
          "api_version" : %API_VER%,
-         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
       }
     ]
     })"},
@@ -2945,15 +2943,13 @@ static RPCCallTestData const rpcCallTestArray[] = {
     // ------------------------------------------------------------------
     {"get_counts: minimal.",
      __LINE__,
-     {
-         "get_counts",
-     },
+     {"get_counts"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "get_counts",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -2986,10 +2982,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"get_counts: count too small.",
      __LINE__,
-     {
-         "get_counts",
-         "-1",
-     },
+     {"get_counts", "-1"},
      RPCCallTestData::bad_cast,
      R"()"},
     {"get_counts: count too large.",
@@ -3237,29 +3230,6 @@ static RPCCallTestData const rpcCallTestArray[] = {
       }
     ]
     })"},
-    {"json2: malformed json (note extra comma).",
-     __LINE__,
-     {
-         "json2",
-         R"({"jsonrpc":"2.0","ripplerpc":"2.0","id":"A1","method":"call_1",})",
-     },
-     RPCCallTestData::no_exception,
-     R"({
-    "id" : "A1",
-    "jsonrpc" : "2.0",
-    "method" : "json2",
-    "params" : [
-      {
-         "error" : "invalidParams",
-         "error_code" : 31,
-         "error_message" : "Invalid parameters.",
-         "id" : "A1",
-         "jsonrpc" : "2.0",
-         "ripplerpc" : "2.0"
-      }
-    ],
-    "ripplerpc" : "2.0"
-    })"},
     {"json2: omit jsonrpc.",
      __LINE__,
      {
@@ -3489,7 +3459,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "ledger",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -3638,7 +3608,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "ledger_closed",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -3667,7 +3637,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "ledger_current",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -3896,7 +3866,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "log_level",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -4051,7 +4021,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "logrotate",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -4247,7 +4217,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "peers",
     "params" : [
        {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
        }
     ]
     })"},
@@ -4386,7 +4356,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "ping",
     "params" : [
        {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
        }
     ]
     })"},
@@ -4417,7 +4387,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "print",
     "params" : [
        {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
        }
     ]
     })"},
@@ -4462,7 +4432,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "random",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -4527,7 +4497,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
       }
     ]
     })"},
-    {"ripple_path_find: ledger hash.",
+    {"ripple_path_find: invalid ledger hash.",
      __LINE__,
      {"ripple_path_find",
       R"({"json_argument":true})",
@@ -4539,7 +4509,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
       {
          "api_version" : %API_VER%,
          "json_argument" : true,
-         "ledger_hash" : "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV"
+         "ledger_index": 0
       }
     ]
     })"},
@@ -4571,23 +4541,6 @@ static RPCCallTestData const rpcCallTestArray[] = {
          "error" : "badSyntax",
          "error_code" : 1,
          "error_message" : "Syntax error."
-      }
-    ]
-    })"},
-    {"ripple_path_find: invalid json (note extra comma).",
-     __LINE__,
-     {
-         "ripple_path_find",
-         R"({"json_argument":true,})",
-     },
-     RPCCallTestData::no_exception,
-     R"({
-    "method" : "ripple_path_find",
-    "params" : [
-      {
-         "error" : "invalidParams",
-         "error_code" : 31,
-         "error_message" : "Invalid parameters."
       }
     ]
     })"},
@@ -4701,24 +4654,6 @@ static RPCCallTestData const rpcCallTestArray[] = {
       }
     ]
     })"},
-    {"sign: invalid JSON (note extra comma).",
-     __LINE__,
-     {
-         "sign",
-         "my_secret",
-         R"({"json_argument":true,})",
-     },
-     RPCCallTestData::no_exception,
-     R"({
-    "method" : "sign",
-    "params" : [
-      {
-         "error" : "invalidParams",
-         "error_code" : 31,
-         "error_message" : "Invalid parameters."
-      }
-    ]
-    })"},
     {"sign: invalid final argument.",
      __LINE__,
      {"sign", "my_secret", R"({"json_argument":true})", "offlin"},
@@ -4814,25 +4749,6 @@ static RPCCallTestData const rpcCallTestArray[] = {
          "error" : "badSyntax",
          "error_code" : 1,
          "error_message" : "Syntax error."
-      }
-    ]
-    })"},
-    {"sign_for: invalid json (note extra comma).",
-     __LINE__,
-     {
-         "sign_for",
-         "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
-         "my_secret",
-         R"({"json_argument":true,})",
-     },
-     RPCCallTestData::no_exception,
-     R"({
-    "method" : "sign_for",
-    "params" : [
-      {
-         "error" : "invalidParams",
-         "error_code" : 31,
-         "error_message" : "Invalid parameters."
       }
     ]
     })"},
@@ -4938,24 +4854,6 @@ static RPCCallTestData const rpcCallTestArray[] = {
       }
     ]
     })"},
-    {"submit: invalid json (note extra comma).",
-     __LINE__,
-     {
-         "submit",
-         "my_secret",
-         R"({"json_argument":true,})",
-     },
-     RPCCallTestData::no_exception,
-     R"({
-    "method" : "submit",
-    "params" : [
-      {
-         "error" : "invalidParams",
-         "error_code" : 31,
-         "error_message" : "Invalid parameters."
-      }
-    ]
-    })"},
     {"submit: last argument not \"offline\".",
      __LINE__,
      {"submit", "my_secret", R"({"json_argument":true})", "offlne"},
@@ -4975,10 +4873,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     // ----------------------------------------------------------
     {"submit_multisigned: json.",
      __LINE__,
-     {
-         "submit_multisigned",
-         R"({"json_argument":true})",
-     },
+     {"submit_multisigned", R"({"json_argument":true})"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "submit_multisigned",
@@ -4993,9 +4888,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"submit_multisigned: too few arguments.",
      __LINE__,
-     {
-         "submit_multisigned",
-     },
+     {"submit_multisigned"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "submit_multisigned",
@@ -5021,38 +4914,17 @@ static RPCCallTestData const rpcCallTestArray[] = {
       }
     ]
     })"},
-    {"submit_multisigned: invalid json (note extra comma).",
-     __LINE__,
-     {
-         "submit_multisigned",
-         R"({"json_argument":true,})",
-     },
-     RPCCallTestData::no_exception,
-     R"({
-    "method" : "submit_multisigned",
-    "params" : [
-      {
-         "error" : "invalidParams",
-         "error_code" : 31,
-         "error_message" : "Invalid parameters."
-         }
-      }
-    ]
-    })"},
-
     // server_info
     // -----------------------------------------------------------------
     {"server_info: minimal.",
      __LINE__,
-     {
-         "server_info",
-     },
+     {"server_info"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "server_info",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -5091,7 +4963,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "server_info",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -5108,7 +4980,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "server_state",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -5147,7 +5019,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "server_state",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -5156,15 +5028,13 @@ static RPCCallTestData const rpcCallTestArray[] = {
     // ------------------------------------------------------------------------
     {"stop: minimal.",
      __LINE__,
-     {
-         "stop",
-     },
+     {"stop"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "stop",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -5217,7 +5087,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
       }
     ]
     })"},
-    {"transaction_entry: ledger hash.",
+    {"transaction_entry: invalid ledger hash.",
      __LINE__,
      {"transaction_entry",
       "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
@@ -5227,18 +5097,15 @@ static RPCCallTestData const rpcCallTestArray[] = {
     "method" : "transaction_entry",
     "params" : [
       {
-         "api_version" : %API_VER%,
-         "ledger_hash" : "VUTSRQPONMLKJIHGFEDCBA9876543210VUTSRQPONMLKJIHGFEDCBA9876543210",
-         "tx_hash" : "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV"
+         "error":"invalidParams",
+         "error_message":"Invalid parameters."
       }
     ]
     })"},
     {"transaction_entry: too few arguments.",
      __LINE__,
-     {
-         "transaction_entry",
-         "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
-     },
+     {"transaction_entry",
+      "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "transaction_entry",
@@ -5269,11 +5136,9 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"transaction_entry: short tx_hash.",
      __LINE__,
-     {
-         "transaction_entry",
-         "123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
-         "validated",
-     },
+     {"transaction_entry",
+      "123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "validated"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "transaction_entry",
@@ -5287,11 +5152,9 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"transaction_entry: long tx_hash.",
      __LINE__,
-     {
-         "transaction_entry",
-         "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUVW",
-         "validated",
-     },
+     {"transaction_entry",
+      "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUVW",
+      "validated"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "transaction_entry",
@@ -5305,11 +5168,9 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"transaction_entry: small ledger index.",
      __LINE__,
-     {
-         "transaction_entry",
-         "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
-         "0",
-     },
+     {"transaction_entry",
+      "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "0"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "transaction_entry",
@@ -5323,11 +5184,9 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"transaction_entry: large ledger index.",
      __LINE__,
-     {
-         "transaction_entry",
-         "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
-         "4294967296",
-     },
+     {"transaction_entry",
+      "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "4294967296"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "transaction_entry",
@@ -5341,11 +5200,9 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"transaction_entry: short ledger hash.",
      __LINE__,
-     {
-         "transaction_entry",
-         "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
-         "VUTSRQPONMLKJIHGFEDCBA9876543210VUTSRQPONMLKJIHGFEDCBA987654321",
-     },
+     {"transaction_entry",
+      "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "VUTSRQPONMLKJIHGFEDCBA9876543210VUTSRQPONMLKJIHGFEDCBA987654321"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "transaction_entry",
@@ -5359,11 +5216,9 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"transaction_entry: long ledger hash.",
      __LINE__,
-     {
-         "transaction_entry",
-         "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
-         "VUTSRQPONMLKJIHGFEDCBA9876543210VUTSRQPONMLKJIHGFEDCBA9876543210Z",
-     },
+     {"transaction_entry",
+      "0123456789ABCDEFGHIJKLMNOPQRSTUV0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "VUTSRQPONMLKJIHGFEDCBA9876543210VUTSRQPONMLKJIHGFEDCBA9876543210Z"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "transaction_entry",
@@ -5438,9 +5293,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"tx: too few arguments.",
      __LINE__,
-     {
-         "tx",
-     },
+     {"tx"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "tx",
@@ -5497,9 +5350,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"tx_history: too few arguments.",
      __LINE__,
-     {
-         "tx_history",
-     },
+     {"tx_history"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "tx_history",
@@ -5525,44 +5376,36 @@ static RPCCallTestData const rpcCallTestArray[] = {
       }
     ]
     })"},
-    {
-        // Note: this really shouldn't throw, but does at the moment.
-        "tx_history: start too small.",
-        __LINE__,
-        {"tx_history", "-1"},
-        RPCCallTestData::bad_cast,
-        R"()",
-    },
-    {
-        // Note: this really shouldn't throw, but does at the moment.
-        "tx_history: start too big.",
-        __LINE__,
-        {"tx_history", "4294967296"},
-        RPCCallTestData::bad_cast,
-        R"()",
-    },
-    {
-        // Note: this really shouldn't throw, but does at the moment.
-        "tx_history: start not integer.",
-        __LINE__,
-        {"tx_history", "beginning"},
-        RPCCallTestData::bad_cast,
-        R"()",
-    },
+    {// Note: this really shouldn't throw, but does at the moment.
+     "tx_history: start too small.",
+     __LINE__,
+     {"tx_history", "-1"},
+     RPCCallTestData::bad_cast,
+     R"()"},
+    {// Note: this really shouldn't throw, but does at the moment.
+     "tx_history: start too big.",
+     __LINE__,
+     {"tx_history", "4294967296"},
+     RPCCallTestData::bad_cast,
+     R"()"},
+    {// Note: this really shouldn't throw, but does at the moment.
+     "tx_history: start not integer.",
+     __LINE__,
+     {"tx_history", "beginning"},
+     RPCCallTestData::bad_cast,
+     R"()"},
 
     // unl_list
     // --------------------------------------------------------------------
     {"unl_list: minimal.",
      __LINE__,
-     {
-         "unl_list",
-     },
+     {"unl_list"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "unl_list",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -5585,15 +5428,13 @@ static RPCCallTestData const rpcCallTestArray[] = {
     // -----------------------------------------------------------
     {"validation_create: minimal.",
      __LINE__,
-     {
-         "validation_create",
-     },
+     {"validation_create"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "validation_create",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -5629,15 +5470,13 @@ static RPCCallTestData const rpcCallTestArray[] = {
     // ---------------------------------------------------------------------
     {"version: minimal.",
      __LINE__,
-     {
-         "version",
-     },
+     {"version"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "version",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -5660,15 +5499,13 @@ static RPCCallTestData const rpcCallTestArray[] = {
     // --------------------------------------------------------------
     {"wallet_propose: minimal.",
      __LINE__,
-     {
-         "wallet_propose",
-     },
+     {"wallet_propose"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "wallet_propose",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -5738,9 +5575,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     })"},
     {"internal: too few arguments.",
      __LINE__,
-     {
-         "internal",
-     },
+     {"internal"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "internal",
@@ -5757,9 +5592,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     // -------------------------------------------------------------------
     {"path_find: minimal.",
      __LINE__,
-     {
-         "path_find",
-     },
+     {"path_find"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "path_find",
@@ -5790,9 +5623,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     // -------------------------------------------------------------------
     {"subscribe: minimal.",
      __LINE__,
-     {
-         "subscribe",
-     },
+     {"subscribe"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "subscribe",
@@ -5823,9 +5654,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
     // -----------------------------------------------------------------
     {"unsubscribe: minimal.",
      __LINE__,
-     {
-         "unsubscribe",
-     },
+     {"unsubscribe"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "unsubscribe",
@@ -5856,15 +5685,13 @@ static RPCCallTestData const rpcCallTestArray[] = {
     // -------------------------------------------------------------
     {"unknown_command: minimal.",
      __LINE__,
-     {
-         "unknown_command",
-     },
+     {"unknown_command"},
      RPCCallTestData::no_exception,
      R"({
     "method" : "unknown_command",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })"},
@@ -5880,8 +5707,7 @@ static RPCCallTestData const rpcCallTestArray[] = {
          "params" : [ "string_arg", "1", "-1", "4294967296", "3.14159" ]
       }
     ]
-    })"},
-};
+    })"}};
 
 std::string
 updateAPIVersionString(const char* const req, unsigned apiVersion)
@@ -5956,8 +5782,9 @@ public:
             }
 
             Json::Value exp;
-            Json::Reader{}.parse(
-                updateAPIVersionString(expVersioned, apiVersion), exp);
+            BEAST_EXPECT(
+                Json::load(
+                    updateAPIVersionString(expVersioned, apiVersion), exp));
 
             // Lambda to remove the "params[0u]:error_code" field if present.
             // Error codes are not expected to be stable between releases.
@@ -5980,8 +5807,6 @@ public:
             }
             else
             {
-                printf("got: %s\n", got.toStyledString().c_str());
-                printf("exp: %s\n", exp.toStyledString().c_str());
                 fail(rpcCallTest.description, __FILE__, rpcCallTest.line);
             }
         }
@@ -5990,7 +5815,7 @@ public:
     void
     run() override
     {
-        forAllApiVersions(std::bind_front(&RPCCall_test::testRPCCall, this));
+        forAllApiVersions([this](auto version) { testRPCCall(version); });
     }
 };
 

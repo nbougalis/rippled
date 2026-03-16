@@ -205,9 +205,7 @@ public:
     class Proxy;
 
     Proxy
-    operator[](std::string const& key);
-    Proxy
-    operator[](Json::StaticString const& key);
+    operator[](std::string_view);
 
     /** Make a new Object at a key and return it.
 
@@ -367,12 +365,13 @@ stringWriterObject(std::string&);
 // Detail class for Object::operator[].
 class Object::Proxy
 {
-private:
     Object& object_;
     std::string const key_;
 
 public:
-    Proxy(Object& object, std::string const& key);
+    Proxy(Object& object, std::string_view key) : object_(object), key_(key)
+    {
+    }
 
     template <class T>
     void

@@ -117,21 +117,10 @@ Array::appendArray()
 
 //------------------------------------------------------------------------------
 
-Object::Proxy::Proxy(Object& object, std::string const& key)
-    : object_(object), key_(key)
-{
-}
-
 Object::Proxy
-Object::operator[](std::string const& key)
+Object::operator[](std::string_view key)
 {
     return Proxy(*this, key);
-}
-
-Object::Proxy
-Object::operator[](Json::StaticString const& key)
-{
-    return Proxy(*this, std::string(key));
 }
 
 //------------------------------------------------------------------------------

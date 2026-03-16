@@ -167,7 +167,7 @@ public:
 
     void
     onUDPMessage(
-        std::string const& message,
+        std::string_view message,
         boost::asio::ip::tcp::endpoint const& remoteEndpoint,
         std::function<void(std::string const&)> sendResponse);
 

@@ -426,7 +426,8 @@ struct Directory_test : public beast::unit_test::suite
         {
             auto const jrr = ledger_data(env);
             auto const& jstate = jrr[jss::state];
-            BEAST_EXPECTS(checkArraySize(jstate, 2), jrr.toStyledString());
+            BEAST_EXPECTS(
+                checkArraySize(jstate, 2), Json::to_compact_string(jrr));
             for (auto const& directory : jstate)
             {
                 BEAST_EXPECT(
@@ -456,7 +457,7 @@ struct Directory_test : public beast::unit_test::suite
         {
             auto const jrr = ledger_data(env);
             auto const& jstate = jrr[jss::state];
-            BEAST_EXPECTS(checkArraySize(jstate, 3), jrr.toStyledString());
+            BEAST_EXPECTS(checkArraySize(jstate, 3), to_compact_string(jrr));
             for (auto const& directory : jstate)
             {
                 BEAST_EXPECT(

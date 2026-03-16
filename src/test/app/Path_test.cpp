@@ -29,8 +29,7 @@
 #include <xrpld/rpc/detail/Tuning.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/unit_test.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/STParsedJSON.h>
 #include <xrpl/protocol/TxFlags.h>
 #include <xrpl/protocol/jss.h>
@@ -38,7 +37,6 @@
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
-#include <thread>
 
 namespace ripple {
 namespace test {
@@ -869,7 +867,7 @@ public:
             json("{\"" + sfQualityOut.fieldName + "\": 1400000000}"));
 
         Json::Value jv;
-        Json::Reader().parse(
+        Json::load(
             R"({
                 "Balance" : {
                     "currency" : "USD",
@@ -914,7 +912,7 @@ public:
         env.trust(Account("alice")["USD"](1000), "bob");
 
         Json::Value jv;
-        Json::Reader().parse(
+        Json::load(
             R"({
                 "Balance" : {
                     "currency" : "USD",
@@ -948,8 +946,9 @@ public:
         env.trust(Account("bob")["USD"](0), "alice");
         env.trust(Account("alice")["USD"](0), "bob");
         BEAST_EXPECT(
-            env.le(keylet::line(
-                Account("bob").id(), Account("alice")["USD"].issue())) ==
+            env.le(
+                keylet::line(
+                    Account("bob").id(), Account("alice")["USD"].issue())) ==
             nullptr);
     }
 
@@ -965,7 +964,7 @@ public:
         env.trust(Account("bob")["USD"](0), "alice");
 
         Json::Value jv;
-        Json::Reader().parse(
+        Json::load(
             R"({
                 "Balance" :
                 {
@@ -1001,8 +1000,9 @@ public:
 
         env(pay("alice", "bob", Account("alice")["USD"](50)));
         BEAST_EXPECT(
-            env.le(keylet::line(
-                Account("alice").id(), Account("bob")["USD"].issue())) ==
+            env.le(
+                keylet::line(
+                    Account("alice").id(), Account("bob")["USD"].issue())) ==
             nullptr);
     }
 

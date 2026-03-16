@@ -23,9 +23,7 @@
 #include <xrpld/ledger/View.h>
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/base64.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Import.h>
 #include <xrpl/protocol/Indexes.h>
@@ -388,9 +386,8 @@ Import::preflight(PreflightContext const& ctx)
     auto const data =
         base64_decode((*xpop)[jss::validation][jss::unl][jss::blob].asString());
 
-    Json::Reader r;
     Json::Value list;
-    if (!r.parse(data, list))
+    if (!Json::load(data, list))
     {
         JLOG(ctx.j.warn())
             << "Import: unl blob was not valid json (after base64 decoding) "

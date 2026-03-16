@@ -73,7 +73,7 @@ public:
         jvParams[jss::account] = bob.human();
         jvParams[jss::limit] = 1u;
         auto const jrr_l = env.rpc(
-            "json", "account_offers", jvParams.toStyledString())[jss::result];
+            "json", "account_offers", to_compact_string(jvParams))[jss::result];
         auto const& jro_l = jrr_l[jss::offers];
         BEAST_EXPECT(checkMarker(jrr_l));
         // 9u is the expected size, since one account object is a trustline
@@ -144,7 +144,7 @@ public:
             auto const jrr_l_1 = env.rpc(
                 "json",
                 "account_offers",
-                jvParams.toStyledString())[jss::result];
+                to_compact_string(jvParams))[jss::result];
             auto const& jro_l_1 = jrr_l_1[jss::offers];
             // there is a difference in the validation of the limit param
             // between admin and non-admin requests. with admin requests, the
@@ -164,7 +164,7 @@ public:
                 auto const jrr_l_2 = env.rpc(
                     "json",
                     "account_offers",
-                    jvParams.toStyledString())[jss::result];
+                    to_compact_string(jvParams))[jss::result];
                 auto const& jro_l_2 = jrr_l_2[jss::offers];
                 BEAST_EXPECT(checkMarker(jrr_l_2));
                 BEAST_EXPECT(checkArraySize(jro_l_2, 1u));
@@ -176,7 +176,7 @@ public:
                 auto const jrr_l_3 = env.rpc(
                     "json",
                     "account_offers",
-                    jvParams.toStyledString())[jss::result];
+                    to_compact_string(jvParams))[jss::result];
                 auto const& jro_l_3 = jrr_l_3[jss::offers];
                 BEAST_EXPECT(!jrr_l_3.isMember(jss::marker));
                 BEAST_EXPECT(checkArraySize(jro_l_3, 1u));
@@ -201,7 +201,7 @@ public:
             auto const jrr = env.rpc(
                 "json",
                 "account_offers",
-                jvParams.toStyledString())[jss::result];
+                to_compact_string(jvParams))[jss::result];
             auto const& jro = jrr[jss::offers];
             if (asAdmin)
             {
@@ -267,7 +267,7 @@ public:
             auto const jrr = env.rpc(
                 "json",
                 "account_offers",
-                jvParams.toStyledString())[jss::result];
+                to_compact_string(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::error] == "actMalformed");
             BEAST_EXPECT(jrr[jss::status] == "error");
             BEAST_EXPECT(jrr[jss::error_message] == "Account malformed.");
@@ -290,7 +290,7 @@ public:
             auto const jrr = env.rpc(
                 "json",
                 "account_offers",
-                jvParams.toStyledString())[jss::result];
+                to_compact_string(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::error] == "invalidParams");
             BEAST_EXPECT(jrr[jss::status] == "error");
             BEAST_EXPECT(
@@ -306,12 +306,12 @@ public:
             auto const jrr = env.rpc(
                 "json",
                 "account_offers",
-                jvParams.toStyledString())[jss::result];
+                to_compact_string(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::error] == "invalidParams");
             BEAST_EXPECT(jrr[jss::status] == "error");
             BEAST_EXPECTS(
                 jrr[jss::error_message] == "Invalid field 'marker'.",
-                jrr.toStyledString());
+                to_compact_string(jrr));
         }
 
         {
@@ -322,7 +322,7 @@ public:
             auto const jrr = env.rpc(
                 "json",
                 "account_offers",
-                jvParams.toStyledString())[jss::result];
+                to_compact_string(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::error] == "invalidParams");
             BEAST_EXPECT(jrr[jss::status] == "error");
             BEAST_EXPECT(
@@ -338,7 +338,7 @@ public:
             auto const jrr = env.rpc(
                 "json",
                 "account_offers",
-                jvParams.toStyledString())[jss::result];
+                to_compact_string(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::error] == "lgrNotFound");
             BEAST_EXPECT(jrr[jss::status] == "error");
             BEAST_EXPECT(jrr[jss::error_message] == "ledgerNotFound");

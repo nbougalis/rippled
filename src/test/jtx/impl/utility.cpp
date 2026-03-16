@@ -37,8 +37,18 @@ STObject
 parse(Json::Value const& jv)
 {
     STParsedJSONObject p("tx_json", jv);
+
     if (!p.object)
-        Throw<parse_error>(rpcErrorString(p.error));
+    {
+        // Probably unnecessary given the STParsedJSONObject cco
+        XRPL_ASSERT(
+            RPC::contains_error(p.error),
+            "ripple::RPC::rpcErrorString : input contains an error");
+        Throw<parse_error>(
+            p.error[jss::error].asString() + ": " +
+            p.error[jss::error_message].asString());
+    }
+
     return std::move(*p.object);
 }
 
@@ -81,11 +91,12 @@ cmdToJSONRPC(
     beast::Journal j,
     unsigned int apiVersion)
 {
-    Json::Value jv = Json::Value(Json::objectValue);
-    auto const paramsObj = rpcCmdToJson(args, jv, apiVersion, j);
+    auto const paramsObj = [&]() {
+        Json::Value tmp;
+        return rpcCmdToJson(args, tmp, apiVersion, j);
+    }();
 
-    // Re-use jv to return our formatted result.
-    jv.clear();
+    Json::Value jv;
 
     // Allow parser to rewrite method.
     jv[jss::method] = paramsObj.isMember(jss::method)

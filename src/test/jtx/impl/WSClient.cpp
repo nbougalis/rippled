@@ -19,8 +19,7 @@
 
 #include <test/jtx.h>
 #include <test/jtx/WSClient.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/server/Port.h>
 #include <boost/beast/core/multi_buffer.hpp>
@@ -279,8 +278,8 @@ private:
         }
 
         Json::Value jv;
-        Json::Reader jr;
-        jr.parse(buffer_string(rb_.data()), jv);
+        // FIXME we don't check the return value here...
+        Json::load(buffer_string(rb_.data()), jv);
         rb_.consume(rb_.size());
         auto m = std::make_shared<msg>(std::move(jv));
         {

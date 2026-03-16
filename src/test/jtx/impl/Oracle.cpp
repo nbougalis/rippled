@@ -183,9 +183,11 @@ Oracle::aggregatePrice(
     {
         if (jr.isMember(jss::result) && jr[jss::result].isMember(jss::status))
             return jr[jss::result];
-        else if (jr.isMember(jss::error))
+
+        if (jr.isMember(jss::error))
             return jr;
     }
+
     return Json::nullValue;
 }
 
@@ -364,14 +366,12 @@ validDocumentID(AnyValue const& v)
     {
         Json::Value jv;
         toJson(jv, v);
-        jv.asUInt();
-        jv.isNumeric();
-        return true;
+        return to_integer<std::uint32_t>(jv).has_value();
     }
     catch (...)
     {
+        return false;
     }
-    return false;
 }
 
 }  // namespace oracle

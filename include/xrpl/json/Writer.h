@@ -23,7 +23,7 @@
 #include <xrpl/basics/ToString.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/json/Output.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <memory>
 
 namespace Json {

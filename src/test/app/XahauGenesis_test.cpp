@@ -22,7 +22,7 @@
 #include <xrpld/app/tx/apply.h>
 #include <xrpld/app/tx/detail/XahauGenesis.h>
 #include <xrpld/core/Config.h>
-#include <xrpl/json/json_reader.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/STAccount.h>
@@ -1369,9 +1369,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
         {
             auto entry = env.le(
                 keylet::hookState(
-                    env.master.id(),
-                    uint256(member_count_key),
-                    beast::zero));
+                    env.master.id(), uint256(member_count_key), beast::zero));
             std::vector<uint8_t> const expected_data{0x02U};
             BEAST_REQUIRE(!!entry);
             BEAST_EXPECT(entry->getFieldVL(sfHookStateData) == expected_data);
@@ -1388,9 +1386,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
         {
             auto entry = env.le(
                 keylet::hookState(
-                    env.master.id(),
-                    uint256(member_count_key),
-                    beast::zero));
+                    env.master.id(), uint256(member_count_key), beast::zero));
             std::vector<uint8_t> const expected_data{0x02U};
             BEAST_REQUIRE(!!entry);
             BEAST_EXPECT(entry->getFieldVL(sfHookStateData) == expected_data);
@@ -1412,9 +1408,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
         {
             auto entry = env.le(
                 keylet::hookState(
-                    env.master.id(),
-                    uint256(member_count_key),
-                    beast::zero));
+                    env.master.id(), uint256(member_count_key), beast::zero));
             std::vector<uint8_t> const expected_data{0x02U};
             BEAST_REQUIRE(!!entry);
             BEAST_EXPECT(entry->getFieldVL(sfHookStateData) == expected_data);
@@ -1502,8 +1496,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
                 key[i] = m6.id().data()[i - 12];
 
             auto entry = env.le(
-                keylet::hookState(
-                    env.master.id(), uint256(key), beast::zero));
+                keylet::hookState(env.master.id(), uint256(key), beast::zero));
             BEAST_EXPECT(
                 !!entry &&
                 entry->getFieldVL(sfHookStateData) ==
@@ -2260,8 +2253,8 @@ struct XahauGenesis_test : public beast::unit_test::suite
                     for (int i = 12; i < 32; ++i)
                         key[i] = mVec[i - 12];
 
-                    auto const reverse = env.le(
-                        keylet::hookState(tableID, uint256(key), ns));
+                    auto const reverse =
+                        env.le(keylet::hookState(tableID, uint256(key), ns));
                     BEAST_EXPECT(
                         !!reverse &&
                         reverse->getFieldVL(sfHookStateData) ==
@@ -2339,8 +2332,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
                     break;
                 }
 
-            std::array<uint8_t, 32> key = {
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            std::array<uint8_t, 32> key = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -3058,9 +3050,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
                                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0x04U};
                 auto entry = env.le(
                     keylet::hookState(
-                        env.master.id(),
-                        uint256(key),
-                        beast::zero));
+                        env.master.id(), uint256(key), beast::zero));
                 BEAST_EXPECT(
                     !!entry &&
                     entry->getFieldVL(sfHookStateData) == vecFromAcc(carol));
@@ -3072,9 +3062,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
                                          0, 0, 0, 0, 0, 0, 0, 0, 'M', 'C'};
                 auto entry = env.le(
                     keylet::hookState(
-                        env.master.id(),
-                        uint256(key),
-                        beast::zero));
+                        env.master.id(), uint256(key), beast::zero));
                 BEAST_EXPECT(
                     !!entry &&
                     entry->getFieldVL(sfHookStateData) ==
@@ -3109,9 +3097,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
                                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0x04U};
                 auto entry = env.le(
                     keylet::hookState(
-                        env.master.id(),
-                        uint256(key),
-                        beast::zero));
+                        env.master.id(), uint256(key), beast::zero));
                 BEAST_EXPECT(!entry);
             }
             // check member count
@@ -3121,9 +3107,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
                                          0, 0, 0, 0, 0, 0, 0, 0, 'M', 'C'};
                 auto entry = env.le(
                     keylet::hookState(
-                        env.master.id(),
-                        uint256(key),
-                        beast::zero));
+                        env.master.id(), uint256(key), beast::zero));
                 BEAST_EXPECT(
                     !!entry &&
                     entry->getFieldVL(sfHookStateData) ==
@@ -4790,10 +4774,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
             "ED74D4036C6591A4BDF9C54CEFA39B996A"
             "5DCE5F86D11FDA1874481CE9D5A1CDC1"};
 
-        Json::Value jsonValue;
-        Json::Reader reader;
-
-        std::string base_genesis = R"json({
+        std::string_view base_genesis = R"json({
         "ledger": {
             "accepted": true,
             "accountState": [
@@ -4862,7 +4843,11 @@ struct XahauGenesis_test : public beast::unit_test::suite
         "status": "success",
         "validated": true
         })json";
-        reader.parse(base_genesis, jsonValue);
+
+        Json::Value jsonValue;
+
+        if (auto ret = Json::load(base_genesis))
+            jsonValue = std::move(*ret);
 
         foreachFeature(features, [&](uint256 const& feature) {
             std::string featureName = featureToName(feature);
@@ -4882,7 +4867,7 @@ struct XahauGenesis_test : public beast::unit_test::suite
 
         return envconfig([&](std::unique_ptr<Config> cfg) {
             cfg->NETWORK_ID = networkID;
-            cfg->START_LEDGER = jsonValue.toStyledString();
+            cfg->START_LEDGER = to_compact_string(jsonValue);
             cfg->START_UP = Config::LOAD_JSON;
             Section config;
             config.append(

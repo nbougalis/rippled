@@ -23,7 +23,7 @@
 #include <xrpld/overlay/Message.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/net/IPEndpoint.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/PublicKey.h>
 
 namespace ripple {

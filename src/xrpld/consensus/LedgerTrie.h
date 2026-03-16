@@ -22,7 +22,7 @@
 
 #include <xrpl/basics/ToString.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <algorithm>
 #include <iomanip>

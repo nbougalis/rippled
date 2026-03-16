@@ -21,7 +21,7 @@
 #define RIPPLE_SERVER_ROLE_H_INCLUDED
 
 #include <xrpl/beast/net/IPEndpoint.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/resource/ResourceManager.h>
 #include <xrpl/server/Handoff.h>
 #include <xrpl/server/Port.h>

@@ -21,7 +21,7 @@
 #define RIPPLE_JSON_JSONPROPERTYSTREAM_H_INCLUDED
 
 #include <xrpl/beast/utility/PropertyStream.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 namespace ripple {
 

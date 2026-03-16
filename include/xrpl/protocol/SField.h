@@ -21,7 +21,7 @@
 #define RIPPLE_PROTOCOL_SFIELD_H_INCLUDED
 
 #include <xrpl/basics/safe_cast.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <cstdint>
 #include <map>
@@ -166,7 +166,7 @@ public:
     int const fieldMeta;
     int const fieldNum;
     IsSigning const signingField;
-    Json::StaticString const jsonName;
+    Json::StaticString const jsonName{""};
 
     SField(SField const&) = delete;
     SField&
@@ -176,22 +176,50 @@ public:
     operator=(SField&&) = delete;
 
 public:
-    struct private_access_tag_t;  // public, but still an implementation detail
-
-    // These constructors can only be called from SField.cpp
     SField(
-        private_access_tag_t,
+        Json::StaticString name,
         SerializedTypeID tid,
         int fv,
-        const char* fn,
         int meta = sMD_Default,
-        IsSigning signing = IsSigning::yes);
-    explicit SField(private_access_tag_t, int fc);
+        IsSigning signing = IsSigning::yes)
+        : fieldCode(field_code(tid, fv))
+        , fieldType(tid)
+        , fieldValue(fv)
+        , fieldName(name.c_str())
+        , fieldMeta(meta)
+        , fieldNum(++num)
+        , signingField(signing)
+        , jsonName(name)
+    {
+        knownCodeToField[fieldCode] = this;
+    }
+
+    template <std::size_t N>
+    SField(
+        SerializedTypeID tid,
+        int fv,
+        char const (&fn)[N],
+        int meta = sMD_Default,
+        IsSigning signing = IsSigning::yes)
+        : SField(Json::StaticString(fn), tid, fv, meta, signing)
+    {
+    }
+
+    explicit SField(int fc)
+        : fieldCode(fc)
+        , fieldType(STI_UNKNOWN)
+        , fieldValue(0)
+        , fieldMeta(sMD_Never)
+        , fieldNum(++num)
+        , signingField(IsSigning::yes)
+    {
+        knownCodeToField[fieldCode] = this;
+    }
 
     static const SField&
     getField(int fieldCode);
     static const SField&
-    getField(std::string const& fieldName);
+    getField(std::string_view fieldName);
     static const SField&
     getField(int type, int value)
     {
@@ -305,6 +333,12 @@ private:
     static int num;
 };
 
+inline std::string
+to_string(SField const& f)
+{
+    return f.getName();
+}
+
 /** A field with a type known at compile time. */
 template <class T>
 struct TypedField : SField
@@ -312,7 +346,7 @@ struct TypedField : SField
     using type = T;
 
     template <class... Args>
-    explicit TypedField(private_access_tag_t pat, Args&&... args);
+    explicit TypedField(Args&&... args);
 };
 
 /** Indicate std::optional field semantics. */

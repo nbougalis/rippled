@@ -30,7 +30,6 @@
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/clock/basic_seconds_clock.h>
 #include <xrpl/beast/core/CurrentThreadName.h>
-#include <xrpl/json/to_string.h>
 #include <xrpl/protocol/BuildInfo.h>
 #include <xrpl/resource/Fees.h>
 
@@ -531,8 +530,7 @@ run(int argc, char** argv)
 
     if (vm.count("definitions"))
     {
-        auto defs = getStaticServerDefinitions();
-        std::cout << Json::FastWriter().write(defs);
+        std::cout << to_string(getStaticServerDefinitions());
         return 0;
     }
 

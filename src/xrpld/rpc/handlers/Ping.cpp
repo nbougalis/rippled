@@ -19,7 +19,7 @@
 
 #include <xrpld/rpc/Context.h>
 #include <xrpld/rpc/Role.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 
 namespace ripple {

@@ -65,7 +65,7 @@
 #include <xrpl/beast/asio/io_latency_probe.h>
 #include <xrpl/beast/core/LexicalCast.h>
 #include <xrpl/crypto/csprng.h>
-#include <xrpl/json/json_reader.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/BuildInfo.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Protocol.h>
@@ -74,8 +74,10 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/asio/steady_timer.hpp>
-#include <boost/system/error_code.hpp>
 
+#include <boost/interprocess/file_mapping.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/system/error_code.hpp>
 #include <date/date.h>
 
 #include <chrono>
@@ -284,13 +286,14 @@ public:
         , m_journal(logs_->journal("Application"))
 
         // PerfLog must be started before any other threads are launched.
-        , perfLog_(perf::make_PerfLog(
-              perf::setup_PerfLog(
-                  config_->section("perf"),
-                  config_->CONFIG_DIR),
-              *this,
-              logs_->journal("PerfLog"),
-              [this] { signalStop(); }))
+        , perfLog_(
+              perf::make_PerfLog(
+                  perf::setup_PerfLog(
+                      config_->section("perf"),
+                      config_->CONFIG_DIR),
+                  *this,
+                  logs_->journal("PerfLog"),
+                  [this] { signalStop(); }))
 
         , m_txMaster(*this)
 
@@ -298,33 +301,34 @@ public:
               config_->section(SECTION_INSIGHT),
               logs_->journal("Collector")))
 
-        , m_jobQueue(std::make_unique<JobQueue>(
-              [](std::unique_ptr<Config> const& config) {
-                  if (config->standalone() && !config->FORCE_MULTI_THREAD)
-                      return 1;
+        , m_jobQueue(
+              std::make_unique<JobQueue>(
+                  [](std::unique_ptr<Config> const& config) {
+                      if (config->standalone() && !config->FORCE_MULTI_THREAD)
+                          return 1;
 
-                  if (config->WORKERS)
-                      return config->WORKERS;
+                      if (config->WORKERS)
+                          return config->WORKERS;
 
-                  auto count =
-                      static_cast<int>(std::thread::hardware_concurrency());
+                      auto count =
+                          static_cast<int>(std::thread::hardware_concurrency());
 
-                  // Be more aggressive about the number of threads to use
-                  // for the job queue if the server is configured as "large"
-                  // or "huge" if there are enough cores.
-                  if (config->NODE_SIZE >= 4 && count >= 16)
-                      count = 6 + std::min(count, 8);
-                  else if (config->NODE_SIZE >= 3 && count >= 8)
-                      count = 4 + std::min(count, 6);
-                  else
-                      count = 2 + std::min(count, 4);
+                      // Be more aggressive about the number of threads to use
+                      // for the job queue if the server is configured as
+                      // "large" or "huge" if there are enough cores.
+                      if (config->NODE_SIZE >= 4 && count >= 16)
+                          count = 6 + std::min(count, 8);
+                      else if (config->NODE_SIZE >= 3 && count >= 8)
+                          count = 4 + std::min(count, 6);
+                      else
+                          count = 2 + std::min(count, 4);
 
-                  return count;
-              }(config_),
-              m_collectorManager->group("jobq"),
-              logs_->journal("JobQueue"),
-              *logs_,
-              *perfLog_))
+                      return count;
+                  }(config_),
+                  m_collectorManager->group("jobq"),
+                  logs_->journal("JobQueue"),
+                  *logs_,
+                  *perfLog_))
 
         , m_nodeStoreScheduler(*m_jobQueue)
 
@@ -349,9 +353,10 @@ public:
 
         , validatorKeys_(*config_, m_journal)
 
-        , m_resourceManager(Resource::make_Manager(
-              m_collectorManager->collector(),
-              logs_->journal("Resource")))
+        , m_resourceManager(
+              Resource::make_Manager(
+                  m_collectorManager->collector(),
+                  logs_->journal("Resource")))
 
         , m_nodeStore(m_shaMapStore->makeNodeStore(
               config_->PREFETCH_WORKERS > 0 ? config_->PREFETCH_WORKERS : 4))
@@ -360,16 +365,18 @@ public:
 
         , m_orderBookDB(*this)
 
-        , m_pathRequests(std::make_unique<PathRequests>(
-              *this,
-              logs_->journal("PathRequest"),
-              m_collectorManager->collector()))
+        , m_pathRequests(
+              std::make_unique<PathRequests>(
+                  *this,
+                  logs_->journal("PathRequest"),
+                  m_collectorManager->collector()))
 
-        , m_ledgerMaster(std::make_unique<LedgerMaster>(
-              *this,
-              stopwatch(),
-              m_collectorManager->collector(),
-              logs_->journal("LedgerMaster")))
+        , m_ledgerMaster(
+              std::make_unique<LedgerMaster>(
+                  *this,
+                  stopwatch(),
+                  m_collectorManager->collector(),
+                  logs_->journal("LedgerMaster")))
 
         , ledgerCleaner_(
               make_LedgerCleaner(*this, logs_->journal("LedgerCleaner")))
@@ -389,10 +396,11 @@ public:
                   gotTXSet(set, fromAcquire);
               }))
 
-        , m_ledgerReplayer(std::make_unique<LedgerReplayer>(
-              *this,
-              *m_inboundLedgers,
-              make_PeerSetBuilder(*this)))
+        , m_ledgerReplayer(
+              std::make_unique<LedgerReplayer>(
+                  *this,
+                  *m_inboundLedgers,
+                  make_PeerSetBuilder(*this)))
 
         , m_acceptedLedgerCache(
               "AcceptedLedger",
@@ -416,8 +424,9 @@ public:
 
         , cluster_(std::make_unique<Cluster>(logs_->journal("Overlay")))
 
-        , peerReservations_(std::make_unique<PeerReservationTable>(
-              logs_->journal("PeerReservationTable")))
+        , peerReservations_(
+              std::make_unique<PeerReservationTable>(
+                  logs_->journal("PeerReservationTable")))
 
         , validatorManifests_(
               std::make_unique<ManifestCache>(logs_->journal("ManifestCache")))
@@ -425,13 +434,14 @@ public:
         , publisherManifests_(
               std::make_unique<ManifestCache>(logs_->journal("ManifestCache")))
 
-        , validators_(std::make_unique<ValidatorList>(
-              *validatorManifests_,
-              *publisherManifests_,
-              *timeKeeper_,
-              config_->legacy("database_path"),
-              logs_->journal("ValidatorList"),
-              config_->VALIDATION_QUORUM))
+        , validators_(
+              std::make_unique<ValidatorList>(
+                  *validatorManifests_,
+                  *publisherManifests_,
+                  *timeKeeper_,
+                  config_->legacy("database_path"),
+                  logs_->journal("ValidatorList"),
+                  config_->VALIDATION_QUORUM))
 
         , validatorSites_(std::make_unique<ValidatorSite>(*this))
 
@@ -446,9 +456,10 @@ public:
         , mFeeTrack(
               std::make_unique<LoadFeeTrack>(logs_->journal("LoadManager")))
 
-        , hashRouter_(std::make_unique<HashRouter>(
-              stopwatch(),
-              HashRouter::getDefaultHoldTime()))
+        , hashRouter_(
+              std::make_unique<HashRouter>(
+                  stopwatch(),
+                  HashRouter::getDefaultHoldTime()))
 
         , mValidations(
               ValidationParms(),
@@ -1160,17 +1171,12 @@ private:
     getLastFullLedger();
 
     std::shared_ptr<Ledger>
-    loadLedgerFromFile(std::string const& ledgerID);
-
-    std::shared_ptr<Ledger>
-    loadLedgerFromJson(std::string const& jsonValue);
+    loadLedgerFromJson(std::string_view jsonValue);
 
     bool
     loadOldLedger(
-        std::string const& ledgerID,
-        bool replay,
-        bool isFilename,
-        bool isJson,
+        Config::StartUpType mode,
+        std::string_view data,
         std::optional<uint256> trapTxID);
 
     void
@@ -1291,11 +1297,7 @@ ApplicationImp::setup(boost::program_options::variables_map const& cmdline)
         JLOG(m_journal.info()) << "Loading specified Ledger";
 
         if (!loadOldLedger(
-                config_->START_LEDGER,
-                startUp == Config::REPLAY,
-                startUp == Config::LOAD_FILE,
-                startUp == Config::LOAD_JSON,
-                config_->TRAP_TX_HASH))
+                startUp, config_->START_LEDGER, config_->TRAP_TX_HASH))
         {
             JLOG(m_journal.error())
                 << "The specified ledger could not be loaded.";
@@ -1495,16 +1497,17 @@ ApplicationImp::setup(boost::program_options::variables_map const& cmdline)
     //
     for (auto cmd : config_->section(SECTION_RPC_STARTUP).lines())
     {
-        Json::Reader jrReader;
         Json::Value jvCommand;
 
-        if (!jrReader.parse(cmd, jvCommand))
+        if (!Json::load(cmd, jvCommand))
         {
             JLOG(m_journal.fatal()) << "Couldn't parse entry in ["
                                     << SECTION_RPC_STARTUP << "]: '" << cmd;
+
+            jvCommand = Json::Value{};
         }
 
-        if (!config_->quiet())
+        if (!config_->quiet() && jvCommand)
         {
             JLOG(m_journal.fatal())
                 << "Startup RPC: " << jvCommand << std::endl;
@@ -1822,35 +1825,23 @@ ApplicationImp::getLastFullLedger()
 }
 
 std::shared_ptr<Ledger>
-ApplicationImp::loadLedgerFromFile(std::string const& name)
+ApplicationImp::loadLedgerFromJson(std::string_view jsonValue)
 {
     try
     {
-        std::ifstream ledgerFile(name, std::ios::in);
+        Json::Value ledger;
 
-        if (!ledgerFile)
-        {
-            JLOG(m_journal.fatal()) << "Unable to open file '" << name << "'";
-            return nullptr;
-        }
-
-        Json::Reader reader;
-        Json::Value jLedger;
-
-        if (!reader.parse(ledgerFile, jLedger))
+        if (!Json::load(jsonValue, ledger))
         {
             JLOG(m_journal.fatal()) << "Unable to parse ledger JSON";
             return nullptr;
         }
 
-        std::reference_wrapper<Json::Value> ledger(jLedger);
+        if (ledger.isMember("result"))
+            ledger = std::move(ledger["result"]);
 
-        // accept a wrapped ledger
-        if (ledger.get().isMember("result"))
-            ledger = ledger.get()["result"];
-
-        if (ledger.get().isMember("ledger"))
-            ledger = ledger.get()["ledger"];
+        if (ledger.isMember("ledger"))
+            ledger = std::move(ledger["ledger"]);
 
         std::uint32_t seq = 1;
         auto closeTime = timeKeeper().closeTime();
@@ -1859,40 +1850,39 @@ ApplicationImp::loadLedgerFromFile(std::string const& name)
         bool closeTimeEstimated = false;
         std::uint64_t totalDrops = 0;
 
-        if (ledger.get().isMember("accountState"))
+        if (ledger.isMember("accountState"))
         {
-            if (ledger.get().isMember(jss::ledger_index))
+            if (ledger.isMember(jss::ledger_index))
             {
-                seq = ledger.get()[jss::ledger_index].asUInt();
+                seq = ledger[jss::ledger_index].asUInt();
             }
 
-            if (ledger.get().isMember("close_time"))
+            if (ledger.isMember("close_time"))
             {
                 using tp = NetClock::time_point;
                 using d = tp::duration;
-                closeTime = tp{d{ledger.get()["close_time"].asUInt()}};
+                closeTime = tp{d{ledger["close_time"].asUInt()}};
             }
-            if (ledger.get().isMember("close_time_resolution"))
+            if (ledger.isMember("close_time_resolution"))
             {
                 using namespace std::chrono;
                 closeTimeResolution =
-                    seconds{ledger.get()["close_time_resolution"].asUInt()};
+                    seconds{ledger["close_time_resolution"].asUInt()};
             }
-            if (ledger.get().isMember("close_time_estimated"))
+            if (ledger.isMember("close_time_estimated"))
             {
-                closeTimeEstimated =
-                    ledger.get()["close_time_estimated"].asBool();
+                closeTimeEstimated = ledger["close_time_estimated"].asBool();
             }
-            if (ledger.get().isMember("total_coins"))
+            if (ledger.isMember("total_coins"))
             {
                 totalDrops = beast::lexicalCastThrow<std::uint64_t>(
-                    ledger.get()["total_coins"].asString());
+                    ledger["total_coins"].asString());
             }
 
-            ledger = ledger.get()["accountState"];
+            ledger = ledger["accountState"];
         }
 
-        if (!ledger.get().isArrayOrNull())
+        if (!ledger.isArrayOrNull())
         {
             JLOG(m_journal.fatal()) << "State nodes must be an array";
             return nullptr;
@@ -1902,9 +1892,9 @@ ApplicationImp::loadLedgerFromFile(std::string const& name)
             std::make_shared<Ledger>(seq, closeTime, *config_, nodeFamily_);
         loadLedger->setTotalDrops(totalDrops);
 
-        for (Json::UInt index = 0; index < ledger.get().size(); ++index)
+        for (Json::UInt index = 0; index < ledger.size(); ++index)
         {
-            Json::Value& entry = ledger.get()[index];
+            Json::Value& entry = ledger[index];
 
             if (!entry.isObjectOrNull())
             {
@@ -1922,7 +1912,7 @@ ApplicationImp::loadLedgerFromFile(std::string const& name)
 
             entry.removeMember(jss::index);
 
-            STParsedJSONObject stp("sle", ledger.get()[index]);
+            STParsedJSONObject stp("sle", ledger[index]);
 
             if (!stp.object || uIndex.isZero())
             {
@@ -1946,137 +1936,7 @@ ApplicationImp::loadLedgerFromFile(std::string const& name)
 
         XRPL_ASSERT(
             loadLedger->read(keylet::fees()),
-            "ripple::ApplicationImp::loadLedgerFromFile : valid ledger fees");
-        loadLedger->setAccepted(
-            closeTime, closeTimeResolution, !closeTimeEstimated);
-
-        return loadLedger;
-    }
-    catch (std::exception const& x)
-    {
-        JLOG(m_journal.fatal()) << "Ledger contains invalid data: " << x.what();
-        return nullptr;
-    }
-}
-
-std::shared_ptr<Ledger>
-ApplicationImp::loadLedgerFromJson(std::string const& jsonValue)
-{
-    try
-    {
-        Json::Reader reader;
-        Json::Value jLedger;
-
-        if (!reader.parse(jsonValue, jLedger))
-        {
-            JLOG(m_journal.fatal()) << "Unable to parse ledger JSON";
-            return nullptr;
-        }
-
-        std::reference_wrapper<Json::Value> ledger(jLedger);
-
-        // accept a wrapped ledger
-        if (ledger.get().isMember("result"))
-            ledger = ledger.get()["result"];
-
-        if (ledger.get().isMember("ledger"))
-            ledger = ledger.get()["ledger"];
-
-        std::uint32_t seq = 1;
-        auto closeTime = timeKeeper().closeTime();
-        using namespace std::chrono_literals;
-        auto closeTimeResolution = 30s;
-        bool closeTimeEstimated = false;
-        std::uint64_t totalDrops = 0;
-
-        if (ledger.get().isMember("accountState"))
-        {
-            if (ledger.get().isMember(jss::ledger_index))
-            {
-                seq = ledger.get()[jss::ledger_index].asUInt();
-            }
-
-            if (ledger.get().isMember("close_time"))
-            {
-                using tp = NetClock::time_point;
-                using d = tp::duration;
-                closeTime = tp{d{ledger.get()["close_time"].asUInt()}};
-            }
-            if (ledger.get().isMember("close_time_resolution"))
-            {
-                using namespace std::chrono;
-                closeTimeResolution =
-                    seconds{ledger.get()["close_time_resolution"].asUInt()};
-            }
-            if (ledger.get().isMember("close_time_estimated"))
-            {
-                closeTimeEstimated =
-                    ledger.get()["close_time_estimated"].asBool();
-            }
-            if (ledger.get().isMember("total_coins"))
-            {
-                totalDrops = beast::lexicalCastThrow<std::uint64_t>(
-                    ledger.get()["total_coins"].asString());
-            }
-
-            ledger = ledger.get()["accountState"];
-        }
-
-        if (!ledger.get().isArrayOrNull())
-        {
-            JLOG(m_journal.fatal()) << "State nodes must be an array";
-            return nullptr;
-        }
-
-        auto loadLedger =
-            std::make_shared<Ledger>(seq, closeTime, *config_, nodeFamily_);
-        loadLedger->setTotalDrops(totalDrops);
-
-        for (Json::UInt index = 0; index < ledger.get().size(); ++index)
-        {
-            Json::Value& entry = ledger.get()[index];
-
-            if (!entry.isObjectOrNull())
-            {
-                JLOG(m_journal.fatal()) << "Invalid entry in ledger";
-                return nullptr;
-            }
-
-            uint256 uIndex;
-
-            if (!uIndex.parseHex(entry[jss::index].asString()))
-            {
-                JLOG(m_journal.fatal()) << "Invalid entry in ledger";
-                return nullptr;
-            }
-
-            entry.removeMember(jss::index);
-
-            STParsedJSONObject stp("sle", ledger.get()[index]);
-
-            if (!stp.object || uIndex.isZero())
-            {
-                JLOG(m_journal.fatal()) << "Invalid entry in ledger";
-                return nullptr;
-            }
-
-            // VFALCO TODO This is the only place that
-            //             constructor is used, try to remove it
-            STLedgerEntry sle(*stp.object, uIndex);
-
-            if (!loadLedger->addSLE(sle))
-            {
-                JLOG(m_journal.fatal())
-                    << "Couldn't add serialized ledger: " << uIndex;
-                return nullptr;
-            }
-        }
-
-        loadLedger->stateMap().flushDirty(hotACCOUNT_NODE);
-
-        XRPL_ASSERT(
-            loadLedger->read(keylet::fees()),
-            "ripple::ApplicationImp::loadLedgerFromFile : valid ledger fees");
+            "ripple::ApplicationImp::loadLedgerFromJson : valid ledger fees");
         loadLedger->setAccepted(
             closeTime, closeTimeResolution, !closeTimeEstimated);
 
@@ -2091,84 +1951,89 @@ ApplicationImp::loadLedgerFromJson(std::string const& jsonValue)
 
 bool
 ApplicationImp::loadOldLedger(
-    std::string const& ledgerID,
-    bool replay,
-    bool isFileName,
-    bool isJson,
+    Config::StartUpType mode,
+    std::string_view identifier,
     std::optional<uint256> trapTxID)
 {
     try
     {
-        std::shared_ptr<Ledger const> loadLedger, replayLedger;
-
-        if (isJson)
-        {
-            if (!ledgerID.empty())
-                loadLedger = loadLedgerFromJson(ledgerID);
-        }
-        else if (isFileName)
-        {
-            if (!ledgerID.empty())
-                loadLedger = loadLedgerFromFile(ledgerID);
-        }
-        else if (ledgerID.length() == 64)
-        {
-            uint256 hash;
-
-            if (hash.parseHex(ledgerID))
+        auto loadLedger = [&]() -> std::shared_ptr<Ledger const> {
+            if (mode == Config::LOAD_JSON || mode == Config::LOAD_FILE)
             {
-                loadLedger = loadByHash(hash, *this);
+                if (identifier.empty())
+                    return nullptr;
 
-                if (!loadLedger)
+                boost::interprocess::file_mapping fm;
+                boost::interprocess::mapped_region region;
+
+                if (mode == Config::LOAD_FILE)
                 {
-                    // Try to build the ledger from the back end
-                    auto il = std::make_shared<InboundLedger>(
-                        *this,
-                        hash,
-                        0,
-                        InboundLedger::Reason::GENERIC,
-                        stopwatch(),
-                        make_DummyPeerSet(*this));
-                    if (il->checkLocal())
-                        loadLedger = il->getLedger();
-                }
-            }
-        }
-        else if (ledgerID.empty() || boost::iequals(ledgerID, "latest"))
-        {
-            loadLedger = getLastFullLedger();
-        }
-        else
-        {
-            // assume by sequence
-            std::uint32_t index;
+                    fm = boost::interprocess::file_mapping(
+                        identifier.data(), boost::interprocess::read_only);
+                    region = boost::interprocess::mapped_region(
+                        fm, boost::interprocess::read_only);
 
-            if (beast::lexicalCastChecked(index, ledgerID))
-                loadLedger = loadByIndex(index, *this);
-        }
+                    identifier = std::string_view(
+                        static_cast<char const*>(region.get_address()),
+                        region.get_size());
+                }
+
+                return loadLedgerFromJson(identifier);
+            }
+
+            if (uint256 hash; hash.parseHex(identifier))
+            {
+                if (auto ledger = loadByHash(hash, *this))
+                    return ledger;
+
+                auto il = std::make_shared<InboundLedger>(
+                    *this,
+                    hash,
+                    0,
+                    InboundLedger::Reason::GENERIC,
+                    stopwatch(),
+                    make_DummyPeerSet(*this));
+
+                if (il->checkLocal())
+                    return il->getLedger();
+            }
+
+            if (identifier.empty() || boost::iequals(identifier, "latest"))
+                return getLastFullLedger();
+
+            if (std::uint32_t index;
+                beast::lexicalCastChecked(index, identifier))
+                return loadByIndex(index, *this);
+
+            return nullptr;
+        }();
 
         if (!loadLedger)
             return false;
 
-        if (replay)
-        {
-            // Replay a ledger close with same prior ledger and transactions
+        // When replaying the requested ledger, we need to load its parent
+        // and use that as the starting point.
+        auto replayLedger = [&]() -> std::shared_ptr<Ledger const> {
+            if (mode != Config::REPLAY)
+                return nullptr;
 
-            // this ledger holds the transactions we want to replay
-            replayLedger = loadLedger;
+            JLOG(m_journal.info())
+                << "Loading parent ledger " << loadLedger->info().seq << ": "
+                << loadLedger->info().parentHash;
 
-            JLOG(m_journal.info()) << "Loading parent ledger";
+            auto replay = std::move(loadLedger);
 
-            loadLedger = loadByHash(replayLedger->info().parentHash, *this);
+            loadLedger = loadByHash(replay->info().parentHash, *this);
+
             if (!loadLedger)
             {
                 JLOG(m_journal.info())
-                    << "Loading parent ledger from node store";
+                    << "Loading parent ledger from node store...";
 
                 // Try to build the ledger from the back end
                 auto il = std::make_shared<InboundLedger>(
                     *this,
-                    replayLedger->info().parentHash,
+                    replay->info().parentHash,
                     0,
                     InboundLedger::Reason::GENERIC,
                     stopwatch(),
@@ -2176,21 +2041,33 @@ ApplicationImp::loadOldLedger(
 
                 if (il->checkLocal())
                     loadLedger = il->getLedger();
-
-                if (!loadLedger)
-                {
-                    JLOG(m_journal.fatal()) << "Replay ledger missing/damaged";
-                    UNREACHABLE(
-                        "ripple::ApplicationImp::loadOldLedger : replay ledger "
-                        "missing/damaged");
-                    return false;
-                }
             }
+
+            return replay;
+        }();
+
+        // We already verified that loadLedger was valid before. It can only
+        // have changed if we are replaying a ledger, and if it is no longer
+        // valid, it means that we were unable to load the parent ledger.
+        if (!loadLedger)
+        {
+            JLOG(m_journal.fatal())
+                << "Replay ledger " << replayLedger->info().seq << " parent ("
+                << replayLedger->info().parentHash
+                << ") is missing or damaged.";
+
+            UNREACHABLE(
+                "ripple::ApplicationImp::loadOldLedger : replay ledger "
+                "missing/damaged");
+            return false;
         }
+
         using namespace std::chrono_literals;
         using namespace date;
+
         static constexpr NetClock::time_point ledgerWarnTimePoint{
             sys_days{January / 1 / 2000} - sys_days{January / 1 / 2000}};
+
         if (loadLedger->info().closeTime < ledgerWarnTimePoint)
         {
             JLOG(m_journal.fatal())
@@ -2243,7 +2120,7 @@ ApplicationImp::loadOldLedger(
         openLedger_.emplace(
             loadLedger, cachedSLEs_, logs_->journal("OpenLedger"));
 
-        if (replay)
+        if (mode == Config::REPLAY)
         {
             // inject transaction(s) from the replayLedger into our open ledger
             // and build replay structure
@@ -2289,10 +2166,10 @@ ApplicationImp::loadOldLedger(
             << "While loading specified ledger: " << mn.what();
         return false;
     }
-    catch (boost::bad_lexical_cast&)
+    catch (std::exception const& ex)
     {
-        JLOG(m_journal.fatal())
-            << "Ledger specified '" << ledgerID << "' is not valid";
+        JLOG(m_journal.fatal()) << "Error loading specified ledger '"
+                                << identifier << ": " << ex.what();
         return false;
     }
 

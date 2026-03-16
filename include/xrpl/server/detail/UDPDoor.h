@@ -167,7 +167,7 @@ private:
 
         // Handle the received UDP message
         handler_.onUDPMessage(
-            std::string(recv_buffer_.data(), bytes_transferred),
+            {recv_buffer_.data(), bytes_transferred},
             tcp_endpoint,
             [this, tcp_endpoint](std::string const& response) {
                 do_send(response, tcp_endpoint);

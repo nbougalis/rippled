@@ -20,15 +20,25 @@
 #ifndef RIPPLE_NET_RPCERR_H_INCLUDED
 #define RIPPLE_NET_RPCERR_H_INCLUDED
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
+#include <xrpl/protocol/ErrorCodes.h>
 
 namespace ripple {
 
-// VFALCO NOTE these are deprecated
-bool
-isRpcError(Json::Value jvResult);
-Json::Value
-rpcError(int iError, std::string msg = "");
+// This is deprecated. We don't use [[deprecated]] because it would generate
+// a lot of warnings.
+inline Json::Value
+rpcError(error_code_i error, std::string_view msg = {})
+{
+    Json::Value jvResult(Json::objectValue);
+
+    if (!msg.empty())
+        RPC::inject_error(error, msg, jvResult);
+    else
+        RPC::inject_error(error, jvResult);
+
+    return jvResult;
+}
 
 }  // namespace ripple
 

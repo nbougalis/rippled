@@ -22,7 +22,6 @@
 #include <xrpld/app/misc/TxQ.h>
 #include <xrpl/beast/hash/uhash.h>
 #include <xrpl/beast/unit_test.h>
-#include <xrpl/json/to_string.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/TxFlags.h>
 #include <xrpl/protocol/jss.h>
@@ -396,7 +395,7 @@ public:
             args[jss::tx_blob] = strHex(s.slice());
             args[jss::fail_hard] = true;
 
-            return env.rpc("json", "submit", args.toStyledString());
+            return env.rpc("json", "submit", to_compact_string(args));
         };
 
         auto jr = applyTxn(noop(alice), fee(1));

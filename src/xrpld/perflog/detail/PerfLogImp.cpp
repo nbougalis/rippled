@@ -23,8 +23,7 @@
 #include <xrpl/basics/BasicConfig.h>
 #include <xrpl/beast/core/CurrentThreadName.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_writer.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
@@ -302,7 +301,7 @@ PerfLogImp::report()
     report[jss::current_activities] = counters_.currentJson();
     app_.getOPs().stateAccounting(report);
 
-    logFile_ << Json::Compact{std::move(report)} << std::endl;
+    logFile_ << report << std::endl;
 }
 
 PerfLogImp::PerfLogImp(

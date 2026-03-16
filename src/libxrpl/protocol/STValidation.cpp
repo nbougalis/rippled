@@ -19,7 +19,6 @@
 
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/contract.h>
-#include <xrpl/json/to_string.h>
 #include <xrpl/protocol/HashPrefix.h>
 #include <xrpl/protocol/STValidation.h>
 

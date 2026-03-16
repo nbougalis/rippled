@@ -279,7 +279,7 @@ public:
             "AB868A6CFEEC779C2FF845C0AF00A642259986AF40C01976A7F842B6918936C7";
         jvParams[jss::ledger_index] = "1";
         auto result = env.rpc(
-            "json", "ledger_request", jvParams.toStyledString())[jss::result];
+            "json", "ledger_request", to_compact_string(jvParams))[jss::result];
         BEAST_EXPECT(result[jss::error] == "invalidParams");
         BEAST_EXPECT(result[jss::status] == "error");
         BEAST_EXPECT(
@@ -360,8 +360,7 @@ public:
     {
         testLedgerRequest();
         testEvolution();
-        forAllApiVersions(
-            std::bind_front(&LedgerRequestRPC_test::testBadInput, this));
+        forAllApiVersions([this](auto version) { testBadInput(version); });
         testMoreThan256Closed();
         testNonAdmin();
     }

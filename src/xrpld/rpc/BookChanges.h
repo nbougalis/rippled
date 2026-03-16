@@ -20,7 +20,7 @@
 #ifndef RIPPLE_RPC_BOOKCHANGES_H_INCLUDED
 #define RIPPLE_RPC_BOOKCHANGES_H_INCLUDED
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/LedgerFormats.h>
 #include <xrpl/protocol/STAmount.h>
 #include <xrpl/protocol/STObject.h>

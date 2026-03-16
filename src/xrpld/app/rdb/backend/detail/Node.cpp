@@ -29,7 +29,6 @@
 #include <xrpld/core/SociDB.h>
 #include <xrpl/basics/BasicConfig.h>
 #include <xrpl/basics/StringUtilities.h>
-#include <xrpl/json/to_string.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/range/adaptor/transformed.hpp>
 #include <soci/sqlite3/soci-sqlite3.h>

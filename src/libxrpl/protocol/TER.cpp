@@ -23,22 +23,44 @@
 
 namespace ripple {
 
-std::unordered_map<
-    TERUnderlyingType,
-    std::pair<char const* const, char const* const>> const&
-transResults()
-{
-    // clang-format off
+namespace detail {
 
-    // Macros are generally ugly, but they can help make code readable to
-    // humans without affecting the compiler.
+struct TERInfo
+{
+    std::string_view token;
+    std::string_view text;
+
+    template <std::size_t N, std::size_t M>
+    consteval TERInfo(char const (&t)[N], char const (&d)[M])
+        : token(t, N - 1), text(d, M - 1)
+    {
+        if (N <= 1)
+            throw "Token must not be empty";
+
+        if (M <= 1)
+            throw "Description must not be empty";
+    }
+};
+
+// clang-format off
+
+// Macros are generally ugly, but they can help make code readable to
+// humans. Save any existing macro definition.
+#pragma push_macro("MAKE_ERROR")
+#undef MAKE_ERROR
 #define MAKE_ERROR(code, desc) { code, { #code, desc } }
 
-    static
-    std::unordered_map<
-            TERUnderlyingType,
-            std::pair<char const* const, char const* const>> const results
-    {
+/** Maps TER codes to their human-readable token and description.
+
+    Each entry associates an integral TER result code with a TERInfo
+    containing the stringified enumerator name (e.g. "tesSUCCESS") and
+    a brief description of the result.
+
+    @note All string data originates from string literals and has static
+          storage duration.
+ */
+static std::unordered_map<TERUnderlyingType, TERInfo> const transResults
+{
         MAKE_ERROR(tecAMM_BALANCE,                   "AMM has invalid balance."),
         MAKE_ERROR(tecAMM_INVALID_TOKENS,            "AMM invalid LP tokens."),
         MAKE_ERROR(tecAMM_FAILED,                    "AMM transaction failed."),
@@ -241,64 +263,68 @@ transResults()
 
         MAKE_ERROR(tesSUCCESS,                "The transaction was applied. Only final in a validated ledger."),
         MAKE_ERROR(tesPARTIAL,                "The transaction was applied but should be submitted again until returning tesSUCCESS."),
-    };
-    // clang-format on
+};
 
-#undef MAKE_ERROR
+/** Reverse lookup table mapping TER token strings to their integral codes.
 
-    return results;
-}
+    Constructed once from transResults. Keys are string_views into the string
+    literals owned by the transResults table entries.
+ */
+static auto const transResultsByToken = []() {
+    std::unordered_map<std::string_view, TERUnderlyingType> ret;
+    for (auto const& [code, info] : transResults)
+        ret.emplace(info.token, code);
+    return ret;
+}();
+
+// clang-format on
+
+#pragma pop_macro("MAKE_ERROR")
+
+}  // namespace detail
 
 bool
 transResultInfo(TER code, std::string& token, std::string& text)
 {
-    auto& results = transResults();
+    auto const r = detail::transResults.find(TERtoInt(code));
 
-    auto const r = results.find(TERtoInt(code));
-
-    if (r == results.end())
+    if (r == detail::transResults.end())
         return false;
 
-    token = r->second.first;
-    text = r->second.second;
+    token = r->second.token;
+    text = r->second.text;
+
     return true;
 }
 
 std::string
-transToken(TER code)
+transToken(TER code, std::string_view def)
 {
-    std::string token;
-    std::string text;
+    auto const r = detail::transResults.find(TERtoInt(code));
 
-    return transResultInfo(code, token, text) ? token : "-";
+    if (r == detail::transResults.end())
+        return std::string{def};
+
+    return std::string{r->second.token};
 }
 
 std::string
-transHuman(TER code)
+transHuman(TER code, std::string_view def)
 {
-    std::string token;
-    std::string text;
+    auto const r = detail::transResults.find(TERtoInt(code));
 
-    return transResultInfo(code, token, text) ? text : "-";
+    if (r == detail::transResults.end())
+        return std::string{def};
+
+    return std::string{r->second.text};
 }
 
 std::optional<TER>
-transCode(std::string const& token)
+transCode(std::string_view token)
 {
-    static auto const results = [] {
-        auto& byTer = transResults();
-        auto range = boost::make_iterator_range(byTer.begin(), byTer.end());
-        auto tRange = boost::adaptors::transform(range, [](auto const& r) {
-            return std::make_pair(r.second.first, r.first);
-        });
-        std::unordered_map<std::string, TERUnderlyingType> const byToken(
-            tRange.begin(), tRange.end());
-        return byToken;
-    }();
+    auto const r = detail::transResultsByToken.find(token);
 
-    auto const r = results.find(token);
-
-    if (r == results.end())
+    if (r == detail::transResultsByToken.end())
         return std::nullopt;
 
     return TER::fromInt(r->second);

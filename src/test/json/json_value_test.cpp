@@ -17,45 +17,21 @@
 */
 //==============================================================================
 
+#include <xrpl/basics/random.h>
 #include <xrpl/beast/core/LexicalCast.h>
 #include <xrpl/beast/type_name.h>
 #include <xrpl/beast/unit_test.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>
+
+#include <xrpl/json/json.h>
 
 #include <algorithm>
+#include <random>
 #include <regex>
 
 namespace ripple {
 
 struct json_value_test : beast::unit_test::suite
 {
-    void
-    test_StaticString()
-    {
-        static constexpr char sample[]{"Contents of a Json::StaticString"};
-
-        static constexpr Json::StaticString test1(sample);
-        char const* addrTest1{test1};
-
-        BEAST_EXPECT(addrTest1 == &sample[0]);
-        BEAST_EXPECT(test1.c_str() == &sample[0]);
-
-        static constexpr Json::StaticString test2{
-            "Contents of a Json::StaticString"};
-        static constexpr Json::StaticString test3{"Another StaticString"};
-
-        BEAST_EXPECT(test1 == test2);
-        BEAST_EXPECT(test1 != test3);
-
-        std::string str{sample};
-        BEAST_EXPECT(str == test2);
-        BEAST_EXPECT(str != test3);
-        BEAST_EXPECT(test2 == str);
-        BEAST_EXPECT(test3 != str);
-    }
-
     void
     test_types()
     {
@@ -594,14 +570,25 @@ struct json_value_test : beast::unit_test::suite
     void
     test_bad_json()
     {
-        char const* s(
-            "{\"method\":\"ledger\",\"params\":[{\"ledger_index\":1e300}]}");
-
-        Json::Value j;
-        Json::Reader r;
-
-        r.parse(s, j);
-        pass();
+        testcase("Bad JSON");
+        BEAST_EXPECT(!Json::load("\"method\""));
+        BEAST_EXPECT(!Json::load("1978"));
+        BEAST_EXPECT(!Json::load("true"));
+        BEAST_EXPECT(!Json::load("{1978]"));
+        BEAST_EXPECT(!Json::load("[1,2,3]potato"));
+        BEAST_EXPECT(!Json::load("[1,2,3],[4,5,6]"));
+        BEAST_EXPECT(!Json::load(
+            "{\"method\":\"ledger\",\"params\":[{\"ledger_index\":1e738}]}"));
+        BEAST_EXPECT(!Json::load(
+            "{\"method\":\"ledger\",\"params\":[{\"ledger_index\"}]}"));
+        BEAST_EXPECT(!Json::load(
+            "{\"method\":\"ledger\",\"params\":[{\"ledger_index\"]]}"));
+        BEAST_EXPECT(
+            !Json::load("{\"method\":ledger,\"params\":[{\"ledger_index\"]]}"));
+        BEAST_EXPECT(
+            !Json::load("{method:\"ledger\",\"params\":[{\"ledger_index\"]]}"));
+        BEAST_EXPECT(!Json::load(
+            "{method:\"ledger\",\"params\":[{\"ledger_index\":9012345678]]}"));
     }
 
     void
@@ -626,9 +613,7 @@ struct json_value_test : beast::unit_test::suite
         json += "}";
 
         Json::Value j1;
-        Json::Reader r1;
-
-        BEAST_EXPECT(r1.parse(json, j1));
+        BEAST_EXPECT(Json::load(json, j1));
         BEAST_EXPECT(j1["max_uint"].asUInt() == max_uint);
         BEAST_EXPECT(j1["max_int"].asInt() == max_int);
         BEAST_EXPECT(j1["min_int"].asInt() == min_int);
@@ -646,18 +631,14 @@ struct json_value_test : beast::unit_test::suite
         json += "}";
 
         Json::Value j2;
-        Json::Reader r2;
-
-        BEAST_EXPECT(!r2.parse(json, j2));
+        BEAST_EXPECT(!Json::load(json, j2));
 
         json = "{\"underflow\":";
         json += std::to_string(std::int64_t(min_int) - 1);
         json += "}";
 
         Json::Value j3;
-        Json::Reader r3;
-
-        BEAST_EXPECT(!r3.parse(json, j3));
+        BEAST_EXPECT(!Json::load(json, j3));
 
         Json::Value intString{"4294967296"};
         try
@@ -743,23 +724,35 @@ struct json_value_test : beast::unit_test::suite
     void
     test_move()
     {
-        Json::Value v1{2.5};
+        // This value is _precisely_ representable in a double, which is why
+        // the equality comparisons checks below are correct and do not need
+        // epsilon.
+        constexpr double value = 2.5;
+
+        Json::Value v1{value};
         BEAST_EXPECT(v1.isDouble());
-        BEAST_EXPECT(v1.asDouble() == 2.5);
+        BEAST_EXPECT(v1.asDouble() == value);
 
         Json::Value v2 = std::move(v1);
-        BEAST_EXPECT(!v1);
+
         BEAST_EXPECT(v2.isDouble());
-        BEAST_EXPECT(v2.asDouble() == 2.5);
+        BEAST_EXPECT(v2.asDouble() == value);
+
+        // The check here depends on the move constructor setting the type
+        // of the moved-from object to "null". That's true now, but it may
+        // change in the future.
+        BEAST_EXPECT(v1.type() == Json::nullValue);
+        BEAST_EXPECT(v1 != v2);
+
+        v1 = 7803;
         BEAST_EXPECT(v1 != v2);
 
         v1 = std::move(v2);
-        BEAST_EXPECT(v1.isDouble());
-        BEAST_EXPECT(v1.asDouble() == 2.5);
-        BEAST_EXPECT(!v2);
+        BEAST_EXPECT(v2.type() == Json::nullValue);
         BEAST_EXPECT(v1 != v2);
 
-        pass();
+        BEAST_EXPECT(v1.isDouble());
+        BEAST_EXPECT(v1.asDouble() == value);
     }
 
     void
@@ -821,264 +814,214 @@ struct json_value_test : beast::unit_test::suite
     void
     test_compact()
     {
-        Json::Value j;
-        Json::Reader r;
-        char const* s("{\"array\":[{\"12\":23},{},null,false,0.5]}");
-
         auto countLines = [](std::string const& str) {
             return 1 + std::count_if(str.begin(), str.end(), [](char c) {
                        return c == '\n';
                    });
         };
 
-        BEAST_EXPECT(r.parse(s, j));
-        {
-            std::stringstream ss;
-            ss << j;
-            BEAST_EXPECT(countLines(ss.str()) > 1);
-        }
-        {
-            std::stringstream ss;
-            ss << Json::Compact(std::move(j));
-            BEAST_EXPECT(countLines(ss.str()) == 1);
-        }
+        Json::Value j;
+        BEAST_EXPECT(
+            Json::load("{\"array\":[{\"12\":23},{},null,false,0.5]}", j));
+
+        auto const styled = to_styled_string(j);
+        auto const compact = to_compact_string(j);
+
+        BEAST_EXPECT(countLines(styled) > 1);
+        BEAST_EXPECT(j == Json::load(styled));
+
+        BEAST_EXPECT(countLines(compact) == 1);
+        BEAST_EXPECT(j == Json::load(compact));
     }
 
     void
     test_conversions()
     {
-        // We have Json::Int, but not Json::Double or Json::Real.
-        // We have Json::Int, Json::Value::Int, and Json::ValueType::intValue.
-        // We have Json::ValueType::realValue but Json::Value::asDouble.
-        // TODO: What's the thinking here?
-        {
-            // null
-            Json::Value val;
-            BEAST_EXPECT(val.isNull());
-            //          BEAST_EXPECT(strcmp (val.asCString(), ?) == 0); //
-            //          asserts
-            BEAST_EXPECT(val.asString() == "");
-            BEAST_EXPECT(val.asInt() == 0);
-            BEAST_EXPECT(val.asUInt() == 0);
-            BEAST_EXPECT(val.asDouble() == 0.0);
-            BEAST_EXPECT(val.asBool() == false);
+        Json::Value val;
 
-            BEAST_EXPECT(val.isConvertibleTo(Json::nullValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::intValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::uintValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::realValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::stringValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::booleanValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::arrayValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::objectValue));
-        }
-        {
-            // int
-            Json::Value val = -1234;
-            BEAST_EXPECT(val.isInt());
-            //          BEAST_EXPECT(strcmp (val.asCString(), ?) == 0); //
-            //          asserts
-            BEAST_EXPECT(val.asString() == "-1234");
-            BEAST_EXPECT(val.asInt() == -1234);
-            //          BEAST_EXPECT(val.asUInt() == ?);                //
-            //          asserts or throws
-            BEAST_EXPECT(val.asDouble() == -1234.0);
-            BEAST_EXPECT(val.asBool() == true);
+        // null
+        BEAST_EXPECT(val.isNull());
+        BEAST_EXPECT(val.asString() == "");
+        BEAST_EXPECT(val.asInt() == 0);
+        BEAST_EXPECT(val.asUInt() == 0);
+        BEAST_EXPECT(val.asDouble() == 0.0);
+        BEAST_EXPECT(val.asBool() == false);
 
-            BEAST_EXPECT(!val.isConvertibleTo(Json::nullValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::intValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::uintValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::realValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::stringValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::booleanValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::arrayValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::objectValue));
-        }
-        {
-            // uint
-            Json::Value val = 1234U;
-            BEAST_EXPECT(val.isUInt());
-            //          BEAST_EXPECT(strcmp (val.asCString(), ?) == 0); //
-            //          asserts
-            BEAST_EXPECT(val.asString() == "1234");
-            BEAST_EXPECT(val.asInt() == 1234);
-            BEAST_EXPECT(val.asUInt() == 1234u);
-            BEAST_EXPECT(val.asDouble() == 1234.0);
-            BEAST_EXPECT(val.asBool() == true);
+        auto test_integer = [&]<typename T>(T x) {
+            Json::Value v(x);
 
-            BEAST_EXPECT(!val.isConvertibleTo(Json::nullValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::intValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::uintValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::realValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::stringValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::booleanValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::arrayValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::objectValue));
-        }
+            BEAST_EXPECT(v.isInt() || v.isUInt());
+            BEAST_EXPECT(v.asString() == std::to_string(x));
+
+            if constexpr (std::is_signed_v<T>)
+            {
+                BEAST_EXPECT(v.asInt() == x);
+
+                try
+                {
+                    BEAST_EXPECT(v.asUInt() == static_cast<std::uint32_t>(x));
+                }
+                catch (...)
+                {
+                    BEAST_EXPECT(x < 0);
+                }
+            }
+            else
+            {
+                BEAST_EXPECT(v.asUInt() == x);
+
+                try
+                {
+                    BEAST_EXPECT(v.asInt() == static_cast<std::int32_t>(x));
+                }
+                catch (...)
+                {
+                    BEAST_EXPECT(!std::in_range<Json::Int>(x));
+                }
+            }
+
+            BEAST_EXPECT(Json::to_integer<T>(v) == x);
+            BEAST_EXPECT(v.asBool() == (x != 0));
+
+            v = Json::Value{std::to_string(x)};
+
+            BEAST_EXPECT(v.isString());
+            BEAST_EXPECT(v.asString() == std::to_string(x));
+
+            if constexpr (std::is_signed_v<T>)
+            {
+                BEAST_EXPECT(v.asInt() == x);
+
+                try
+                {
+                    BEAST_EXPECT(v.asUInt() == static_cast<std::uint32_t>(x));
+                }
+                catch (...)
+                {
+                    BEAST_EXPECT(x < 0);
+                }
+            }
+            else
+            {
+                BEAST_EXPECT(v.asUInt() == x);
+
+                try
+                {
+                    BEAST_EXPECT(v.asInt() == static_cast<std::int32_t>(x));
+                }
+                catch (...)
+                {
+                    BEAST_EXPECT(!std::in_range<Json::Int>(x));
+                }
+            }
+        };
+
+        // signed and unsigned integer
+        for (int i = 0; i != 1024; ++i)
         {
-            // real
-            Json::Value val = 2.0;
+            test_integer(rand_int<std::int32_t>(-100, 100));
+            test_integer(rand_int<std::uint32_t>(0, 256));
+        }
+
+        // Real values:
+        for (int i = 0; i != 1024; ++i)
+        {
+            auto const x = rand_int<int>(-100, 100);
+
+            val = Json::Value{x * 1.0};
+
             BEAST_EXPECT(val.isDouble());
-            //          BEAST_EXPECT(strcmp (val.asCString(), ?) == 0); //
-            //          asserts
-            BEAST_EXPECT(
-                std::regex_match(val.asString(), std::regex("^2\\.0*$")));
-            BEAST_EXPECT(val.asInt() == 2);
-            BEAST_EXPECT(val.asUInt() == 2u);
-            BEAST_EXPECT(val.asDouble() == 2.0);
-            BEAST_EXPECT(val.asBool() == true);
+            BEAST_EXPECT(val.asDouble() == x * 1.0);
+            BEAST_EXPECT(val.asBool() == (x != 0));
 
-            BEAST_EXPECT(!val.isConvertibleTo(Json::nullValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::intValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::uintValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::realValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::stringValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::booleanValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::arrayValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::objectValue));
-        }
-        {
-            // numeric string
-            Json::Value val = "54321";
-            BEAST_EXPECT(val.isString());
-            BEAST_EXPECT(strcmp(val.asCString(), "54321") == 0);
-            BEAST_EXPECT(val.asString() == "54321");
-            BEAST_EXPECT(val.asInt() == 54321);
-            BEAST_EXPECT(val.asUInt() == 54321u);
-            //          BEAST_EXPECT(val.asDouble() == 54321.0);        //
-            //          asserts or throws
-            BEAST_EXPECT(val.asBool() == true);
+            // Integer conversion: exact for this range
+            BEAST_EXPECT(val.asInt() == x);
 
-            BEAST_EXPECT(!val.isConvertibleTo(Json::nullValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::intValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::uintValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::realValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::stringValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::booleanValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::arrayValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::objectValue));
-        }
-        {
-            // non-numeric string
-            Json::Value val(Json::stringValue);
-            BEAST_EXPECT(val.isString());
-            BEAST_EXPECT(val.asCString() == nullptr);
-            BEAST_EXPECT(val.asString() == "");
             try
             {
-                BEAST_EXPECT(val.asInt() == 0);
-                fail("expected exception", __FILE__, __LINE__);
+                BEAST_EXPECT(val.asInt() == static_cast<std::int32_t>(x));
             }
-            catch (std::exception const&)
+            catch (...)
             {
-                pass();
+                BEAST_EXPECT(!std::in_range<Json::Int>(x));
             }
-            try
-            {
-                BEAST_EXPECT(val.asUInt() == 0);
-                fail("expected exception", __FILE__, __LINE__);
-            }
-            catch (std::exception const&)
-            {
-                pass();
-            }
-            //          BEAST_EXPECT(val.asDouble() == ?);              //
-            //          asserts or throws
-            BEAST_EXPECT(val.asBool() == false);
 
-            BEAST_EXPECT(val.isConvertibleTo(Json::nullValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::intValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::uintValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::realValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::stringValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::booleanValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::arrayValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::objectValue));
+            // String form must look like a double, not a bare integer
+            auto const s = val.asString();
+            BEAST_EXPECT(std::regex_match(s, std::regex(R"(^-?\d+\.\d*$)")));
+
+            // Round-trip: parsing the string back gives the same double
+            BEAST_EXPECT(std::stod(s) == x * 1.0);
         }
+
+        // Non-numeric string
+        for (std::size_t i = 0; i != 1024; ++i)
         {
-            // bool false
-            Json::Value val = false;
-            BEAST_EXPECT(val.isBool());
-            //          BEAST_EXPECT(strcmp (val.asCString(), ?) == 0); //
-            //          asserts
-            BEAST_EXPECT(val.asString() == "false");
-            BEAST_EXPECT(val.asInt() == 0);
-            BEAST_EXPECT(val.asUInt() == 0);
-            BEAST_EXPECT(val.asDouble() == 0.0);
-            BEAST_EXPECT(val.asBool() == false);
+            auto const x = rand_int<int>(-100000, 100000);
 
-            BEAST_EXPECT(val.isConvertibleTo(Json::nullValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::intValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::uintValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::realValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::stringValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::booleanValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::arrayValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::objectValue));
-        }
-        {
-            // bool true
-            Json::Value val = true;
-            BEAST_EXPECT(val.isBool());
-            //          BEAST_EXPECT(strcmp (val.asCString(), ?) == 0); //
-            //          asserts
-            BEAST_EXPECT(val.asString() == "true");
-            BEAST_EXPECT(val.asInt() == 1);
-            BEAST_EXPECT(val.asUInt() == 1);
-            BEAST_EXPECT(val.asDouble() == 1.0);
-            BEAST_EXPECT(val.asBool() == true);
+            auto s = std::to_string(x);
 
-            BEAST_EXPECT(!val.isConvertibleTo(Json::nullValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::intValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::uintValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::realValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::stringValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::booleanValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::arrayValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::objectValue));
-        }
-        {
-            // array type
-            Json::Value val(Json::arrayValue);
-            BEAST_EXPECT(val.isArray());
-            //          BEAST_EXPECT(strcmp (val.asCString(), ?) == 0); //
-            //          asserts BEAST_EXPECT(val.asString() == ?); // asserts or
-            //          throws BEAST_EXPECT(val.asInt() == ?); // asserts or
-            //          throws BEAST_EXPECT(val.asUInt() == ?); // asserts or
-            //          throws BEAST_EXPECT(val.asDouble() == ?); // asserts or
-            //          throws
-            BEAST_EXPECT(val.asBool() == false);  // empty or not
+            // Corrupt one digit, turning it into a non-digit
+            s[i % s.size()] += rand_int<int>(16, 64);
 
-            BEAST_EXPECT(val.isConvertibleTo(Json::nullValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::intValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::uintValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::realValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::stringValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::booleanValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::arrayValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::objectValue));
-        }
-        {
-            // object type
-            Json::Value val(Json::objectValue);
-            BEAST_EXPECT(val.isObject());
-            //          BEAST_EXPECT(strcmp (val.asCString(), ?) == 0); //
-            //          asserts BEAST_EXPECT(strcmp (val.asCString(), ?) == 0);
-            //          // asserts BEAST_EXPECT(val.asString() == ?); // asserts
-            //          or throws BEAST_EXPECT(val.asInt() == ?); // asserts or
-            //          throws BEAST_EXPECT(val.asUInt() == ?); // asserts or
-            //          throws
-            BEAST_EXPECT(val.asBool() == false);  // empty or not
+            val = Json::Value(s);
+            BEAST_EXPECT(val.isString());
 
-            BEAST_EXPECT(val.isConvertibleTo(Json::nullValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::intValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::uintValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::realValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::stringValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::booleanValue));
-            BEAST_EXPECT(!val.isConvertibleTo(Json::arrayValue));
-            BEAST_EXPECT(val.isConvertibleTo(Json::objectValue));
+            BEAST_EXPECT(!to_integer<std::int32_t>(val));
+            BEAST_EXPECT(!to_integer<std::uint32_t>(val));
+
+            auto check_throw = [&val](std::string_view s) {
+                try
+                {
+                    (void)val.asInt();
+                    (void)val.asUInt();
+                    return false;
+                }
+                catch (...)
+                {
+                    return val.asString() == s;
+                }
+            };
+
+            BEAST_EXPECT(check_throw(s));
         }
+
+        val = Json::Value{false};
+        BEAST_EXPECT(val.isBool());
+        BEAST_EXPECT(val.asBool() == false);
+        BEAST_EXPECT(val.asString() == "false");
+        BEAST_EXPECT(val.asInt() == 0);
+        BEAST_EXPECT(val.asUInt() == 0);
+        BEAST_EXPECT(val.asDouble() == 0.0);
+
+        val = Json::Value{true};
+        BEAST_EXPECT(val.isBool());
+        BEAST_EXPECT(val.asBool() == true);
+        BEAST_EXPECT(val.asString() == "true");
+        BEAST_EXPECT(val.asInt() == 1);
+        BEAST_EXPECT(val.asUInt() == 1);
+        BEAST_EXPECT(val.asDouble() == 1.0);
+
+        // array type
+        val = Json::Value{Json::arrayValue};
+        BEAST_EXPECT(val.isArray());
+        BEAST_EXPECT(!val.isObject());
+        BEAST_EXPECT(val.asBool() == false);
+        val[0] = "n";
+        BEAST_EXPECT(val[0].isString() && val[0].asStringView() == "n");
+        BEAST_EXPECT(val.asBool() == true);
+
+        // object type
+        val = Json::Value{Json::objectValue};
+        BEAST_EXPECT(val.isObject());
+        BEAST_EXPECT(!val.isArray());
+        BEAST_EXPECT(val.asBool() == false);
+
+        constexpr Json::StaticString k("an obscenely long key goes here");
+        val[k] = "b";
+        std::string sk = k.c_str();
+        BEAST_EXPECT(val[k].isString() && val[sk].asStringView() == "b");
+        BEAST_EXPECT(val.asBool() == true);
     }
 
     void
@@ -1087,7 +1030,6 @@ struct json_value_test : beast::unit_test::suite
         Json::Value val;
         BEAST_EXPECT(val.type() == Json::nullValue);
         BEAST_EXPECT(val.size() == 0);
-        BEAST_EXPECT(!val.isValidIndex(0));
         BEAST_EXPECT(!val.isMember("key"));
         {
             Json::Value const constVal = val;
@@ -1103,31 +1045,26 @@ struct json_value_test : beast::unit_test::suite
         val = -7;
         BEAST_EXPECT(val.type() == Json::intValue);
         BEAST_EXPECT(val.size() == 0);
-        BEAST_EXPECT(!val.isValidIndex(0));
         BEAST_EXPECT(!val.isMember("key"));
 
         val = 42u;
         BEAST_EXPECT(val.type() == Json::uintValue);
         BEAST_EXPECT(val.size() == 0);
-        BEAST_EXPECT(!val.isValidIndex(0));
         BEAST_EXPECT(!val.isMember("key"));
 
         val = 3.14159;
         BEAST_EXPECT(val.type() == Json::realValue);
         BEAST_EXPECT(val.size() == 0);
-        BEAST_EXPECT(!val.isValidIndex(0));
         BEAST_EXPECT(!val.isMember("key"));
 
         val = true;
         BEAST_EXPECT(val.type() == Json::booleanValue);
         BEAST_EXPECT(val.size() == 0);
-        BEAST_EXPECT(!val.isValidIndex(0));
         BEAST_EXPECT(!val.isMember("key"));
 
         val = "string";
         BEAST_EXPECT(val.type() == Json::stringValue);
         BEAST_EXPECT(val.size() == 0);
-        BEAST_EXPECT(!val.isValidIndex(0));
         BEAST_EXPECT(!val.isMember("key"));
 
         val = Json::Value(Json::objectValue);
@@ -1137,8 +1074,6 @@ struct json_value_test : beast::unit_test::suite
         val[staticThree] = 3;
         val["two"] = 2;
         BEAST_EXPECT(val.size() == 2);
-        BEAST_EXPECT(val.isValidIndex(1));
-        BEAST_EXPECT(!val.isValidIndex(2));
         BEAST_EXPECT(val[staticThree] == 3);
         BEAST_EXPECT(val.isMember("two"));
         BEAST_EXPECT(val.isMember(staticThree));
@@ -1161,8 +1096,6 @@ struct json_value_test : beast::unit_test::suite
         val[0u] = "zero";
         val[1u] = "one";
         BEAST_EXPECT(val.size() == 2);
-        BEAST_EXPECT(val.isValidIndex(1));
-        BEAST_EXPECT(!val.isValidIndex(2));
         BEAST_EXPECT(val[20u].type() == Json::nullValue);
         BEAST_EXPECT(!val.isMember("key"));
         {
@@ -1179,58 +1112,95 @@ struct json_value_test : beast::unit_test::suite
     test_removeMember()
     {
         Json::Value val;
-        BEAST_EXPECT(
-            val.removeMember(std::string("member")).type() == Json::nullValue);
+
+        BEAST_EXPECT(!val.removeMember(std::string("member")));
 
         val = Json::Value(Json::objectValue);
-        static Json::StaticString const staticThree("three");
-        val[staticThree] = 3;
-        val["two"] = 2;
-        BEAST_EXPECT(val.size() == 2);
 
-        BEAST_EXPECT(
-            val.removeMember(std::string("six")).type() == Json::nullValue);
-        BEAST_EXPECT(val.size() == 2);
+        struct TestCase
+        {
+            Json::StaticString key;
+            Json::Int value;
+        };
 
-        BEAST_EXPECT(val.removeMember(staticThree) == 3);
-        BEAST_EXPECT(val.size() == 1);
+        constexpr TestCase const testCases[] = {
+            {Json::StaticString("one"), 1},
+            {Json::StaticString("two"), 2},
+            {Json::StaticString("three"), 3},
+            {Json::StaticString("four"), 4},
+            {Json::StaticString("five"), 5},
+        };
 
-        BEAST_EXPECT(val.removeMember(staticThree).type() == Json::nullValue);
-        BEAST_EXPECT(val.size() == 1);
+        for (auto const& tc : testCases)
+        {
+            BEAST_EXPECT(!val.isMember(tc.key));
+            val[tc.key] = tc.value;
+            BEAST_EXPECT(val.isMember(tc.key));
+        }
 
-        BEAST_EXPECT(val.removeMember(std::string("two")) == 2);
+        BEAST_EXPECT(val.size() == std::size(testCases));
+        BEAST_EXPECT(!val.removeMember("potato"));
+        for (auto const& tc : testCases)
+        {
+            BEAST_EXPECT(!val.removeMember(std::to_string(tc.value)));
+
+            auto const v1 = val.get(tc.key);
+
+            BEAST_EXPECT(v1.type() == Json::intValue);
+            BEAST_EXPECT(v1.asInt() == tc.value);
+        }
+
+        BEAST_EXPECT(val.size() == std::size(testCases));
+
+        for (auto const& tc : testCases)
+        {
+            auto rm = val.removeMember(tc.key);
+            BEAST_EXPECT(rm);
+
+            if (rm)
+            {
+                BEAST_EXPECT(rm->type() == Json::intValue);
+                BEAST_EXPECT(rm->asInt() == tc.value);
+                BEAST_EXPECT(!val.isMember(tc.key));
+                BEAST_EXPECT(!val.removeMember(tc.key));
+            }
+        }
+
         BEAST_EXPECT(val.size() == 0);
 
-        BEAST_EXPECT(
-            val.removeMember(std::string("two")).type() == Json::nullValue);
-        BEAST_EXPECT(val.size() == 0);
+        BEAST_EXPECT(!val.removeMember("potato"));
+
+        for (auto const& tc : testCases)
+        {
+            BEAST_EXPECT(!val.removeMember(std::to_string(tc.value)));
+            BEAST_EXPECT(!val.removeMember(tc.key));
+        }
     }
 
     void
     test_iterator()
     {
         {
-            // Iterating an array.
+            // Iterating a non-const array.
             Json::Value arr{Json::arrayValue};
             arr[0u] = "zero";
             arr[1u] = "one";
             arr[2u] = "two";
             arr[3u] = "three";
 
-            Json::ValueIterator const b{arr.begin()};
-            Json::ValueIterator const e{arr.end()};
+            auto const b = arr.begin();
+            auto const e = arr.end();
 
-            Json::ValueIterator i1 = b;
-            Json::ValueIterator i2 = e;
-            --i2;
-
-            // key(), index(), and memberName() on an object iterator.
             BEAST_EXPECT(b != e);
             BEAST_EXPECT(!(b == e));
-            BEAST_EXPECT(i1.key() == 0);
-            BEAST_EXPECT(i2.key() == 3);
-            BEAST_EXPECT(i1.index() == 0);
-            BEAST_EXPECT(i2.index() == 3);
+
+            auto i1 = b;
+            auto i2 = e;
+            --i2;
+
+            // key() and memberName() on an array iterator.
+            BEAST_EXPECT(i1.key() == Json::Value{0u});
+            BEAST_EXPECT(i2.key() == Json::Value{3u});
             BEAST_EXPECT(std::strcmp(i1.memberName(), "") == 0);
             BEAST_EXPECT(std::strcmp(i2.memberName(), "") == 0);
 
@@ -1257,17 +1227,16 @@ struct json_value_test : beast::unit_test::suite
                 return obj;
             }()};
 
-            Json::ValueConstIterator i1{obj.begin()};
-            Json::ValueConstIterator i2{obj.end()};
+            auto i1 = obj.begin();
+            auto i2 = obj.end();
             --i2;
 
-            // key(), index(), and memberName() on an object iterator.
             BEAST_EXPECT(i1 != i2);
             BEAST_EXPECT(!(i1 == i2));
-            BEAST_EXPECT(i1.key() == "0");
-            BEAST_EXPECT(i2.key() == "3");
-            BEAST_EXPECT(i1.index() == -1);
-            BEAST_EXPECT(i2.index() == -1);
+
+            // key() and memberName() on an object iterator.
+            BEAST_EXPECT(i1.key() == Json::Value{"0"});
+            BEAST_EXPECT(i2.key() == Json::Value{"3"});
             BEAST_EXPECT(std::strcmp(i1.memberName(), "0") == 0);
             BEAST_EXPECT(std::strcmp(i2.memberName(), "3") == 0);
 
@@ -1282,12 +1251,21 @@ struct json_value_test : beast::unit_test::suite
             BEAST_EXPECT(*i1 == 2);
         }
         {
-            // Iterating a non-const null object.
+            // const_iterator is constructible from iterator.
+            Json::Value arr{Json::arrayValue};
+            arr[0u] = 0;
+
+            auto it = arr.begin();
+            Json::Value::const_iterator cit{it};
+            BEAST_EXPECT(cit == arr.cbegin());
+        }
+        {
+            // Iterating a non-const null value yields empty range.
             Json::Value nul{};
             BEAST_EXPECT(nul.begin() == nul.end());
         }
         {
-            // Iterating a const Int.
+            // Iterating a const scalar yields empty range.
             Json::Value const i{-3};
             BEAST_EXPECT(i.begin() == i.end());
         }
@@ -1296,48 +1274,17 @@ struct json_value_test : beast::unit_test::suite
     void
     test_nest_limits()
     {
-        Json::Reader r;
+        constexpr std::uint16_t limit = 5;
+
+        Json::Value obj(Json::objectValue);
+
+        for (std::uint16_t depth = 1; depth <= limit; ++depth)
         {
-            auto nest = [](std::uint32_t depth) -> std::string {
-                std::string s = "{";
-                for (std::uint32_t i{1}; i <= depth; ++i)
-                    s += "\"obj\":{";
-                for (std::uint32_t i{1}; i <= depth; ++i)
-                    s += "}";
-                s += "}";
-                return s;
-            };
-
-            {
-                // Within object nest limit
-                auto json{nest(std::min(10u, Json::Reader::nest_limit))};
-                Json::Value j;
-                BEAST_EXPECT(r.parse(json, j));
-            }
-
-            {
-                // Exceed object nest limit
-                auto json{nest(Json::Reader::nest_limit + 1)};
-                Json::Value j;
-                BEAST_EXPECT(!r.parse(json, j));
-            }
+            BEAST_EXPECT(Json::load(to_string(obj), depth));
+            obj[std::to_string(depth)] = obj;
         }
 
-        auto nest = [](std::uint32_t depth) -> std::string {
-            std::string s = "{";
-            for (std::uint32_t i{1}; i <= depth; ++i)
-                s += "\"array\":[{";
-            for (std::uint32_t i{1}; i <= depth; ++i)
-                s += "]}";
-            s += "}";
-            return s;
-        };
-        {
-            // Exceed array nest limit
-            auto json{nest(Json::Reader::nest_limit + 1)};
-            Json::Value j;
-            BEAST_EXPECT(!r.parse(json, j));
-        }
+        BEAST_EXPECT(!Json::load(to_string(obj), limit));
     }
 
     void
@@ -1365,17 +1312,12 @@ struct json_value_test : beast::unit_test::suite
 
             b.append(std::move(temp));
             BEAST_EXPECT(b.size() == 2);
-
-            // Note that the type() == nullValue check is implementation
-            // specific and not guaranteed to be valid in the future.
-            BEAST_EXPECT(temp.type() == Json::nullValue);
         }
     }
 
     void
     run() override
     {
-        test_StaticString();
         test_types();
         test_compare();
         test_bool();

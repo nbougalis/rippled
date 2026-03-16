@@ -20,8 +20,7 @@
 #include <test/app/Import_json.h>
 #include <test/jtx/network.h>
 #include <xrpl/basics/StringUtilities.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/TxFlags.h>
 #include <xrpl/protocol/jss.h>
@@ -103,8 +102,9 @@ makeGenesisConfig(
     using namespace jtx;
 
     Json::Value jsonValue;
-    Json::Reader reader;
-    reader.parse(ImportTCHalving::base_genesis, jsonValue);
+
+    if (!Json::load(ImportTCHalving::base_genesis, jsonValue))
+        return {};
 
     foreachFeature(features, [&](uint256 const& feature) {
         std::string featureName = featureToName(feature);
@@ -123,7 +123,7 @@ makeGenesisConfig(
 
     return envconfig([&](std::unique_ptr<Config> cfg) {
         cfg->NETWORK_ID = networkID;
-        cfg->START_LEDGER = jsonValue.toStyledString();
+        cfg->START_LEDGER = to_string(jsonValue);
         cfg->START_UP = Config::LOAD_JSON;
         Section config;
         config.append(

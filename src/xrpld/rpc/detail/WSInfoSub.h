@@ -22,8 +22,9 @@
 
 #include <xrpld/net/InfoSub.h>
 #include <xrpld/rpc/Role.h>
+#include <xrpld/rpc/json_body.h>
 #include <xrpl/beast/net/IPAddressConversion.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/server/WSSession.h>
 #include <boost/utility/string_view.hpp>
 #include <memory>
@@ -69,17 +70,10 @@ public:
     void
     send(Json::Value const& jv, bool) override
     {
-        auto sp = ws_.lock();
-        if (!sp)
-            return;
-        boost::beast::multi_buffer sb;
-        Json::stream(jv, [&](void const* data, std::size_t n) {
-            sb.commit(
-                boost::asio::buffer_copy(
-                    sb.prepare(n), boost::asio::buffer(data, n)));
-        });
-        auto m = std::make_shared<StreambufWSMsg<decltype(sb)>>(std::move(sb));
-        sp->send(m);
+        if (auto sp = ws_.lock())
+            sp->send(
+                std::make_shared<StreambufWSMsg<boost::beast::multi_buffer>>(
+                    to_multi_buffer(jv)));
     }
 };
 

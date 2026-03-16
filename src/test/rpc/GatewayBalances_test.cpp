@@ -177,10 +177,10 @@ public:
             auto jv = wsc->invoke("gateway_balances", qry2);
             expect(jv[jss::status] == "error");
 
-            auto response = jv[jss::result];
-            auto const error =
-                apiVersion < 2u ? "invalidHotWallet" : "invalidParams";
-            BEAST_EXPECT(response[jss::error] == error);
+            if (apiVersion < 2u)
+                BEAST_EXPECT(jv[jss::result][jss::error] == "invalidHotWallet");
+            else
+                BEAST_EXPECT(jv[jss::result][jss::error] == "invalidParams");
         });
     }
 

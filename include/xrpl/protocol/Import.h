@@ -24,7 +24,7 @@
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/base64.h>
-#include <xrpl/json/json_reader.h>
+#include <xrpl/json/json.h>
 #include <charconv>
 
 namespace ripple {
@@ -182,9 +182,8 @@ syntaxCheckXPOP(Blob const& blob, beast::Journal const& j)
     try
     {
         Json::Value xpop;
-        Json::Reader reader;
 
-        if (!reader.parse(strJson, xpop))
+        if (!Json::load(strJson, xpop))
         {
             JLOG(j.warn()) << "XPOP failed to parse string json";
             return {};
@@ -444,11 +443,12 @@ syntaxCheckXPOP(Blob const& blob, beast::Journal const& j)
 inline std::optional<std::pair<uint32_t, PublicKey>>
 getVLInfo(Json::Value const& xpop, beast::Journal const& j)
 {
-    auto const data =
-        base64_decode(xpop[jss::validation][jss::unl][jss::blob].asString());
-    Json::Reader r;
     Json::Value list;
-    if (!r.parse(data, list))
+
+    if (!Json::load(
+            base64_decode(
+                xpop[jss::validation][jss::unl][jss::blob].asString()),
+            list))
     {
         JLOG(j.warn())
             << "Import: unl blob was not valid json (after base64 decoding)";

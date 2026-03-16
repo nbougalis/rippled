@@ -18,8 +18,7 @@
 //==============================================================================
 
 #include <test/jtx/import.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 
 namespace ripple {
@@ -34,7 +33,7 @@ import(jtx::Account const& account, Json::Value const& xpop)
 {
     using namespace jtx;
     Json::Value jv;
-    std::string strJson = Json::FastWriter().write(xpop);
+    std::string strJson = to_compact_string(xpop);
     jv[jss::TransactionType] = jss::Import;
     jv[jss::Account] = account.human();
     jv[jss::Blob] = strHex(strJson);
@@ -48,20 +47,9 @@ issuer::operator()(Env& env, JTx& jt) const
 }
 
 Json::Value
-loadXpop(std::string content)
+loadXpop(std::string_view content)
 {
-    // If the string is empty, return an empty Json::Value
-    if (content.empty())
-    {
-        std::cout << "JSON string was empty"
-                  << "\n";
-        return {};
-    }
-
-    Json::Value jsonValue;
-    Json::Reader reader;
-    reader.parse(content, jsonValue);
-    return jsonValue;
+    return Json::load(content).value_or(Json::Value{});
 }
 
 }  // namespace import

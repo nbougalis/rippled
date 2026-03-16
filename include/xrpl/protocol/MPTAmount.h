@@ -24,7 +24,7 @@
 #include <xrpl/basics/contract.h>
 #include <xrpl/basics/safe_cast.h>
 #include <xrpl/beast/utility/Zero.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/operators.hpp>
@@ -116,7 +116,8 @@ MPTAmount::operator=(beast::Zero)
 }
 
 /** Returns true if the amount is not zero */
-constexpr MPTAmount::operator bool() const noexcept
+constexpr MPTAmount::
+operator bool() const noexcept
 {
     return value_ != 0;
 }

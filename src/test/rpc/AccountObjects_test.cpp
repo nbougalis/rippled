@@ -22,9 +22,7 @@
 #include <test/jtx/xchain_bridge.h>
 #include <xrpld/app/tx/detail/NFTokenMint.h>
 #include <xrpl/hook/Enum.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/protocol/nft.h>
 
@@ -298,8 +296,9 @@ public:
         env(offer(bob, XRP(100), USD1(1)), txflags(tfPassive));
 
         Json::Value bobj[4];
+
         for (int i = 0; i < 4; ++i)
-            Json::Reader{}.parse(bobs_account_objects[i], bobj[i]);
+            BEAST_EXPECT(Json::load(bobs_account_objects[i], bobj[i]));
 
         // test 'unstepped'
         // i.e. request account objects without explicit limit/marker paging
@@ -769,7 +768,8 @@ public:
                 features | FeatureBitset{featureXChainBridge});
             x.createScBridgeObjects(scEnv);
 
-            auto scEnvAcctObjs = [&](Account const& acct, char const* type) {
+            auto scEnvAcctObjs = [&](Account const& acct,
+                                     std::string_view type) {
                 Json::Value params;
                 params[jss::account] = acct.human();
                 params[jss::type] = type;
@@ -819,7 +819,8 @@ public:
             scEnv(xchain_create_claim_id(x.scBob, x.jvb, x.reward, x.mcBob));
             scEnv.close();
 
-            auto scEnvAcctObjs = [&](Account const& acct, char const* type) {
+            auto scEnvAcctObjs = [&](Account const& acct,
+                                     std::string_view type) {
                 Json::Value params;
                 params[jss::account] = acct.human();
                 params[jss::type] = type;
@@ -866,20 +867,22 @@ public:
             // xchain_create_account_claim_id should be present on the door
             // account (Account::master) to collect the signatures until a
             // quorum is reached
-            scEnv(test::jtx::create_account_attestation(
-                x.scAttester,
-                x.jvb,
-                x.mcCarol,
-                amt,
-                x.reward,
-                x.payees[0],
-                true,
-                1,
-                x.scuAlice,
-                x.signers[0]));
+            scEnv(
+                test::jtx::create_account_attestation(
+                    x.scAttester,
+                    x.jvb,
+                    x.mcCarol,
+                    amt,
+                    x.reward,
+                    x.payees[0],
+                    true,
+                    1,
+                    x.scuAlice,
+                    x.signers[0]));
             scEnv.close();
 
-            auto scEnvAcctObjs = [&](Account const& acct, char const* type) {
+            auto scEnvAcctObjs = [&](Account const& acct,
+                                     std::string_view type) {
                 Json::Value params;
                 params[jss::account] = acct.human();
                 params[jss::type] = type;
@@ -1300,8 +1303,9 @@ public:
                                       std::uint16_t flags = 0,
                                       std::uint16_t fee = 0) {
             // the marker has the exact same format as an NFTokenID
-            return to_string(NFTokenMint::createNFTokenID(
-                flags, fee, issuer, nft::toTaxon(taxon), tokenSeq));
+            return to_string(
+                NFTokenMint::createNFTokenID(
+                    flags, fee, issuer, nft::toTaxon(taxon), tokenSeq));
         };
 
         // test an unassociated marker which does not exist in the NFTokenIDs

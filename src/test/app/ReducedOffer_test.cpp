@@ -551,13 +551,7 @@ public:
                     bool const bobsOfferGone =
                         !offerInLedger(env, bob, bobOfferSeq);
                     STAmount aliceBalanceUSD = env.balance(alice, USD);
-#if 0
-                    std::cout
-                        << "bobs initial: " << initialBobUSD
-                        << "; alice final: " << aliceBalanceUSD
-                        << "; bobs offer: " << bobsOfferJson.toStyledString()
-                        << std::endl;
-#endif
+
                     // Sanity check the ledger if alice got USD.
                     if (aliceBalanceUSD.signum() > 0)
                     {

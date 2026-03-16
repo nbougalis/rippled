@@ -26,8 +26,7 @@
 #include <xrpld/app/tx/detail/Import.h>
 #include <xrpld/core/ConfigSections.h>
 #include <xrpld/ledger/Dir.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Import.h>
 #include <xrpl/protocol/jss.h>
@@ -248,7 +247,7 @@ class Import_test : public beast::unit_test::suite
         env.fund(XRP(1000), alice);
         env.close();
 
-        std::string strJson = R"json({
+        constexpr auto document = R"json({
             "children": {
                 "3": {
                     "children": {},
@@ -261,8 +260,8 @@ class Import_test : public beast::unit_test::suite
         })json";
 
         Json::Value proof;
-        Json::Reader reader;
-        reader.parse(strJson, proof);
+
+        BEAST_EXPECT(Json::load(document, proof));
 
         // XPOP.transaction.proof list entry has wrong format
         {
@@ -1494,57 +1493,59 @@ class Import_test : public beast::unit_test::suite
 
         test::jtx::Env env{*this, network::makeNetworkVLConfig(21337, keys)};
 
-        std::string strJson = R"json({
-            "ledger": {
-                "acroot": "DCE36DCACDCFCB3441866E09A183B7B8064B3F5E06593CD6AA8ACCC1B284B477",
-                "txroot": "409C8D073DDB5AB07FD2CD4F14467A8F3BC8FFBA16A0032D12D823D8511C12F4",
-                "phash": "BAB19E13B25251A83493073F424FD986EA7BA49F9F4C83A061700131460D747D",
-                "close": 738786851,
-                "coins": "99999998999999868",
-                "cres": 10,
-                "flags": 10,
-                "index": 1,
-                "pclose": 738786851
-            },
-            "transaction": {
-                "blob": "12000322000000002400000002201B0000006C201D0000535968400000003B9ACA007321EDA8D46E11FD5D2082A4E6FF3039EB6259FBC2334983D015FC62ECAD0AE4A96C747440549A370E68DBB1947419D4CCDF90CAE0BCA9121593ECC21B3C79EF0F232EB4375F95F1EBCED78B94D09838B5E769D43F041019ADEF3EC206AD3C5177C519560F81148EA87CA747AF74EE03A7E36C0F8EB1C1568D588A",
-                "meta": "201C00000000F8E51100612500000052553CEFE169D8DB251A7757C8A80214D7466E81FB2EF6A91E0970B428326B2134EB56A92E4B1340C656FE01A66D529BB7957EAD34D9E193D190EA62AAE4764B5B08C5E624000000026240000000773593F4E1E7220000000024000000032D0000000162400000003B9AC9F481148EA87CA747AF74EE03A7E36C0F8EB1C1568D588AE1E1F1031000",
-                "proof": {
-                    "children": {
-                        "3": {
-                        "children": {},
-                        "hash": "AA126BA0486ADAE575BBC5335E42E236275A452037CA9A876D1A8CDACA1AE542",
-                        "key": "39D6F6AB7D0A827DD1502B7B9571626A2B601DBE5BC786EF8ADD00E0CB7FCEB3"
+        Json::Value const xpop_orig = [this]() {
+            Json::Value ret;
+            BEAST_EXPECT(
+                Json::load(
+                    R"json({
+                    "ledger": {
+                        "acroot": "DCE36DCACDCFCB3441866E09A183B7B8064B3F5E06593CD6AA8ACCC1B284B477",
+                        "txroot": "409C8D073DDB5AB07FD2CD4F14467A8F3BC8FFBA16A0032D12D823D8511C12F4",
+                        "phash": "BAB19E13B25251A83493073F424FD986EA7BA49F9F4C83A061700131460D747D",
+                        "close": 738786851,
+                        "coins": "99999998999999868",
+                        "cres": 10,
+                        "flags": 10,
+                        "index": 1,
+                        "pclose": 738786851
+                    },
+                    "transaction": {
+                        "blob": "12000322000000002400000002201B0000006C201D0000535968400000003B9ACA007321EDA8D46E11FD5D2082A4E6FF3039EB6259FBC2334983D015FC62ECAD0AE4A96C747440549A370E68DBB1947419D4CCDF90CAE0BCA9121593ECC21B3C79EF0F232EB4375F95F1EBCED78B94D09838B5E769D43F041019ADEF3EC206AD3C5177C519560F81148EA87CA747AF74EE03A7E36C0F8EB1C1568D588A",
+                        "meta": "201C00000000F8E51100612500000052553CEFE169D8DB251A7757C8A80214D7466E81FB2EF6A91E0970B428326B2134EB56A92E4B1340C656FE01A66D529BB7957EAD34D9E193D190EA62AAE4764B5B08C5E624000000026240000000773593F4E1E7220000000024000000032D0000000162400000003B9AC9F481148EA87CA747AF74EE03A7E36C0F8EB1C1568D588AE1E1F1031000",
+                        "proof": {
+                            "children": {
+                                "3": {
+                                "children": {},
+                                "hash": "AA126BA0486ADAE575BBC5335E42E236275A452037CA9A876D1A8CDACA1AE542",
+                                "key": "39D6F6AB7D0A827DD1502B7B9571626A2B601DBE5BC786EF8ADD00E0CB7FCEB3"
+                                }
+                            },
+                            "hash": "409C8D073DDB5AB07FD2CD4F14467A8F3BC8FFBA16A0032D12D823D8511C12F4",
+                            "key": "0000000000000000000000000000000000000000000000000000000000000000"
                         }
                     },
-                    "hash": "409C8D073DDB5AB07FD2CD4F14467A8F3BC8FFBA16A0032D12D823D8511C12F4",
-                    "key": "0000000000000000000000000000000000000000000000000000000000000000"
-                }
-            },
-            "validation": {
-                "data": {
-                    "n94at1vSdHSBEun25yT4ZfgqD1tVQNsx1nqRZG3T6ygbuvwgcMZN": "22800000012600000059292C08FE225149FB62BB67011E9C3F641848E32A209CEAD98BD4D73A78A11F2F92E4AFA65F6A50177BC1723CF6FEDBE539067FF3EA2CF5ADF8FD611DA22B682617DB782041BCA913732103D4A61C3C4E882313665E67471AE9DB28D6679823C760EBA1416B5389EB12A53B76473045022100E53006BDE6CB3ECB7FD08711B103DFD793438751DDFBED5DC421A3C7DE3545C4022045A2332222261A55153A338930545A5F463DAC2E1BF56C4CE5E02726E919A714"
-                },
-                "unl": {
-                    "public_key": "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
-                    "manifest": "JAAAAAFxIe101ANsZZGkvfnFTO+jm5lqXc5fhtEf2hh0SBzp1aHNwXMh7TN9+b62cZqTngaFYU5tbGpYHC8oYuI3G3vwj9OW2Z9gdkAnUjfY5zOEkhq31tU4338jcyUpVA5/VTsANFce7unDo+JeVoEhfuOb/Y8WA3Diu9XzuOD4U/ikfgf9SZOlOGcBcBJAw44PLjH+HUtEnwX45lIRmo0x5aINFMvZsBpE9QteSDBXKwYzLdnSW4e1bs21o+IILJIiIKU/+1Uxx0FRpQbMDA==",
-                    "blob": "eyJzZXF1ZW5jZSI6MiwiZXhwaXJhdGlvbiI6NzQxMzk4NDAwLCJ2YWxpZGF0b3JzIjpbeyJ2YWxpZGF0aW9uX3B1YmxpY19rZXkiOiJFRDM4QkQ0NDVBRkQ2MjE1OTYyMENDMTk2QzI2NjhBMjZCNkZCQjM2QjA5OUVCNTVCMzhBNThDMTFDMTIwNERFNUMiLCJtYW5pZmVzdCI6IkpBQUFBQUp4SWUwNHZVUmEvV0lWbGlETUdXd21hS0pyYjdzMnNKbnJWYk9LV01FY0VnVGVYSE1oQW9HTU5jc2dVVU53S28raDd6aGFYS0YrSEd3NlhoRWpvREtyYWxrWW5Naktka2N3UlFJaEFKN2NONEo2TmRWZnBudkVJL1pldVdDVHZucGFKaXJLTkZjQzN6TU9qZ3dqQWlBYktJMGZiWGdTMVJMbG9OaHhkSGhWcTlvekVXVkU5Y0l3WEROM0F4cXlZM0FTUUN0MCt1L2lOU0RENmJYdlVUdGRtdDROcnRsYng0Vnp1bVRwZmpSWXA0bE1vSS9oNDNwVVRqcDdWRm9YYm5LV2pWaHFOYUdtNTc3SzZKNjk3WFo3VFFFPSJ9LHsidmFsaWRhdGlvbl9wdWJsaWNfa2V5IjoiRURCRUUzMEZBRTkyRUVFODhFMUM0OTgwRDA5RUNGREU5OUExMTZEMDc4RUMyMTg1N0RCMUI0N0I0MjY0MThFNDI4IiwibWFuaWZlc3QiOiJKQUFBQUFKeEllMis0dyt1a3U3b2poeEpnTkNlejk2Wm9SYlFlT3doaFgyeHRIdENaQmprS0hNaEE5U21IRHhPaUNNVFpsNW5SeHJwMnlqV1o1Z2p4MkRyb1VGclU0bnJFcVU3ZGtjd1JRSWhBTGRFRmVqWStwVW5nbGk3c1R2aWIwQm1ESFA3TjZpa1ZFQkk2SDdJd1UxekFpQmRzeW9TcVBjQzJOTXFnQW5IWEhHZGtBSXdCUUQxQVVnOVg4WkpMeWZjd0hBU1FDdDFiS1Z6T014UlFtUjN3Tks0ZEtkb2ZJR3J4RTlTanVMUjZQYThCNW4wOFNZSjhLNjJnZSs5YTZCdFphbEVtL0hPZGN6ME5BRk9jeWNyRi9DdFNBND0ifV19",
-                    "signature": "849F6B8DA6E11C213B561659C16F13D35385E8EA9E775483ADC84578F6D578943DE5EB681584B2C03EFFFDFD216F9E0B21576E482F941C7195893B72B5B1F70D",
-                    "version": 1
-                }
-            }
-        })json";
-
-        Json::Value xpop;
-        Json::Reader reader;
-        reader.parse(strJson, xpop);
-        Json::FastWriter writer;
+                    "validation": {
+                        "data": {
+                            "n94at1vSdHSBEun25yT4ZfgqD1tVQNsx1nqRZG3T6ygbuvwgcMZN": "22800000012600000059292C08FE225149FB62BB67011E9C3F641848E32A209CEAD98BD4D73A78A11F2F92E4AFA65F6A50177BC1723CF6FEDBE539067FF3EA2CF5ADF8FD611DA22B682617DB782041BCA913732103D4A61C3C4E882313665E67471AE9DB28D6679823C760EBA1416B5389EB12A53B76473045022100E53006BDE6CB3ECB7FD08711B103DFD793438751DDFBED5DC421A3C7DE3545C4022045A2332222261A55153A338930545A5F463DAC2E1BF56C4CE5E02726E919A714"
+                        },
+                        "unl": {
+                            "public_key": "ED74D4036C6591A4BDF9C54CEFA39B996A5DCE5F86D11FDA1874481CE9D5A1CDC1",
+                            "manifest": "JAAAAAFxIe101ANsZZGkvfnFTO+jm5lqXc5fhtEf2hh0SBzp1aHNwXMh7TN9+b62cZqTngaFYU5tbGpYHC8oYuI3G3vwj9OW2Z9gdkAnUjfY5zOEkhq31tU4338jcyUpVA5/VTsANFce7unDo+JeVoEhfuOb/Y8WA3Diu9XzuOD4U/ikfgf9SZOlOGcBcBJAw44PLjH+HUtEnwX45lIRmo0x5aINFMvZsBpE9QteSDBXKwYzLdnSW4e1bs21o+IILJIiIKU/+1Uxx0FRpQbMDA==",
+                            "blob": "eyJzZXF1ZW5jZSI6MiwiZXhwaXJhdGlvbiI6NzQxMzk4NDAwLCJ2YWxpZGF0b3JzIjpbeyJ2YWxpZGF0aW9uX3B1YmxpY19rZXkiOiJFRDM4QkQ0NDVBRkQ2MjE1OTYyMENDMTk2QzI2NjhBMjZCNkZCQjM2QjA5OUVCNTVCMzhBNThDMTFDMTIwNERFNUMiLCJtYW5pZmVzdCI6IkpBQUFBQUp4SWUwNHZVUmEvV0lWbGlETUdXd21hS0pyYjdzMnNKbnJWYk9LV01FY0VnVGVYSE1oQW9HTU5jc2dVVU53S28raDd6aGFYS0YrSEd3NlhoRWpvREtyYWxrWW5Naktka2N3UlFJaEFKN2NONEo2TmRWZnBudkVJL1pldVdDVHZucGFKaXJLTkZjQzN6TU9qZ3dqQWlBYktJMGZiWGdTMVJMbG9OaHhkSGhWcTlvekVXVkU5Y0l3WEROM0F4cXlZM0FTUUN0MCt1L2lOU0RENmJYdlVUdGRtdDROcnRsYng0Vnp1bVRwZmpSWXA0bE1vSS9oNDNwVVRqcDdWRm9YYm5LV2pWaHFOYUdtNTc3SzZKNjk3WFo3VFFFPSJ9LHsidmFsaWRhdGlvbl9wdWJsaWNfa2V5IjoiRURCRUUzMEZBRTkyRUVFODhFMUM0OTgwRDA5RUNGREU5OUExMTZEMDc4RUMyMTg1N0RCMUI0N0I0MjY0MThFNDI4IiwibWFuaWZlc3QiOiJKQUFBQUFKeEllMis0dyt1a3U3b2poeEpnTkNlejk2Wm9SYlFlT3doaFgyeHRIdENaQmprS0hNaEE5U21IRHhPaUNNVFpsNW5SeHJwMnlqV1o1Z2p4MkRyb1VGclU0bnJFcVU3ZGtjd1JRSWhBTGRFRmVqWStwVW5nbGk3c1R2aWIwQm1ESFA3TjZpa1ZFQkk2SDdJd1UxekFpQmRzeW9TcVBjQzJOTXFnQW5IWEhHZGtBSXdCUUQxQVVnOVg4WkpMeWZjd0hBU1FDdDFiS1Z6T014UlFtUjN3Tks0ZEtkb2ZJR3J4RTlTanVMUjZQYThCNW4wOFNZSjhLNjJnZSs5YTZCdFphbEVtL0hPZGN6ME5BRk9jeWNyRi9DdFNBND0ifV19",
+                            "signature": "849F6B8DA6E11C213B561659C16F13D35385E8EA9E775483ADC84578F6D578943DE5EB681584B2C03EFFFDFD216F9E0B21576E482F941C7195893B72B5B1F70D",
+                            "version": 1
+                        }
+                    }
+                })json",
+                    ret));
+            return ret;
+        }();
 
         // Import: unl blob was not valid json (after base64 decoding)
         {
-            Json::Value tmpXpop = xpop;
+            Json::Value tmpXpop = xpop_orig;
             tmpXpop[jss::validation][jss::unl][jss::blob] = "YmFkSnNvbg==";
-            std::string strJson = writer.write(tmpXpop);
+            std::string strJson = to_styled_string(tmpXpop);
             Blob raw(strJson.begin(), strJson.end());
             auto const xpop = syntaxCheckXPOP(raw, env.journal);
             BEAST_EXPECT(getVLInfo(*xpop, env.journal).has_value() == false);
@@ -1552,9 +1553,9 @@ class Import_test : public beast::unit_test::suite
 
         // Import: failed to deserialize manifest
         {
-            Json::Value tmpXpop = xpop;
+            Json::Value tmpXpop = xpop_orig;
             tmpXpop[jss::validation][jss::unl][jss::manifest] = "YmFkSnNvbg==";
-            std::string strJson = writer.write(tmpXpop);
+            std::string strJson = to_styled_string(tmpXpop);
             Blob raw(strJson.begin(), strJson.end());
             auto const xpop = syntaxCheckXPOP(raw, env.journal);
             BEAST_EXPECT(getVLInfo(*xpop, env.journal).has_value() == false);
@@ -1562,8 +1563,8 @@ class Import_test : public beast::unit_test::suite
 
         // Import: valid unl blob
         {
-            Json::Value tmpXpop = xpop;
-            std::string strJson = writer.write(tmpXpop);
+            Json::Value tmpXpop = xpop_orig;
+            std::string strJson = to_styled_string(tmpXpop);
             Blob raw(strJson.begin(), strJson.end());
             auto const xpop = syntaxCheckXPOP(raw, env.journal);
             auto const [seq, masterKey] = *getVLInfo(*xpop, env.journal);

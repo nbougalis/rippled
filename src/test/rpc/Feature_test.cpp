@@ -311,7 +311,7 @@ class Feature_test : public beast::unit_test::suite
                 "feature",
                 boost::lexical_cast<std::string>(params))[jss::result];
             BEAST_EXPECTS(
-                result[jss::error] == "badFeature", result.toStyledString());
+                result[jss::error] == "badFeature", to_compact_string(result));
             BEAST_EXPECT(
                 result[jss::error_message] == "Feature unknown or invalid.");
         }

@@ -105,7 +105,7 @@ private:
     void
     fillJson(Type t)
     {
-        value_.clear();
+        value_ = {};
         Status(t).fillJson(value_);
     }
 
@@ -137,7 +137,6 @@ private:
         Status::Strings messages,
         std::string const& message)
     {
-        value_.clear();
         fillJson(Status(status, messages));
 
         auto prefix = label + ": ";

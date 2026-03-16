@@ -90,7 +90,7 @@ msig::operator()(Env& env, JTx& jt) const
         }
         catch (parse_error const&)
         {
-            env.test.log << pretty(jtx.jv) << std::endl;
+            env.test.log << to_styled_string(jtx.jv) << std::endl;
             throw;
         }
         auto& js = jtx[sfSigners.getJsonName()];

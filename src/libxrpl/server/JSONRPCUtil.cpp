@@ -18,7 +18,6 @@
 //==============================================================================
 
 #include <xrpl/basics/Log.h>
-#include <xrpl/json/to_string.h>
 #include <xrpl/protocol/BuildInfo.h>
 #include <xrpl/protocol/SystemParameters.h>
 #include <xrpl/protocol/jss.h>

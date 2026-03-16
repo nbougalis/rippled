@@ -531,10 +531,7 @@ private:
     //
     //    return true if func added to queue.
     bool
-    addRefCountedJob(
-        JobType type,
-        std::string const& name,
-        JobFunction func);
+    addRefCountedJob(JobType type, std::string const& name, JobFunction func);
 
     // Runs the next appropriate waiting Job.
     //

@@ -22,8 +22,7 @@
 #include <xrpl/basics/random.h>
 #include <xrpl/beast/unit_test.h>
 #include <xrpl/beast/xor_shift_engine.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/SecretKey.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/protocol/st.h>

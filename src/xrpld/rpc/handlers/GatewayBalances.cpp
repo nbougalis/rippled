@@ -125,15 +125,11 @@ doGatewayBalances(RPC::JsonContext& context)
             // The documentation states that invalidParams is used when
             // One or more fields are specified incorrectly.
             // invalidHotwallet should be used when the account exists, but does
-            // not have currency issued by the account from the request.
-            if (context.apiVersion < 2u)
-            {
-                RPC::inject_error(rpcINVALID_HOTWALLET, result);
-            }
-            else
-            {
-                RPC::inject_error(rpcINVALID_PARAMS, result);
-            }
+            // not have currency issued by the account from the request
+            RPC::inject_error(
+                context.apiVersion < 2u ? rpcINVALID_HOTWALLET
+                                        : rpcINVALID_PARAMS,
+                result);
             return result;
         }
     }

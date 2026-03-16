@@ -421,7 +421,7 @@ struct Remit_test : public beast::unit_test::suite
             BEAST_EXPECT(amm.ammExists());
 
             auto tx = remit::remit(alice, bob);
-            tx[sfInform.jsonName] = to_string(amm.ammAccount());
+            tx[sfInform] = to_string(amm.ammAccount());
             env(tx, alice, ter(tecNO_PERMISSION));
             env.close();
         }

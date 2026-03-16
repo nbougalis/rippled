@@ -31,7 +31,7 @@
 #include <xrpld/rpc/detail/TransactionSign.h>
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/mulDiv.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/RPCErr.h>
@@ -571,8 +571,7 @@ transactionPreProcessImpl(
             "Exception occurred constructing serialized transaction");
     }
 
-    std::string reason;
-    if (!passesLocalChecks(*stTx, reason))
+    if (std::string reason; !passesLocalChecks(*stTx, reason))
         return RPC::make_error(rpcINVALID_PARAMS, reason);
 
     // If multisign then return multiSignature, else set TxnSignature field.
@@ -1265,8 +1264,8 @@ transactionSubmitMultiSigned(
                 rpcINTERNAL,
                 "Exception while serializing transaction: " + reason);
         }
-        std::string reason;
-        if (!passesLocalChecks(*stTx, reason))
+
+        if (std::string reason; !passesLocalChecks(*stTx, reason))
             return RPC::make_error(rpcINVALID_PARAMS, reason);
     }
 

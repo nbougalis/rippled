@@ -75,21 +75,21 @@ class NFTokenDir_test : public beast::unit_test::suite
 
                     if (vol == noisy)
                     {
-                        std::cout << state[i].toStyledString() << std::endl;
+                        std::cout << to_styled_string(state[i]) << std::endl;
                     }
                     else
                     {
                         if (tokenCount > 0)
                             std::cout << "first: "
-                                      << state[i][sfNFTokens.jsonName][0u]
-                                             .toStyledString()
+                                      << to_styled_string(
+                                             state[i][sfNFTokens.jsonName][0u])
                                       << std::endl;
                         if (tokenCount > 1)
-                            std::cout
-                                << "last: "
-                                << state[i][sfNFTokens.jsonName][tokenCount - 1]
-                                       .toStyledString()
-                                << std::endl;
+                            std::cout << "last: "
+                                      << to_styled_string(
+                                             state[i][sfNFTokens.jsonName]
+                                                  [tokenCount - 1])
+                                      << std::endl;
                     }
                 }
             }

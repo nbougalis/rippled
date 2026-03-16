@@ -20,7 +20,7 @@
 #include <test/jtx.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/unit_test.h>
-#include <xrpl/json/json_reader.h>     // Json::Reader
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>  // RPC::containsError
 #include <xrpl/protocol/InnerObjectFormats.h>
 #include <xrpl/protocol/STParsedJSON.h>  // STParsedJSONObject
@@ -101,7 +101,7 @@ static TestJSONTxt const testArray[] = {
         {
             "SignerEntry" :
             {
-                "Account" : "rPcNzota6B8YBokhYtcTNqQVCngtbnWfux",
+                "Account" : "rPcNzota6B8YBokhYtcTNqQVCngtbnWfux"
             }
         }
     ],
@@ -178,25 +178,23 @@ public:
 
         for (auto const& test : testArray)
         {
-            Json::Value req;
-            Json::Reader().parse(test.txt, req);
-            if (RPC::contains_error(req))
+            auto req = Json::load(test.txt);
+
+            if (!req)
             {
-                Throw<std::runtime_error>(
-                    "Internal InnerObjectFormatsParsedJSON error.  Bad JSON.");
+                fail("Unable to parse JSON:\n" + test.txt);
+                continue;
             }
-            STParsedJSONObject parsed("request", req);
-            bool const noObj = !parsed.object.has_value();
-            if (noObj == test.expectFail)
+
+            STParsedJSONObject parsed("request", req.value());
+
+            if (parsed.object.has_value() != test.expectFail)
             {
                 pass();
+                continue;
             }
-            else
-            {
-                std::string errStr("Unexpected STParsedJSON result on:\n");
-                errStr += test.txt;
-                fail(errStr);
-            }
+
+            fail("Unexpected STParsedJSON result on:\n" + test.txt);
         }
     }
 };

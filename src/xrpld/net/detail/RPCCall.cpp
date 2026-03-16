@@ -30,8 +30,7 @@
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/core/LexicalCast.h>
 #include <xrpl/json/Object.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/RPCErr.h>
@@ -94,26 +93,51 @@ private:
     unsigned const apiVersion_;
     beast::Journal const j_;
 
-    // TODO New routine for parsing ledger parameters, other routines should
-    // standardize on this.
+    // According to a previous comment, this was supposed to be a new
+    // routine to be used everywhere for parsing ledger parameters in
+    // a consistent and uniform way.
+    //
+    // Unfortunately the original code was poorly written: it did not
+    // sanitize the input carefully and always returned true. Callers
+    // mostly ignored the return value anyways.
+    //
+    // @todo Update this code further to validate inputs and return a
+    //       meaningful "success" or "failure" marker. This will need
+    //       more extensive changes downstream.
     static bool
-    jvParseLedger(Json::Value& jvRequest, std::string const& strLedger)
+    jvParseLedger(Json::Value& jvRequest, std::string_view str)
     {
-        if (strLedger == "current" || strLedger == "closed" ||
-            strLedger == "validated")
+        if (str == "current" || str == "closed" || str == "validated")
         {
-            jvRequest[jss::ledger_index] = strLedger;
+            jvRequest[jss::ledger_index] = str;
+            return true;
         }
-        else if (strLedger.length() == 64)
+
+        // A previous version of this function would accept any string
+        // of length 64 through and other code would determine that it
+        // is not valid. Since parseHex would accepts "0" as shorthand
+        // for the all-zero string, we need to also perform the length
+        // check here to maintain backwards compatibility.
+        if (uint256 hex; str.size() == 64 && hex.parseHex(str))
         {
-            // YYY Could confirm this is a uint256.
-            jvRequest[jss::ledger_hash] = strLedger;
+            jvRequest[jss::ledger_hash] = str;
+            return true;
         }
-        else
+
+        if (std::uint32_t li; beast::lexicalCastChecked(li, str))
         {
-            jvRequest[jss::ledger_index] =
-                beast::lexicalCast<std::uint32_t>(strLedger);
+            jvRequest[jss::ledger_index] = li;
+            return true;
         }
+
+        // A previous version of this function used beast::lexicalCast
+        // unconditionally at this point and returned true. This meant
+        // that the 'ledger_index' parameter would be set to 0 when an
+        // invalid input was passed in. This very unfortunate behavior
+        // is relied upon in other parts of the code, so we cannot fix
+        // this here without, first, updating the callers and any unit
+        // tests that depend on this behavior.
+        jvRequest[jss::ledger_index] = 0;
 
         return true;
     }
@@ -353,7 +377,7 @@ private:
         Json::Value jvTakerGets =
             jvParseCurrencyIssuer(jvParams[1u].asString());
 
-        if (isRpcError(jvTakerPays))
+        if (RPC::contains_error(jvTakerPays))
         {
             return jvTakerPays;
         }
@@ -362,7 +386,7 @@ private:
             jvRequest[jss::taker_pays] = jvTakerPays;
         }
 
-        if (isRpcError(jvTakerGets))
+        if (RPC::contains_error(jvTakerGets))
         {
             return jvTakerGets;
         }
@@ -543,9 +567,7 @@ private:
 
         if (3 == jvParams.size() || bOffline)
         {
-            Json::Value txJSON;
-            Json::Reader reader;
-            if (reader.parse(jvParams[2u].asString(), txJSON))
+            if (Json::Value txJSON; Json::load(jvParams[2u].asString(), txJSON))
             {
                 // sign_for txJSON.
                 Json::Value jvRequest{Json::objectValue};
@@ -567,13 +589,11 @@ private:
     Json::Value
     parseJson(Json::Value const& jvParams)
     {
-        Json::Reader reader;
-        Json::Value jvRequest;
-
         JLOG(j_.trace()) << "RPC method: " << jvParams[0u];
         JLOG(j_.trace()) << "RPC json: " << jvParams[1u];
 
-        if (reader.parse(jvParams[1u].asString(), jvRequest))
+        if (Json::Value jvRequest;
+            Json::load(jvParams[1u].asString(), jvRequest))
         {
             if (!jvRequest.isObjectOrNull())
                 return rpcError(rpcINVALID_PARAMS);
@@ -619,10 +639,9 @@ private:
     Json::Value
     parseJson2(Json::Value const& jvParams)
     {
-        Json::Reader reader;
         Json::Value jv;
-        bool valid_parse = reader.parse(jvParams[0u].asString(), jv);
-        if (valid_parse && isValidJson2(jv))
+
+        if (Json::load(jvParams[0u].asString(), jv) && isValidJson2(jv))
         {
             if (jv.isObject())
             {
@@ -673,9 +692,7 @@ private:
         Json::Value jvRequest(Json::objectValue);
 
         if (!jvParams.size())
-        {
             return jvRequest;
-        }
 
         jvParseLedger(jvRequest, jvParams[0u].asString());
 
@@ -1024,9 +1041,9 @@ private:
     }
 
     Json::Value
-    parseAccountRaw2(Json::Value const& jvParams, char const* const acc2Field)
+    parseAccountRaw2(Json::Value const& jvParams, std::string_view acc2Field)
     {
-        std::array<char const* const, 2> accFields{{jss::account, acc2Field}};
+        std::array<std::string_view, 2> accFields{{jss::account, acc2Field}};
         auto const nParams = jvParams.size();
         Json::Value jvRequest(Json::objectValue);
         for (auto i = 0; i < nParams; ++i)
@@ -1106,18 +1123,13 @@ private:
     Json::Value
     parseRipplePathFind(Json::Value const& jvParams)
     {
-        Json::Reader reader;
-        Json::Value jvRequest{Json::objectValue};
-        bool bLedger = 2 == jvParams.size();
-
         JLOG(j_.trace()) << "RPC json: " << jvParams[0u];
 
-        if (reader.parse(jvParams[0u].asString(), jvRequest))
+        if (Json::Value jvRequest;
+            Json::load(jvParams[0u].asString(), jvRequest))
         {
-            if (bLedger)
-            {
+            if (jvParams.size() == 2)
                 jvParseLedger(jvRequest, jvParams[1u].asString());
-            }
 
             return jvRequest;
         }
@@ -1132,11 +1144,9 @@ private:
     Json::Value
     parseSimulate(Json::Value const& jvParams)
     {
-        Json::Value txJSON;
-        Json::Reader reader;
         Json::Value jvRequest{Json::objectValue};
 
-        if (reader.parse(jvParams[0u].asString(), txJSON))
+        if (Json::Value txJSON; Json::load(jvParams[0u].asString(), txJSON))
         {
             jvRequest[jss::tx_json] = txJSON;
         }
@@ -1149,6 +1159,7 @@ private:
         {
             if (!jvParams[1u].isString() || jvParams[1u].asString() != "binary")
                 return rpcError(rpcINVALID_PARAMS);
+
             jvRequest[jss::binary] = true;
         }
 
@@ -1163,32 +1174,25 @@ private:
     Json::Value
     parseSignSubmit(Json::Value const& jvParams)
     {
-        Json::Value txJSON;
-        Json::Reader reader;
-        bool const bOffline =
-            3 == jvParams.size() && jvParams[2u].asString() == "offline";
+        auto const size = jvParams.size();
 
-        if (1 == jvParams.size())
+        if (size == 1)
         {
-            // Submitting tx_blob
-
             Json::Value jvRequest{Json::objectValue};
-
-            jvRequest[jss::tx_blob] = jvParams[0u].asString();
-
+            jvRequest[jss::tx_blob] = jvParams[0].asString();
             return jvRequest;
         }
-        else if (
-            (2 == jvParams.size() || bOffline) &&
-            reader.parse(jvParams[1u].asString(), txJSON))
+
+        bool const offline = (size == 3 && jvParams[2].asString() == "offline");
+
+        if (Json::Value v;
+            (size == 2 || offline) && Json::load(jvParams[1u].asString(), v))
         {
-            // Signing or submitting tx_json.
             Json::Value jvRequest{Json::objectValue};
-
             jvRequest[jss::secret] = jvParams[0u].asString();
-            jvRequest[jss::tx_json] = txJSON;
+            jvRequest[jss::tx_json] = std::move(v);
 
-            if (bOffline)
+            if (offline)
                 jvRequest[jss::offline] = true;
 
             return jvRequest;
@@ -1203,16 +1207,12 @@ private:
     Json::Value
     parseSubmitMultiSigned(Json::Value const& jvParams)
     {
-        if (1 == jvParams.size())
+        if (Json::Value v;
+            jvParams.size() == 1 && Json::load(jvParams[0].asString(), v))
         {
-            Json::Value txJSON;
-            Json::Reader reader;
-            if (reader.parse(jvParams[0u].asString(), txJSON))
-            {
-                Json::Value jvRequest{Json::objectValue};
-                jvRequest[jss::tx_json] = txJSON;
-                return jvRequest;
-            }
+            Json::Value jvRequest{Json::objectValue};
+            jvRequest[jss::tx_json] = std::move(v);
+            return jvRequest;
         }
 
         return rpcError(rpcINVALID_PARAMS);
@@ -1596,18 +1596,20 @@ struct RPCCallImp
             if (strData.find("Unable to parse request") == 0 ||
                 strData.find(jss::invalid_API_version.c_str()) == 0)
                 Throw<RequestNotParseable>(strData);
-            Json::Reader reader;
-            Json::Value jvReply;
-            if (!reader.parse(strData, jvReply))
-                Throw<std::runtime_error>("couldn't parse reply from server");
 
-            if (!jvReply)
+            Json::Value reply;
+
+            if (!Json::load(strData, reply))
+                Throw<std::runtime_error>(
+                    "couldn't parse reply from server:" + strData);
+
+            if (!reply)
                 Throw<std::runtime_error>(
                     "expected reply to have result, error and id properties");
 
             Json::Value jvResult(Json::objectValue);
 
-            jvResult["result"] = jvReply;
+            jvResult[jss::result] = std::move(reply);
 
             (callbackFuncP)(jvResult);
         }
@@ -1749,6 +1751,18 @@ rpcClient(
 
             {
                 boost::asio::io_service isService;
+
+                // Allow parser to select the appropriate method.
+                auto const method = [&]() -> std::string {
+                    if (jvRequest.isMember(jss::method))
+                        return jvRequest[jss::method].asString();
+
+                    if (jvRequest.isArray())
+                        return "batch";
+
+                    return args[0];
+                }();
+
                 RPCCall::fromNetwork(
                     isService,
                     setup.client.ip,
@@ -1756,18 +1770,14 @@ rpcClient(
                     setup.client.user,
                     setup.client.password,
                     "",
-                    jvRequest.isMember(
-                        jss::method)  // Allow parser to rewrite method.
-                        ? jvRequest[jss::method].asString()
-                        : jvRequest.isArray() ? "batch" : args[0],
+                    method,
                     jvParams,                  // Parsed, execute.
                     setup.client.secure != 0,  // Use SSL
                     config.quiet(),
                     logs,
-                    std::bind(
-                        RPCCallImp::callRPCHandler,
-                        &jvOutput,
-                        std::placeholders::_1),
+                    [&jvOutput](Json::Value const& jv) {
+                        RPCCallImp::callRPCHandler(&jvOutput, jv);
+                    },
                     headers);
                 isService.run();  // This blocks until there are no more
                                   // outstanding async calls.
@@ -1843,7 +1853,7 @@ fromCommandLine(
     auto const result =
         rpcClient(vCmd, config, logs, RPC::apiCommandLineVersion);
 
-    std::cout << result.second.toStyledString();
+    std::cout << to_styled_string(result.second);
 
     return result.first;
 }

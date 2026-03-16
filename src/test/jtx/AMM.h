@@ -26,7 +26,7 @@
 #include <test/jtx/seq.h>
 #include <test/jtx/ter.h>
 #include <xrpld/rpc/GRPCHandlers.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/STAmount.h>
 #include <xrpl/protocol/TxFlags.h>
 
@@ -351,14 +351,14 @@ public:
     operator<<(std::ostream& s, AMM const& amm)
     {
         if (auto const res = amm.ammRpcInfo())
-            s << res.toStyledString();
+            s << to_string(res);
         return s;
     }
 
     std::string
     operator[](AccountID const& lp)
     {
-        return ammRpcInfo(lp).toStyledString();
+        return to_styled_string(ammRpcInfo(lp));
     }
 
     Json::Value

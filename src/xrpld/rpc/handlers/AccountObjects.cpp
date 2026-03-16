@@ -67,6 +67,7 @@ doAccountNFTs(RPC::JsonContext& context)
     auto result = RPC::lookupLedger(ledger, context);
     if (ledger == nullptr)
         return result;
+
     auto const accountID{id.value()};
 
     if (!ledger->exists(keylet::account(accountID)))
@@ -251,14 +252,13 @@ doAccountObjects(RPC::JsonContext& context)
 
         if (rpcStatus)
         {
-            result.clear();
-            rpcStatus.inject(result);
-            return result;
+            Json::Value ret;
+            rpcStatus.inject(ret);
+            return ret;
         }
-        else if (type != ltANY)
-        {
+
+        if (type != ltANY)
             typeFilter = std::vector<LedgerEntryType>({type});
-        }
     }
 
     unsigned int limit;

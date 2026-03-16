@@ -22,7 +22,6 @@
 #include <xrpld/app/main/Application.h>
 #include <xrpld/app/misc/NegativeUNLVote.h>
 #include <xrpld/shamap/SHAMapItem.h>
-#include <xrpl/json/to_string.h>
 
 namespace ripple {
 

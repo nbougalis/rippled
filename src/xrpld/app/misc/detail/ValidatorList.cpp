@@ -25,7 +25,7 @@
 #include <xrpl/basics/Slice.h>
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/base64.h>
-#include <xrpl/json/json_reader.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/PublicKey.h>
 #include <xrpl/protocol/STValidation.h>
 #include <xrpl/protocol/digest.h>
@@ -383,7 +383,7 @@ ValidatorList::cacheValidatorFile(
     // `ValidatorSite::missingSite()`)
     value[jss::refresh_interval] = 24 * 60;
 
-    writeFileContents(ec, filename, value.toStyledString());
+    writeFileContents(ec, filename, to_styled_string(value));
 
     if (ec)
     {
@@ -1385,8 +1385,7 @@ ValidatorList::verify(
     if (!sig || !ripple::verify(*signingKey, makeSlice(data), makeSlice(*sig)))
         return {ListDisposition::invalid, masterPubKey};
 
-    Json::Reader r;
-    if (!r.parse(data, list))
+    if (!Json::load(data, list))
         return {ListDisposition::invalid, masterPubKey};
 
     if (list.isMember(jss::sequence) && list[jss::sequence].isInt() &&

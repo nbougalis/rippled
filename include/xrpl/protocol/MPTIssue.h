@@ -20,6 +20,7 @@
 #ifndef RIPPLE_PROTOCOL_MPTISSUE_H_INCLUDED
 #define RIPPLE_PROTOCOL_MPTISSUE_H_INCLUDED
 
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/UintTypes.h>
 

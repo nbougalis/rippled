@@ -3495,8 +3495,7 @@ public:
                 server_info.isMember(jss::result) &&
                 server_info[jss::result].isMember(jss::info));
             auto const& info = server_info[jss::result][jss::info];
-            BEAST_EXPECT(
-                info.isMember(jss::load_factor) && info[jss::load_factor] == 1);
+            BEAST_EXPECT(info[jss::load_factor] == 1.0);
             BEAST_EXPECT(!info.isMember(jss::load_factor_server));
             BEAST_EXPECT(!info.isMember(jss::load_factor_local));
             BEAST_EXPECT(!info.isMember(jss::load_factor_net));
@@ -3538,22 +3537,22 @@ public:
 
         {
             auto const server_info = env.rpc("server_info");
+
             BEAST_EXPECT(
                 server_info.isMember(jss::result) &&
                 server_info[jss::result].isMember(jss::info));
             auto const& info = server_info[jss::result][jss::info];
+
+            BEAST_EXPECT(!info.isMember(jss::load_factor_local));
+            BEAST_EXPECT(!info.isMember(jss::load_factor_net));
+
+            BEAST_EXPECT(info[jss::load_factor_server] == 1.0);
+
             // Avoid double rounding issues by comparing to a range.
             BEAST_EXPECT(
-                info.isMember(jss::load_factor) &&
                 info[jss::load_factor] > 888.88 &&
                 info[jss::load_factor] < 888.89);
             BEAST_EXPECT(
-                info.isMember(jss::load_factor_server) &&
-                info[jss::load_factor_server] == 1);
-            BEAST_EXPECT(!info.isMember(jss::load_factor_local));
-            BEAST_EXPECT(!info.isMember(jss::load_factor_net));
-            BEAST_EXPECT(
-                info.isMember(jss::load_factor_fee_escalation) &&
                 info[jss::load_factor_fee_escalation] > 888.88 &&
                 info[jss::load_factor_fee_escalation] < 888.89);
         }
@@ -3586,16 +3585,16 @@ public:
             BEAST_EXPECT(
                 server_info.isMember(jss::result) &&
                 server_info[jss::result].isMember(jss::info));
+
             auto const& info = server_info[jss::result][jss::info];
-            // Avoid double rounding issues by comparing to a range.
-            BEAST_EXPECT(
-                info.isMember(jss::load_factor) &&
-                info[jss::load_factor] == 1000);
+
             BEAST_EXPECT(!info.isMember(jss::load_factor_server));
             BEAST_EXPECT(!info.isMember(jss::load_factor_local));
-            BEAST_EXPECT(
-                info.isMember(jss::load_factor_net) &&
-                info[jss::load_factor_net] == 1000);
+
+            BEAST_EXPECT(info[jss::load_factor] == 1000.0);
+            BEAST_EXPECT(info[jss::load_factor_net] == 1000.0);
+
+            // Avoid double rounding issues by comparing to a range.
             BEAST_EXPECT(
                 info.isMember(jss::load_factor_fee_escalation) &&
                 info[jss::load_factor_fee_escalation] > 888.88 &&

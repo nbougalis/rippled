@@ -22,7 +22,7 @@
 #include <xrpld/ledger/ReadView.h>
 #include <xrpld/rpc/Context.h>
 #include <xrpld/rpc/detail/RPCHelpers.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/jss.h>
 
@@ -182,17 +182,13 @@ doGetAggregatePrice(RPC::JsonContext& context)
 
     // Lambda to get `trim` and `time_threshold` fields. If the field
     // is not included in the input then a default value is returned.
-    auto getField = [&params, &validUInt](
+    auto getField = [&params](
                         Json::StaticString const& field,
                         unsigned int def =
                             0) -> std::variant<std::uint32_t, error_code_i> {
-        if (params.isMember(field))
-        {
-            if (!validUInt(params, field))
-                return rpcINVALID_PARAMS;
-            return params[field].asUInt();
-        }
-        return def;
+        if (auto ret = to_integer<std::uint32_t>(params.get(field, def)))
+            return *ret;
+        return rpcINVALID_PARAMS;
     };
 
     // Lambda to get `base_asset` and `quote_asset`. The values have
@@ -258,9 +254,8 @@ doGetAggregatePrice(RPC::JsonContext& context)
             RPC::inject_error(rpcORACLE_MALFORMED, result);
             return result;
         }
-        auto const documentID = validUInt(oracle, jss::oracle_document_id)
-            ? std::make_optional(oracle[jss::oracle_document_id].asUInt())
-            : std::nullopt;
+        auto const documentID =
+            to_integer<std::uint32_t>(oracle[jss::oracle_document_id]);
         auto const account =
             parseBase58<AccountID>(oracle[jss::account].asString());
         if (!account || account->isZero() || !documentID)
@@ -294,9 +289,10 @@ doGetAggregatePrice(RPC::JsonContext& context)
                 auto const scale = iter->isFieldPresent(sfScale)
                     ? -static_cast<int>(iter->getFieldU8(sfScale))
                     : 0;
-                prices.insert(Prices::value_type(
-                    node.getFieldU32(sfLastUpdateTime),
-                    STAmount{noIssue(), price, scale}));
+                prices.insert(
+                    Prices::value_type(
+                        node.getFieldU32(sfLastUpdateTime),
+                        STAmount{noIssue(), price, scale}));
                 return true;
             }
             return false;

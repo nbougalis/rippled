@@ -324,7 +324,7 @@ class Simulate_test : public beast::unit_test::suite
             auto const resp = env.rpc("json", "simulate", to_string(params));
             BEAST_EXPECTS(
                 resp[jss::result][jss::error] == "srcActMalformed",
-                resp[jss::result][jss::error].toStyledString());
+                to_compact_string(resp[jss::result][jss::error]));
             BEAST_EXPECT(
                 resp[jss::result][jss::error_message] ==
                 "Invalid field 'tx.Account'.");
@@ -845,7 +845,7 @@ class Simulate_test : public beast::unit_test::suite
 
                 BEAST_EXPECTS(
                     result[jss::engine_result] == "tefBAD_SIGNATURE",
-                    result[jss::engine_result].toStyledString());
+                    to_compact_string(result[jss::engine_result]));
                 BEAST_EXPECT(result[jss::engine_result_code] == -186);
                 BEAST_EXPECT(
                     result[jss::engine_result_message] ==

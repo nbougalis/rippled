@@ -20,8 +20,7 @@
 #ifndef RIPPLE_RPC_JSON_BODY_H
 #define RIPPLE_RPC_JSON_BODY_H
 
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 
 #include <boost/beast/core/multi_buffer.hpp>
 #include <boost/beast/http/message.hpp>
@@ -50,11 +49,8 @@ struct json_body
         template <bool isRequest, class Fields>
         explicit reader(
             boost::beast::http::message<isRequest, json_body, Fields> const& m)
+            : buffer_(to_multi_buffer(m.body))
         {
-            stream(m.body, [&](void const* data, std::size_t n) {
-                buffer_.commit(boost::asio::buffer_copy(
-                    buffer_.prepare(n), boost::asio::buffer(data, n)));
-            });
         }
 
         void

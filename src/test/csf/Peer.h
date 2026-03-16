@@ -636,7 +636,7 @@ struct Peer
 
         if (netLgr != ledgerID)
         {
-            JLOG(j.trace()) << Json::Compact(validations.getJsonTrie());
+            JLOG(j.trace()) << validations.getJsonTrie();
             issue(WrongPrevLedger{ledgerID, netLgr});
         }
 
@@ -953,8 +953,9 @@ struct Peer
         // code are positive. (e.g. proposeFRESHNESS)
         using namespace std::chrono;
         using namespace std::chrono_literals;
-        return NetClock::time_point(duration_cast<NetClock::duration>(
-            scheduler.now().time_since_epoch() + 86400s + clockSkew));
+        return NetClock::time_point(
+            duration_cast<NetClock::duration>(
+                scheduler.now().time_since_epoch() + 86400s + clockSkew));
     }
 
     Ledger::ID

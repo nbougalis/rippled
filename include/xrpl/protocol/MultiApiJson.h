@@ -20,7 +20,7 @@
 #ifndef RIPPLE_JSON_MULTIAPIJSON_H_INCLUDED
 #define RIPPLE_JSON_MULTIAPIJSON_H_INCLUDED
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ApiVersion.h>
 
 #include <xrpl/beast/utility/instrumentation.h>
@@ -73,14 +73,12 @@ struct MultiApiJson
 
     explicit MultiApiJson(Json::Value const& init = {})
     {
-        if (init == Json::Value{})
-            return;  // All elements are already default-initialized
         for (auto& v : val)
             v = init;
     }
 
     void
-    set(const char* key, auto const& v)
+    set(std::string_view key, auto const& v)
         requires std::constructible_from<Json::Value, decltype(v)>
     {
         for (auto& a : this->val)
@@ -91,7 +89,7 @@ struct MultiApiJson
     enum IsMemberResult : int { none = 0, some, all };
 
     [[nodiscard]] IsMemberResult
-    isMember(const char* key) const
+    isMember(std::string_view key) const
     {
         int count = 0;
         for (auto& a : this->val)
@@ -152,8 +150,8 @@ struct MultiApiJson
             typename... Args,
             typename Fn>
             requires(!some_integral_constant<Version>) &&
-                        std::convertible_to<Version, unsigned> &&
-                        std::same_as<std::remove_cvref_t<Json>, MultiApiJson>
+            std::convertible_to<Version, unsigned> &&
+            std::same_as<std::remove_cvref_t<Json>, MultiApiJson>
         auto
         operator()(Json& json, Version version, Fn fn, Args&&... args) const
             -> std::
@@ -173,8 +171,8 @@ struct MultiApiJson
         // unsigned int version, Json only
         template <typename Json, typename Version, typename Fn>
             requires(!some_integral_constant<Version>) &&
-                        std::convertible_to<Version, unsigned> &&
-                        std::same_as<std::remove_cvref_t<Json>, MultiApiJson>
+            std::convertible_to<Version, unsigned> &&
+            std::same_as<std::remove_cvref_t<Json>, MultiApiJson>
         auto
         operator()(Json& json, Version version, Fn fn) const
             -> std::invoke_result_t<Fn, decltype(json.val[0])>

@@ -23,8 +23,7 @@
 #include <xrpld/app/misc/AmendmentTable.h>
 #include <xrpld/app/misc/NetworkOPs.h>
 #include <xrpld/rpc/detail/TransactionSign.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/LedgerFormats.h>
 #include <xrpl/protocol/RPCErr.h>
 #include <xrpl/protocol/SField.h>
@@ -466,7 +465,7 @@ private:
 
         // generate hash
         {
-            const std::string out = Json::FastWriter().write(ret);
+            const std::string out = to_compact_string(ret);
             defsHash =
                 ripple::sha512Half(ripple::Slice{out.data(), out.size()});
         }
@@ -547,7 +546,7 @@ doServerDefinitions(RPC::JsonContext& context)
 
         lastFeatures = features;
         {
-            const std::string out = Json::FastWriter().write(features);
+            const std::string out = to_compact_string(features);
             lastFeatureHash =
                 ripple::sha512Half(ripple::Slice{out.data(), out.size()});
         }

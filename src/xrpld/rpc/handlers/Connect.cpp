@@ -45,28 +45,21 @@ doConnect(RPC::JsonContext& context)
     if (!context.params.isMember(jss::ip))
         return RPC::missing_field_error(jss::ip);
 
-    if (context.params.isMember(jss::port) &&
-        !context.params[jss::port].isConvertibleTo(Json::intValue))
-    {
+    auto port = to_integer<std::uint16_t>(
+        context.params.get(jss::port, DEFAULT_PEER_PORT));
+
+    if (port.value_or(0) == 0)
         return rpcError(rpcINVALID_PARAMS);
-    }
-
-    int iPort;
-
-    if (context.params.isMember(jss::port))
-        iPort = context.params[jss::port].asInt();
-    else
-        iPort = DEFAULT_PEER_PORT;
 
     auto const ip_str = context.params[jss::ip].asString();
     auto ip = beast::IP::Endpoint::from_string(ip_str);
 
     if (!is_unspecified(ip))
-        context.app.overlay().connect(ip.at_port(iPort));
+        context.app.overlay().connect(ip.at_port(*port));
 
     return RPC::makeObjectValue(
         "attempting connection to IP:" + ip_str +
-        " port: " + std::to_string(iPort));
+        " port: " + std::to_string(*port));
 }
 
 }  // namespace ripple

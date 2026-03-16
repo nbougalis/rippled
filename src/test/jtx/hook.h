@@ -22,7 +22,7 @@
 
 #include <test/jtx/Account.h>
 #include <xrpld/app/hook/applyHook.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <cstdint>
 #include <map>
 #include <optional>

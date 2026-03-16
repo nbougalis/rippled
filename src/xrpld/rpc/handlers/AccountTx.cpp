@@ -28,8 +28,7 @@
 #include <xrpld/rpc/DeliveredAmount.h>
 #include <xrpld/rpc/MPTokenIssuanceID.h>
 #include <xrpld/rpc/Role.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/NFTSyntheticSerializer.h>
 #include <xrpl/protocol/RPCErr.h>
@@ -458,10 +457,12 @@ doAccountTxJson(RPC::JsonContext& context)
 
     if (params.isMember(jss::marker))
     {
-        auto& token = params[jss::marker];
-        if (!token.isMember(jss::ledger) || !token.isMember(jss::seq) ||
-            !token[jss::ledger].isConvertibleTo(Json::ValueType::uintValue) ||
-            !token[jss::seq].isConvertibleTo(Json::ValueType::uintValue))
+        auto const& token = params[jss::marker];
+
+        auto ledgerSeq = to_integer<std::uint32_t>(token[jss::ledger]);
+        auto txnSeq = to_integer<std::uint32_t>(token[jss::seq]);
+
+        if (!ledgerSeq || !txnSeq)
         {
             RPC::Status status{
                 rpcINVALID_PARAMS,
@@ -470,7 +471,8 @@ doAccountTxJson(RPC::JsonContext& context)
             status.inject(response);
             return response;
         }
-        args.marker = {token[jss::ledger].asUInt(), token[jss::seq].asUInt()};
+
+        args.marker = {*ledgerSeq, *txnSeq};
     }
 
     auto res = doAccountTxHelp(context, args);

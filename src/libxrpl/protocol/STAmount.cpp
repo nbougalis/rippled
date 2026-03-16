@@ -933,9 +933,18 @@ amountFromJson(SField const& name, Json::Value const& v)
     }
     else if (v.isArray())
     {
-        value = v.get(Json::UInt(0), 0);
-        currencyOrMPTID = v.get(Json::UInt(1), Json::nullValue);
-        issuer = v.get(Json::UInt(2), Json::nullValue);
+        value = 0;
+
+        if (v.size() != 0)
+        {
+            value = v[0];
+
+            if (v.size() > 1)
+                currencyOrMPTID = v[1];
+
+            if (v.size() > 2)
+                issuer = v[2];
+        }
     }
     else if (v.isString())
     {

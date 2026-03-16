@@ -1507,10 +1507,10 @@ class MPToken_test : public beast::unit_test::suite
             Env env{*this, feature};
             env.fund(XRP(1'000), alice);
             env.fund(XRP(1'000), carol);
-            auto test = [&](Json::Value const& jv,
-                            std::string const& mptField) {
+            auto test = [&](Json::Value const& jv, std::string_view mptField) {
                 txWithAmounts.erase(
-                    jv[jss::TransactionType].asString() + mptField);
+                    jv[jss::TransactionType].asString() +
+                    std::string(mptField));
 
                 // tx is signed
                 auto jtx = env.jt(jv);
@@ -1669,7 +1669,7 @@ class MPToken_test : public beast::unit_test::suite
                 jv[jss::Account] = alice.human();
                 jv[jss::Destination] = carol.human();
                 jv[jss::SendMax] = mpt.getJson(JsonOptions::none);
-                test(jv, jss::SendMax.c_str());
+                test(jv, jss::SendMax);
             }
             // EscrowCreate
             {
@@ -1678,14 +1678,14 @@ class MPToken_test : public beast::unit_test::suite
                 jv[jss::Account] = alice.human();
                 jv[jss::Destination] = carol.human();
                 jv[jss::Amount] = mpt.getJson(JsonOptions::none);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // OfferCreate
             {
                 Json::Value jv = offer(alice, USD(100), mpt);
-                test(jv, jss::TakerPays.c_str());
+                test(jv, jss::TakerPays);
                 jv = offer(alice, mpt, USD(100));
-                test(jv, jss::TakerGets.c_str());
+                test(jv, jss::TakerGets);
             }
             // PaymentChannelCreate
             {
@@ -1696,7 +1696,7 @@ class MPToken_test : public beast::unit_test::suite
                 jv[jss::SettleDelay] = 1;
                 jv[sfPublicKey.fieldName] = strHex(alice.pk().slice());
                 jv[jss::Amount] = mpt.getJson(JsonOptions::none);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // PaymentChannelFund
             {
@@ -1705,7 +1705,7 @@ class MPToken_test : public beast::unit_test::suite
                 jv[jss::Account] = alice.human();
                 jv[sfChannel.fieldName] = to_string(uint256{1});
                 jv[jss::Amount] = mpt.getJson(JsonOptions::none);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // PaymentChannelClaim
             {
@@ -1714,7 +1714,7 @@ class MPToken_test : public beast::unit_test::suite
                 jv[jss::Account] = alice.human();
                 jv[sfChannel.fieldName] = to_string(uint256{1});
                 jv[jss::Amount] = mpt.getJson(JsonOptions::none);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // NFTokenCreateOffer
             {
@@ -1723,7 +1723,7 @@ class MPToken_test : public beast::unit_test::suite
                 jv[jss::Account] = alice.human();
                 jv[sfNFTokenID.fieldName] = to_string(uint256{1});
                 jv[jss::Amount] = mpt.getJson(JsonOptions::none);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // NFTokenAcceptOffer
             {
@@ -1741,7 +1741,7 @@ class MPToken_test : public beast::unit_test::suite
                 jv[jss::Account] = alice.human();
                 jv[sfNFTokenTaxon.fieldName] = 1;
                 jv[jss::Amount] = mpt.getJson(JsonOptions::none);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // TrustSet
             auto trustSet = [&](SField const& field) {
@@ -1757,12 +1757,12 @@ class MPToken_test : public beast::unit_test::suite
             // XChainCommit
             {
                 Json::Value const jv = xchain_commit(alice, jvb, 1, mpt);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // XChainClaim
             {
                 Json::Value const jv = xchain_claim(alice, jvb, 1, mpt, alice);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // XChainCreateClaimID
             {
@@ -1782,7 +1782,7 @@ class MPToken_test : public beast::unit_test::suite
                     1,
                     alice,
                     signer(alice));
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // XChainAddAccountCreateAttestation
             {
@@ -1856,19 +1856,19 @@ class MPToken_test : public beast::unit_test::suite
             {
                 Json::Value jv = uritoken::buy(alice, hexid);
                 jv[jss::Amount] = mpt.getJson(JsonOptions::none);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // URITokenCreateOffer
             {
                 Json::Value jv = uritoken::sell(alice, hexid);
                 jv[jss::Amount] = mpt.getJson(JsonOptions::none);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // URITokenMint
             {
                 Json::Value jv = uritoken::mint(alice, hexid);
                 jv[jss::Amount] = mpt.getJson(JsonOptions::none);
-                test(jv, jss::Amount.c_str());
+                test(jv, jss::Amount);
             }
             // Remit
             {
@@ -1876,14 +1876,13 @@ class MPToken_test : public beast::unit_test::suite
                 jv[sfAmounts.jsonName] = Json::arrayValue;
                 jv[sfAmounts.jsonName][0u][sfAmountEntry.jsonName]
                   [jss::Amount] = mpt.getJson(JsonOptions::none);
-                test(jv, sfAmounts.jsonName.c_str());
+                test(jv, sfAmounts.jsonName);
             }
             // ClaimReward
             {
                 Json::Value jv = reward::claim(alice);
-                jv[sfClaimCurrency.jsonName][jss::mpt_issuance_id] =
-                    to_string(issue);
-                test(jv, sfClaimCurrency.jsonName.c_str());
+                jv[sfClaimCurrency][jss::mpt_issuance_id] = to_string(issue);
+                test(jv, sfClaimCurrency);
             }
         }
         for (const auto& str : txWithAmounts)

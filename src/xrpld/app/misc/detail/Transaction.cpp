@@ -27,7 +27,7 @@
 #include <xrpld/rpc/CTID.h>
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/safe_cast.h>
-#include <xrpl/json/json_reader.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/jss.h>

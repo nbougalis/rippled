@@ -3607,10 +3607,10 @@ private:
             for (Json::UInt i = 0; i < acctObjs.size(); ++i)
             {
                 if (BEAST_EXPECT(
-                        acctObjs[i].isMember(sfNFTokens.jsonName) &&
-                        acctObjs[i][sfNFTokens.jsonName].isArray()))
+                        acctObjs[i].isMember(sfNFTokens) &&
+                        acctObjs[i][sfNFTokens].isArray()))
                 {
-                    BEAST_EXPECT(acctObjs[i][sfNFTokens.jsonName].size() == 32);
+                    BEAST_EXPECT(acctObjs[i][sfNFTokens].size() == 32);
                     ++pageCount;
                 }
             }

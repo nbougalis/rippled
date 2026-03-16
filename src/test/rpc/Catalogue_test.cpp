@@ -476,7 +476,8 @@ class Catalogue_test : public beast::unit_test::suite
                 env.client().invoke("catalogue_create", params)[jss::result];
             BEAST_EXPECT(result[jss::status] == jss::success);
 
-            JLOG(j.trace()) << "Catalogue created: " << result.toStyledString();
+            JLOG(j.trace())
+                << "Catalogue created: " << to_styled_string(result);
         }
 
         // Create a new environment for loading the catalogue
@@ -506,7 +507,7 @@ class Catalogue_test : public beast::unit_test::suite
             loadEnv.client().invoke("catalogue_load", params)[jss::result];
 
         JLOG(loadJ.trace())
-            << "Catalogue load result: " << result.toStyledString();
+            << "Catalogue load result: " << to_styled_string(result);
 
         BEAST_EXPECT(result[jss::status] == jss::success);
         BEAST_EXPECT(result[jss::ledger_min] == minLedger);

@@ -23,7 +23,7 @@
 #include <xrpl/basics/Number.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/utility/Zero.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/FeeUnits.h>
 
 #include <boost/multiprecision/cpp_int.hpp>

@@ -35,8 +35,7 @@
 #include <xrpl/basics/make_SSLContext.h>
 #include <xrpl/beast/net/IPAddressConversion.h>
 #include <xrpl/beast/rfc2616.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/RPCErr.h>
 #include <xrpl/resource/Fees.h>
@@ -337,23 +336,23 @@ ServerHandler::onWSMessage(
     std::vector<boost::asio::const_buffer> const& buffers)
 {
     Json::Value jv;
-    auto const size = boost::asio::buffer_size(buffers);
-    if (size > RPC::Tuning::maxRequestSize ||
-        !Json::Reader{}.parse(jv, buffers) || !jv.isObject())
+
+    if (boost::asio::buffer_size(buffers) > RPC::Tuning::maxRequestSize ||
+        !Json::load(buffers_to_string(buffers), jv) || !jv.isObject())
     {
         Json::Value jvResult(Json::objectValue);
         jvResult[jss::type] = jss::error;
         jvResult[jss::error] = "jsonInvalid";
+
+        // FIXME: This is weird. Why are we including the content that we
+        //        just determined is problematic and may, in fact, result
+        //        in the response itself being unparseable?
         jvResult[jss::value] = buffers_to_string(buffers);
-        boost::beast::multi_buffer sb;
-        Json::stream(jvResult, [&sb](auto const p, auto const n) {
-            sb.commit(
-                boost::asio::buffer_copy(
-                    sb.prepare(n), boost::asio::buffer(p, n)));
-        });
-        JLOG(m_journal.trace()) << "Websocket sending '" << jvResult << "'";
+
         session->send(
-            std::make_shared<StreambufWSMsg<decltype(sb)>>(std::move(sb)));
+            std::make_shared<StreambufWSMsg<boost::beast::multi_buffer>>(
+                Json::save<boost::beast::multi_buffer>(jvResult)));
+
         session->complete();
         return;
     }
@@ -385,17 +384,22 @@ ServerHandler::onWSMessage(
 
 void
 ServerHandler::onUDPMessage(
-    std::string const& message,
+    std::string_view message,
     boost::asio::ip::tcp::endpoint const& remoteEndpoint,
     std::function<void(std::string const&)> sendResponse)
 {
     Json::Value jv;
+
     if (message.size() > RPC::Tuning::maxRequestSize ||
-        !Json::Reader{}.parse(message, jv) || !jv.isObject())
+        !Json::load(message, jv) || !jv.isObject())
     {
         Json::Value jvResult(Json::objectValue);
         jvResult[jss::type] = jss::error;
         jvResult[jss::error] = "jsonInvalid";
+
+        // FIXME: This is weird. Why are we including the content that we
+        //        just determined is problematic and may, in fact, result
+        //        in the response itself being unparseable?
         jvResult[jss::value] = message;
 
         std::string const response = to_string(jvResult);
@@ -558,7 +562,7 @@ ServerHandler::processUDP(
         jr[jss::result] = RPC::make_error(rpcINTERNAL);
         JLOG(m_journal.error())
             << "Exception while processing WS: " << ex.what() << "\n"
-            << "Input JSON: " << Json::Compact{Json::Value{jv}};
+            << "Input JSON: " << jv;
     }
 
     if (is)
@@ -706,7 +710,7 @@ ServerHandler::processSession(
         jr[jss::result] = RPC::make_error(rpcINTERNAL);
         JLOG(m_journal.error())
             << "Exception while processing WS: " << ex.what() << "\n"
-            << "Input JSON: " << Json::Compact{Json::Value{jv}};
+            << "Input JSON: " << jv;
     }
 
     is->getConsumer().charge(loadType);
@@ -814,24 +818,41 @@ ServerHandler::processRequest(
 {
     auto rpcJ = app_.journal("RPC");
 
-    Json::Value jsonOrig;
+    if (request.size() > RPC::Tuning::maxRequestSize)
     {
-        Json::Reader reader;
-        if ((request.size() > RPC::Tuning::maxRequestSize) ||
-            !reader.parse(request, jsonOrig) || !jsonOrig ||
-            !jsonOrig.isObject())
+        HTTPReply(
+            400,
+            "Unable to parse request: request is too large.",
+            output,
+            rpcJ);
+        return;
+    }
+
+    Json::Value jsonOrig;
+
+    {
+        std::string error;
+
+        auto ret = Json::load(request, error);
+
+        if (ret && !ret->isObject())
         {
-            HTTPReply(
-                400,
-                "Unable to parse request: " + reader.getFormatedErrorMessages(),
-                output,
-                rpcJ);
+            error = "An object was expected.";
+            ret.reset();
+        }
+
+        if (!ret)
+        {
+            HTTPReply(400, "Unable to parse request: " + error, output, rpcJ);
             return;
         }
+
+        jsonOrig = std::move(*ret);
     }
 
     bool batch = false;
-    unsigned size = 1;
+    Json::UInt size = 1;
+
     if (jsonOrig.isMember(jss::method) && jsonOrig[jss::method] == "batch")
     {
         batch = true;
@@ -1105,9 +1126,9 @@ ServerHandler::processRequest(
         catch (std::exception const& ex)
         {
             result = RPC::make_error(rpcINTERNAL);
-            JLOG(m_journal.error()) << "Internal error : " << ex.what()
-                                    << " when processing request: "
-                                    << Json::Compact{Json::Value{params}};
+            JLOG(m_journal.error())
+                << "Internal error : " << ex.what()
+                << " when processing request: " << Json::Value{params};
         }
 
         auto end = std::chrono::system_clock::now();
@@ -1125,10 +1146,14 @@ ServerHandler::processRequest(
             {
                 result[jss::status] = jss::error;
                 result["code"] = result[jss::error_code];
-                result["message"] = result[jss::error_message];
-                result.removeMember(jss::error_message);
-                JLOG(m_journal.debug()) << "rpcError: " << result[jss::error]
-                                        << ": " << result[jss::error_message];
+
+                if (auto m = result.removeMember(jss::error_message))
+                    result["message"] = std::move(*m);
+
+                JLOG(m_journal.debug())
+                    << "rpcError: " << result[jss::error] << ": "
+                    << result.get(jss::error_message, "<none>");
+
                 r[jss::error] = std::move(result);
             }
             else
@@ -1139,34 +1164,35 @@ ServerHandler::processRequest(
         }
         else
         {
-            // Always report "status".  On an error report the request as
+            // Always report "status". On an error report the request as
             // received.
+            result[jss::status] = jss::success;
+
             if (result.isMember(jss::error))
             {
                 auto rq = params;
 
                 if (rq.isObject())
                 {  // But mask potentially sensitive information.
-                    if (rq.isMember(jss::passphrase.c_str()))
-                        rq[jss::passphrase.c_str()] = "<masked>";
-                    if (rq.isMember(jss::secret.c_str()))
-                        rq[jss::secret.c_str()] = "<masked>";
-                    if (rq.isMember(jss::seed.c_str()))
-                        rq[jss::seed.c_str()] = "<masked>";
-                    if (rq.isMember(jss::seed_hex.c_str()))
-                        rq[jss::seed_hex.c_str()] = "<masked>";
+                    for (auto const key :
+                         {jss::passphrase,
+                          jss::secret,
+                          jss::seed,
+                          jss::seed_hex})
+                    {
+                        if (rq.isMember(key))
+                            rq[key] = "<masked>";
+                    }
                 }
 
                 result[jss::status] = jss::error;
                 result[jss::request] = rq;
 
-                JLOG(m_journal.debug()) << "rpcError: " << result[jss::error]
-                                        << ": " << result[jss::error_message];
+                JLOG(m_journal.debug())
+                    << "rpcError: " << result[jss::error] << ": "
+                    << result.get(jss::error_message, "<none>");
             }
-            else
-            {
-                result[jss::status] = jss::success;
-            }
+
             r[jss::result] = std::move(result);
         }
 

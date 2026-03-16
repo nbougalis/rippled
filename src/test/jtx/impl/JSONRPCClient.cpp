@@ -17,8 +17,7 @@
 */
 //==============================================================================
 #include <test/jtx/JSONRPCClient.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/server/Port.h>
 #include <boost/asio.hpp>
@@ -138,14 +137,17 @@ public:
         response<dynamic_body> res;
         read(stream_, bin_, res);
 
-        Json::Reader jr;
-        Json::Value jv;
-        jr.parse(buffer_string(res.body().data()), jv);
-        if (jv["result"].isMember("error"))
-            jv["error"] = jv["result"]["error"];
-        if (jv["result"].isMember("status"))
-            jv["status"] = jv["result"]["status"];
-        return jv;
+        if (Json::Value jv; Json::load(buffer_string(res.body().data()), jv))
+        {
+            if (jv["result"].isMember("error"))
+                jv["error"] = jv["result"]["error"];
+            if (jv["result"].isMember("status"))
+                jv["status"] = jv["result"]["status"];
+
+            return jv;
+        }
+
+        return {};
     }
 
     unsigned
