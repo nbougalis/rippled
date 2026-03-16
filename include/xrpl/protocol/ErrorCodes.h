@@ -173,34 +173,21 @@ enum warning_code_i {
 
 //------------------------------------------------------------------------------
 
-// VFALCO NOTE these should probably not be in the RPC namespace.
-
 namespace RPC {
 
 /** Maps an rpc error code to its token, default message, and HTTP status. */
 struct ErrorInfo
 {
-    // Default ctor needed to produce an empty std::array during constexpr eval.
-    constexpr ErrorInfo()
-        : code(rpcUNKNOWN)
-        , token("unknown")
-        , message("An unknown error code.")
-        , http_status(200)
-    {
-    }
+    error_code_i code;
+    Json::StaticString token;
+    Json::StaticString message;
+    int http_status;
 
-    constexpr ErrorInfo(
+    template <std::size_t N1, std::size_t N2>
+    consteval ErrorInfo(
         error_code_i code_,
-        char const* token_,
-        char const* message_)
-        : code(code_), token(token_), message(message_), http_status(200)
-    {
-    }
-
-    constexpr ErrorInfo(
-        error_code_i code_,
-        char const* token_,
-        char const* message_,
+        char const (&token_)[N1],
+        char const (&message_)[N2],
         int http_status_)
         : code(code_)
         , token(token_)
@@ -209,15 +196,16 @@ struct ErrorInfo
     {
     }
 
-    error_code_i code;
-    Json::StaticString token;
-    Json::StaticString message;
-    int http_status;
+    // Default ctor needed to produce an empty std::array during consteval.
+    consteval ErrorInfo()
+        : ErrorInfo(rpcUNKNOWN, "unknown", "An unknown error code.", 200)
+    {
+    }
 };
 
 /** Returns an ErrorInfo that reflects the error code. */
 ErrorInfo const&
-get_error_info(error_code_i code);
+get_error_info(error_code_i code) noexcept;
 
 /** Add or update the json update to reflect the error code. */
 /** @{ */
@@ -225,7 +213,8 @@ template <class JsonValue>
 void
 inject_error(error_code_i code, JsonValue& json)
 {
-    ErrorInfo const& info(get_error_info(code));
+    auto const& info = get_error_info(code);
+
     json[jss::error] = info.token;
     json[jss::error_code] = info.code;
     json[jss::error_message] = info.message;
@@ -233,35 +222,39 @@ inject_error(error_code_i code, JsonValue& json)
 
 template <class JsonValue>
 void
-inject_error(int code, JsonValue& json)
+inject_error(error_code_i code, std::string_view message, JsonValue& json)
 {
-    inject_error(error_code_i(code), json);
-}
+    inject_error(code, json);
 
-template <class JsonValue>
-void
-inject_error(error_code_i code, std::string const& message, JsonValue& json)
-{
-    ErrorInfo const& info(get_error_info(code));
-    json[jss::error] = info.token;
-    json[jss::error_code] = info.code;
-    json[jss::error_message] = message;
+    if (!message.empty())
+        json[jss::error_message] = message;
 }
 
 /** @} */
 
 /** Returns a new json object that reflects the error code. */
 /** @{ */
-Json::Value
-make_error(error_code_i code);
-Json::Value
-make_error(error_code_i code, std::string const& message);
+inline Json::Value
+make_error(error_code_i code)
+{
+    Json::Value json{Json::objectValue};
+    inject_error(code, json);
+    return json;
+}
+
+inline Json::Value
+make_error(error_code_i code, std::string_view message)
+{
+    Json::Value json{Json::objectValue};
+    inject_error(code, message, json);
+    return json;
+}
 /** @} */
 
 /** Returns a new json object that indicates invalid parameters. */
 /** @{ */
 inline Json::Value
-make_param_error(std::string const& message)
+make_param_error(std::string_view message)
 {
     return make_error(rpcINVALID_PARAMS, message);
 }
@@ -359,18 +352,20 @@ not_validator_error()
 /** @} */
 
 /** Returns `true` if the json contains an rpc error specification. */
-bool
-contains_error(Json::Value const& json);
+inline bool
+contains_error(Json::Value const& json) noexcept
+{
+    return json.isObject() && json.isMember(jss::error);
+}
 
 /** Returns http status that corresponds to the error code. */
-int
-error_code_http_status(error_code_i code);
+inline int
+error_code_http_status(error_code_i code)
+{
+    return get_error_info(code).http_status;
+}
 
 }  // namespace RPC
-
-/** Returns a single string with the contents of an RPC error. */
-std::string
-rpcErrorString(Json::Value const& jv);
 
 }  // namespace ripple
 
