@@ -81,25 +81,41 @@ statusRequestResponse(
     return handoff;
 }
 
-// VFALCO TODO Rewrite to use boost::beast::http::fields
 static bool
-authorized(Port const& port, std::map<std::string, std::string> const& h)
+authorized(Port const& port, boost::beast::http::fields const& headers)
 {
+    auto is_authorized = [&port](std::string_view token) {
+        auto const colon = token.find(':');
+
+        if (colon == std::string_view::npos)
+            return false;
+
+        return token.substr(0, colon) == port.user &&
+            token.substr(colon + 1) == port.password;
+    };
+
     if (port.user.empty() || port.password.empty())
         return true;
 
-    auto const it = h.find("authorization");
-    if ((it == h.end()) || (it->second.substr(0, 6) != "Basic "))
+    auto const it = headers.find("authorization");
+
+    if (it == headers.end())
         return false;
-    std::string strUserPass64 = it->second.substr(6);
-    boost::trim(strUserPass64);
-    std::string strUserPass = base64_decode(strUserPass64);
-    std::string::size_type nColon = strUserPass.find(":");
-    if (nColon == std::string::npos)
+
+    std::string_view value = it->value();
+
+    if (!value.starts_with("Basic "))
         return false;
-    std::string strUser = strUserPass.substr(0, nColon);
-    std::string strPassword = strUserPass.substr(nColon + 1);
-    return strUser == port.user && strPassword == port.password;
+
+    value.remove_prefix(6);
+
+    while (!value.empty() && (value.front() == ' ' || value.front() == '\t'))
+        value.remove_prefix(1);
+
+    while (!value.empty() && (value.back() == ' ' || value.back() == '\t'))
+        value.remove_suffix(1);
+
+    return is_authorized(base64_decode(value));
 }
 
 ServerHandler::ServerHandler(
@@ -260,23 +276,6 @@ makeOutput(Session& session)
     };
 }
 
-static std::map<std::string, std::string>
-build_map(boost::beast::http::fields const& h)
-{
-    std::map<std::string, std::string> c;
-    for (auto const& e : h)
-    {
-        // key cannot be a std::string_view because it needs to be used in
-        // map and along with iterators
-        std::string key(e.name_string());
-        std::transform(key.begin(), key.end(), key.begin(), [](auto kc) {
-            return std::tolower(static_cast<unsigned char>(kc));
-        });
-        c[key] = std::string(e.value());
-    }
-    return c;
-}
-
 template <class ConstBufferSequence>
 static std::string
 buffers_to_string(ConstBufferSequence const& bs)
@@ -305,7 +304,7 @@ ServerHandler::onRequest(Session& session)
     }
 
     // Check user/password authorization
-    if (!authorized(session.port(), build_map(session.request())))
+    if (!authorized(session.port(), session.request()))
     {
         HTTPReply(403, "Forbidden", makeOutput(session), app_.journal("RPC"));
         session.close(true);
