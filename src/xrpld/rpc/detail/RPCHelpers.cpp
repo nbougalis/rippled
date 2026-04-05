@@ -37,7 +37,6 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <xrpl/resource/Fees.h>
 #include <regex>
 
 namespace ripple {
@@ -638,9 +637,6 @@ getLedger(T& ledger, uint32_t ledgerIndex, Context& context)
     return Status::OK;
 }
 
-#include <iostream>
-#include <typeinfo>
-
 template <class T>
 Status
 getLedger(T& ledger, LedgerShortcut shortcut, Context& context)
@@ -871,35 +867,22 @@ parseRippleLibSeed(Json::Value const& value)
 std::optional<Seed>
 getSeedFromRPC(Json::Value const& params, Json::Value& error)
 {
-    using string_to_seed_t =
-        std::function<std::optional<Seed>(std::string const&)>;
-    using seed_match_t = std::pair<char const*, string_to_seed_t>;
+    auto const ok = [&params]() {
+        int count = 0;
 
-    static seed_match_t const seedTypes[]{
-        {jss::passphrase.c_str(),
-         [](std::string const& s) { return parseGenericSeed(s); }},
-        {jss::seed.c_str(),
-         [](std::string const& s) { return parseBase58<Seed>(s); }},
-        {jss::seed_hex.c_str(), [](std::string const& s) {
-             uint128 i;
-             if (i.parseHex(s))
-                 return std::optional<Seed>(Slice(i.data(), i.size()));
-             return std::optional<Seed>{};
-         }}};
-
-    // Identify which seed type is in use.
-    seed_match_t const* seedType = nullptr;
-    int count = 0;
-    for (auto const& t : seedTypes)
-    {
-        if (params.isMember(t.first))
-        {
+        if (params.isMember(jss::passphrase))
             ++count;
-            seedType = &t;
-        }
-    }
 
-    if (count != 1)
+        if (params.isMember(jss::seed))
+            ++count;
+
+        if (params.isMember(jss::seed_hex))
+            ++count;
+
+        return count == 1;
+    }();
+
+    if (!ok)
     {
         error = RPC::make_param_error(
             "Exactly one of the following must be specified: " +
@@ -908,109 +891,65 @@ getSeedFromRPC(Json::Value const& params, Json::Value& error)
         return std::nullopt;
     }
 
-    // Make sure a string is present
-    auto const& param = params[seedType->first];
-    if (!param.isString())
-    {
-        error = RPC::expected_field_error(seedType->first, "string");
+    auto ret = [&]() -> std::optional<Seed> {
+        if (params.isMember(jss::passphrase))
+        {
+            if (!params[jss::passphrase].isString())
+            {
+                error = RPC::expected_field_error(jss::passphrase, "string");
+                return std::nullopt;
+            }
+
+            return parseGenericSeed(params[jss::passphrase].asString());
+        }
+
+        if (params.isMember(jss::seed))
+        {
+            if (!params[jss::seed].isString())
+            {
+                error = RPC::expected_field_error(jss::seed, "string");
+                return std::nullopt;
+            }
+
+            return parseBase58<Seed>(params[jss::seed].asString());
+        }
+
+        if (!params[jss::seed_hex].isString())
+        {
+            error = RPC::expected_field_error(jss::seed_hex, "string");
+            return std::nullopt;
+        }
+
+        if (uint128 seed; seed.parseHex(params[jss::seed_hex].asString()))
+            return Seed(Slice(seed.data(), seed.size()));
+
         return std::nullopt;
-    }
+    }();
 
-    auto const fieldContents = param.asString();
-
-    // Convert string to seed.
-    std::optional<Seed> seed = seedType->second(fieldContents);
-
-    if (!seed)
+    if (!ret && !contains_error(error))
         error = rpcError(rpcBAD_SEED);
 
-    return seed;
+    return ret;
 }
 
 std::optional<std::pair<PublicKey, SecretKey>>
-keypairForSignature(
+keypairForSignatureHelper(
+    Json::StaticString const& field,
+    std::optional<KeyType> keyType,
     Json::Value const& params,
     Json::Value& error,
     unsigned int apiVersion)
 {
-    bool const has_key_type = params.isMember(jss::key_type);
-
-    // All of the secret types we allow, but only one at a time.
-    static char const* const secretTypes[]{
-        jss::passphrase.c_str(),
-        jss::secret.c_str(),
-        jss::seed.c_str(),
-        jss::seed_hex.c_str()};
-
-    // Identify which secret type is in use.
-    char const* secretType = nullptr;
-    int count = 0;
-    for (auto t : secretTypes)
-    {
-        if (params.isMember(t))
-        {
-            ++count;
-            secretType = t;
-        }
-    }
-
-    if (count == 0 || secretType == nullptr)
-    {
-        error = RPC::missing_field_error(jss::secret);
-        return {};
-    }
-
-    if (count > 1)
-    {
-        error = RPC::make_param_error(
-            "Exactly one of the following must be specified: " +
-            std::string(jss::passphrase) + ", " + std::string(jss::secret) +
-            ", " + std::string(jss::seed) + " or " +
-            std::string(jss::seed_hex));
-        return {};
-    }
-
-    std::optional<KeyType> keyType;
+    // Unless the data is specified as hex (which is unambiguous) we try
+    // to detect whether the seed is encoded using a non-standard way by
+    // ripple-lib. Unless we perform these checks, using such a key will
+    // generate the wrong wallet, leading to confusion and panic. Please
+    // facepalm.
     std::optional<Seed> seed;
 
-    if (has_key_type)
+    if (field != jss::seed_hex)
     {
-        if (!params[jss::key_type].isString())
-        {
-            error = RPC::expected_field_error(jss::key_type, "string");
-            return {};
-        }
-
-        keyType = keyTypeFromString(params[jss::key_type].asString());
-
-        if (!keyType)
-        {
-            if (apiVersion > 1u)
-                error = RPC::make_error(rpcBAD_KEY_TYPE);
-            else
-                error = RPC::invalid_field_error(jss::key_type);
-            return {};
-        }
-
-        // using strcmp as pointers may not match (see
-        // https://developercommunity.visualstudio.com/t/assigning-constexpr-char--to-static-cha/10021357?entry=problem)
-        if (strcmp(secretType, jss::secret.c_str()) == 0)
-        {
-            error = RPC::make_param_error(
-                "The secret field is not allowed if " +
-                std::string(jss::key_type) + " is used.");
-            return {};
-        }
-    }
-
-    // ripple-lib encodes seed used to generate an Ed25519 wallet in a
-    // non-standard way. While we never encode seeds that way, we try
-    // to detect such keys to avoid user confusion.
-    // using strcmp as pointers may not match (see
-    // https://developercommunity.visualstudio.com/t/assigning-constexpr-char--to-static-cha/10021357?entry=problem)
-    if (strcmp(secretType, jss::seed_hex.c_str()) != 0)
-    {
-        seed = RPC::parseRippleLibSeed(params[secretType]);
+        seed = RPC::parseRippleLibSeed(params[field]);
 
         if (seed)
         {
@@ -1032,35 +971,114 @@ keypairForSignature(
 
     if (!seed)
     {
-        if (has_key_type)
-            seed = getSeedFromRPC(params, error);
-        else
+        if (!params[field].isString())
         {
-            if (!params[jss::secret].isString())
-            {
-                error = RPC::expected_field_error(jss::secret, "string");
-                return {};
-            }
-
-            seed = parseGenericSeed(params[jss::secret].asString());
+            error = RPC::expected_field_error(field, "string");
+            return std::nullopt;
         }
+
+        if (field == jss::secret)
+            seed = parseGenericSeed(params[jss::secret].asString());
+        else
+            seed = getSeedFromRPC(params, error);
     }
 
     if (!seed)
     {
         if (!contains_error(error))
-        {
-            error = RPC::make_error(
-                rpcBAD_SEED, RPC::invalid_field_message(secretType));
-        }
+            error =
+                RPC::make_error(rpcBAD_SEED, RPC::invalid_field_message(field));
 
+        return std::nullopt;
+    }
+
+    return generateKeyPair(*keyType, *seed);
+}
+
+std::optional<std::pair<PublicKey, SecretKey>>
+keypairForSignature(
+    Json::Value const& params,
+    Json::Value& error,
+    unsigned int apiVersion)
+{
+    auto const count = [&params]() {
+        int count = 0;
+
+        if (params.isMember(jss::passphrase))
+            ++count;
+
+        if (params.isMember(jss::seed))
+            ++count;
+
+        if (params.isMember(jss::seed_hex))
+            ++count;
+
+        if (params.isMember(jss::secret))
+            ++count;
+
+        return count;
+    }();
+
+    if (count == 0)
+    {
+        error = RPC::missing_field_error(jss::secret);
         return {};
     }
 
-    if (keyType != KeyType::secp256k1 && keyType != KeyType::ed25519)
-        LogicError("keypairForSignature: invalid key type");
+    if (count != 1)
+    {
+        error = RPC::make_param_error(
+            "Exactly one of the following must be specified: " +
+            std::string(jss::passphrase) + ", " + std::string(jss::secret) +
+            ", " + std::string(jss::seed) + " or " +
+            std::string(jss::seed_hex));
+        return {};
+    }
 
-    return generateKeyPair(*keyType, *seed);
+    bool const has_key_type = params.isMember(jss::key_type);
+
+    std::optional<KeyType> keyType;
+
+    if (has_key_type)
+    {
+        if (!params[jss::key_type].isString())
+        {
+            error = RPC::expected_field_error(jss::key_type, "string");
+            return {};
+        }
+
+        keyType = keyTypeFromString(params[jss::key_type].asString());
+
+        if (!keyType)
+        {
+            error = (apiVersion > 1u) ? RPC::make_error(rpcBAD_KEY_TYPE)
+                                      : RPC::invalid_field_error(jss::key_type);
+            return {};
+        }
+    }
+
+    if (has_key_type && params.isMember(jss::secret))
+    {
+        error = RPC::make_param_error(
+            "The '" + std::string(jss::secret) + "' field is not allowed if '" +
+            std::string(jss::key_type) + "' is specified.");
+        return {};
+    }
+
+    if (params.isMember(jss::passphrase))
+        return keypairForSignatureHelper(
+            jss::passphrase, keyType, params, error, apiVersion);
+
+    if (params.isMember(jss::seed))
+        return keypairForSignatureHelper(
+            jss::seed, keyType, params, error, apiVersion);
+
+    if (params.isMember(jss::seed_hex))
+        return keypairForSignatureHelper(
+            jss::seed_hex, keyType, params, error, apiVersion);
+
+    return keypairForSignatureHelper(
+        jss::secret, keyType, params, error, apiVersion);
 }
 
 std::pair<RPC::Status, LedgerEntryType>

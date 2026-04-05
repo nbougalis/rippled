@@ -478,7 +478,8 @@ public:
             BEAST_EXPECT(!ret);
             BEAST_EXPECT(
                 error[jss::error_message] ==
-                "The secret field is not allowed if key_type is used.");
+                "The 'secret' field is not allowed if 'key_type' is "
+                "specified.");
         }
 
         // Specify unknown or bad "key_type"
