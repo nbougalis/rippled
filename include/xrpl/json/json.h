@@ -134,9 +134,9 @@ inline constexpr char const* const json_empty_string = "";
     exception, if caught, results in different handling between the
     v1 and v2+ responses that are generated. Ask me how I know :D
 
-    Code that throws or catches this exception, should not be moved
-    over to a more general exception type without due consideration
-    as doing so has potentially breaking client-facing impact.
+    Code that throws or catches this exception cannot be moved over
+    to a more general exception type without careful review, due to
+    the client-facing breaking impact.
  */
 class error : public std::runtime_error
 {

@@ -22,10 +22,9 @@
 
 #include <xrpld/shamap/SHAMapTreeNode.h>
 #include <xrpl/basics/base_uint.h>
-#include <iosfwd>
-#include <stdexcept>
+#include <xrpl/basics/exception_buffer.h>
+#include <exception>
 #include <string>
-#include <type_traits>
 
 namespace ripple {
 
@@ -35,36 +34,44 @@ enum class SHAMapType : std::uint8_t {
     FREE = 3,         // A tree not part of a ledger
 };
 
-inline std::string
-to_string(SHAMapType t)
+class SHAMapMissingNode : public std::exception, exception_buffer
 {
-    switch (t)
+    SHAMapMissingNode(SHAMapType t, std::string_view tag) noexcept
+        : exception_buffer("Missing Node: ")
     {
-        case SHAMapType::TRANSACTION:
-            return "Transaction Tree";
-        case SHAMapType::STATE:
-            return "State Tree";
-        case SHAMapType::FREE:
-            return "Free Tree";
-        default:
-            return std::to_string(
-                safe_cast<std::underlying_type_t<SHAMapType>>(t));
-    }
-}
+        append([t]() {
+            if (t == SHAMapType::TRANSACTION)
+                return "Transaction Tree: ";
+            if (t == SHAMapType::STATE)
+                return "State Tree: ";
+            if (t == SHAMapType::FREE)
+                return "Free Tree: ";
 
-class SHAMapMissingNode : public std::runtime_error
-{
+            return "";
+        }());
+
+        append(tag);
+    }
+
 public:
-    SHAMapMissingNode(SHAMapType t, SHAMapHash const& hash)
-        : std::runtime_error(
-              "Missing Node: " + to_string(t) + ": hash " + to_string(hash))
+    SHAMapMissingNode(SHAMapType t, SHAMapHash const& hash) noexcept
+        : SHAMapMissingNode(t, "hash")
     {
+        append(" ");
+        append(hash);
     }
 
-    SHAMapMissingNode(SHAMapType t, uint256 const& id)
-        : std::runtime_error(
-              "Missing Node: " + to_string(t) + ": id " + to_string(id))
+    SHAMapMissingNode(SHAMapType t, uint256 const& id) noexcept
+        : SHAMapMissingNode(t, "id")
     {
+        append(" ");
+        append(id);
+    }
+
+    char const*
+    what() const noexcept override
+    {
+        return c_str();
     }
 };
 

@@ -4,6 +4,7 @@
 #include <xrpl/basics/Buffer.h>
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/contract.h>
+#include <xrpl/basics/exception_buffer.h>
 #include <xrpl/json/json.h>
 #include <xrpl/protocol/SField.h>
 
@@ -13,42 +14,44 @@
 #include <string>
 
 namespace Json {
-struct JsonMissingKeyError : std::exception
+
+struct MissingKeyError : std::exception, protected ripple::exception_buffer
 {
-    char const* const key;
-    mutable std::string msg;
-    JsonMissingKeyError(Json::StaticString const& k) : key{k.c_str()}
+    MissingKeyError(StaticString const& k) noexcept
+        : exception_buffer("Missing JSON key")
     {
+        append(" '");
+        append(k);
+        append("'");
     }
+
     const char*
     what() const noexcept override
     {
-        if (msg.empty())
-        {
-            msg = std::string("Missing json key: ") + key;
-        }
-        return msg.c_str();
+        return c_str();
     }
 };
 
-struct JsonTypeMismatchError : std::exception
+struct TypeMismatchError : std::exception, protected ripple::exception_buffer
 {
-    char const* const key;
-    std::string const expectedType;
-    mutable std::string msg;
-    JsonTypeMismatchError(Json::StaticString const& k, std::string et)
-        : key{k.c_str()}, expectedType{std::move(et)}
+    TypeMismatchError(StaticString const& k, std::string_view et) noexcept
+        : exception_buffer("Type mismatch on JSON key")
     {
+        append(" '");
+        append(k);
+        append("'");
+
+        if (!et.empty())
+        {
+            append("; expected type: ");
+            append(et);
+        }
     }
+
     const char*
     what() const noexcept override
     {
-        if (msg.empty())
-        {
-            msg = std::string("Type mismatch on json key: ") + key +
-                "; expected type: " + expectedType;
-        }
-        return msg.c_str();
+        return c_str();
     }
 };
 
@@ -61,53 +64,53 @@ getOrThrow(Json::Value const& v, ripple::SField const& field)
 
 template <>
 inline std::string
-getOrThrow(Json::Value const& v, ripple::SField const& field)
+getOrThrow(Value const& v, ripple::SField const& field)
 {
     using namespace ripple;
-    Json::StaticString const& key = field.getJsonName();
+    StaticString const& key = field.getJsonName();
     if (!v.isMember(key))
-        Throw<JsonMissingKeyError>(key);
+        Throw<MissingKeyError>(key);
 
-    Json::Value const& inner = v[key];
+    Value const& inner = v[key];
     if (!inner.isString())
-        Throw<JsonTypeMismatchError>(key, "string");
+        Throw<TypeMismatchError>(key, "string");
     return inner.asString();
 }
 
 // Note, this allows integer numeric fields to act as bools
 template <>
 inline bool
-getOrThrow(Json::Value const& v, ripple::SField const& field)
+getOrThrow(Value const& v, ripple::SField const& field)
 {
     using namespace ripple;
-    Json::StaticString const& key = field.getJsonName();
+    StaticString const& key = field.getJsonName();
     if (!v.isMember(key))
-        Throw<JsonMissingKeyError>(key);
-    Json::Value const& inner = v[key];
+        Throw<MissingKeyError>(key);
+    Value const& inner = v[key];
     if (inner.isBool())
         return inner.asBool();
     if (!inner.isIntegral())
-        Throw<JsonTypeMismatchError>(key, "bool");
+        Throw<TypeMismatchError>(key, "bool");
 
     return inner.asInt() != 0;
 }
 
 template <>
 inline std::uint64_t
-getOrThrow(Json::Value const& v, ripple::SField const& field)
+getOrThrow(Value const& v, ripple::SField const& field)
 {
     using namespace ripple;
-    Json::StaticString const& key = field.getJsonName();
+    StaticString const& key = field.getJsonName();
     if (!v.isMember(key))
-        Throw<JsonMissingKeyError>(key);
-    Json::Value const& inner = v[key];
+        Throw<MissingKeyError>(key);
+    Value const& inner = v[key];
     if (inner.isUInt())
         return inner.asUInt();
     if (inner.isInt())
     {
         auto const r = inner.asInt();
         if (r < 0)
-            Throw<JsonTypeMismatchError>(key, "uint64");
+            Throw<TypeMismatchError>(key, "uint64");
         return r;
     }
     if (inner.isString())
@@ -119,15 +122,15 @@ getOrThrow(Json::Value const& v, ripple::SField const& field)
         auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), val, 16);
 
         if (ec != std::errc() || (p != s.data() + s.size()))
-            Throw<JsonTypeMismatchError>(key, "uint64");
+            Throw<TypeMismatchError>(key, "uint64");
         return val;
     }
-    Throw<JsonTypeMismatchError>(key, "uint64");
+    Throw<TypeMismatchError>(key, "uint64");
 }
 
 template <>
 inline ripple::Buffer
-getOrThrow(Json::Value const& v, ripple::SField const& field)
+getOrThrow(Value const& v, ripple::SField const& field)
 {
     using namespace ripple;
     std::string const hex = getOrThrow<std::string>(v, field);
@@ -136,13 +139,13 @@ getOrThrow(Json::Value const& v, ripple::SField const& field)
         // TODO: mismatch between a buffer and a blob
         return Buffer{r->data(), r->size()};
     }
-    Throw<JsonTypeMismatchError>(field.getJsonName(), "Buffer");
+    Throw<TypeMismatchError>(field.getJsonName(), "Buffer");
 }
 
 // This function may be used by external projects (like the witness server).
 template <class T>
 std::optional<T>
-getOptional(Json::Value const& v, ripple::SField const& field)
+getOptional(Value const& v, ripple::SField const& field)
 {
     try
     {

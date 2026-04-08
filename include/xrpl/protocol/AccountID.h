@@ -114,14 +114,15 @@ operator<<(std::ostream& os, AccountID const& x)
 namespace Json {
 template <>
 inline ripple::AccountID
-getOrThrow(Json::Value const& v, ripple::SField const& field)
+getOrThrow(Value const& v, ripple::SField const& field)
 {
     using namespace ripple;
 
-    std::string const b58 = getOrThrow<std::string>(v, field);
-    if (auto const r = parseBase58<AccountID>(b58))
+    if (auto const r =
+            parseBase58<AccountID>(getOrThrow<std::string>(v, field)))
         return *r;
-    Throw<JsonTypeMismatchError>(field.getJsonName(), "AccountID");
+
+    Throw<TypeMismatchError>(field.getJsonName(), "AccountID");
 }
 }  // namespace Json
 

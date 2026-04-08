@@ -231,21 +231,25 @@ calcAccountID(PublicKey const& pk);
 namespace Json {
 template <>
 inline ripple::PublicKey
-getOrThrow(Json::Value const& v, ripple::SField const& field)
+getOrThrow(Value const& v, ripple::SField const& field)
 {
     using namespace ripple;
+
     std::string const b58 = getOrThrow<std::string>(v, field);
-    if (auto pubKeyBlob = strUnHex(b58); publicKeyType(makeSlice(*pubKeyBlob)))
+
+    if (auto pubKeyBlob = strUnHex(b58);
+        pubKeyBlob && publicKeyType(makeSlice(*pubKeyBlob)))
     {
         return PublicKey{makeSlice(*pubKeyBlob)};
     }
-    for (auto const tokenType :
-         {TokenType::NodePublic, TokenType::AccountPublic})
-    {
-        if (auto const pk = parseBase58<PublicKey>(tokenType, b58))
-            return *pk;
-    }
-    Throw<JsonTypeMismatchError>(field.getJsonName(), "PublicKey");
+
+    if (auto const pk = parseBase58<PublicKey>(TokenType::NodePublic, b58))
+        return *pk;
+
+    if (auto const pk = parseBase58<PublicKey>(TokenType::AccountPublic, b58))
+        return *pk;
+
+    Throw<TypeMismatchError>(field.getJsonName(), "PublicKey");
 }
 }  // namespace Json
 

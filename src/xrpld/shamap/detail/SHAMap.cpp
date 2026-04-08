@@ -196,7 +196,7 @@ SHAMap::finishFetch(
             canonicalize(hash, node);
         return node;
     }
-    catch (std::runtime_error const& e)
+    catch (std::exception const& e)
     {
         JLOG(journal_.warn()) << "finishFetch exception: " << e.what();
     }

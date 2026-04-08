@@ -24,6 +24,7 @@
 #include <xrpl/basics/Slice.h>
 #include <xrpl/basics/chrono.h>
 #include <xrpl/basics/contract.h>
+#include <xrpl/basics/exception_buffer.h>
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/protocol/FeeUnits.h>
 #include <xrpl/protocol/HashPrefix.h>
@@ -674,9 +675,40 @@ private:
     optional_value() const;
 };
 
-class STObject::FieldErr : public std::runtime_error
+struct STObject::FieldErr : std::exception, protected exception_buffer
 {
-    using std::runtime_error::runtime_error;
+    explicit FieldErr(std::string_view description) noexcept
+        : exception_buffer(description)
+    {
+    }
+
+    FieldErr(
+        std::string_view description,
+        SField const& field,
+        std::string_view extra = {}) noexcept
+        : FieldErr(description)
+    {
+        append(": Field ");
+
+        if (auto name = field.getJsonName(); !name.empty())
+        {
+            append("='");
+            append(name);
+            append("'");
+        }
+
+        if (!extra.empty())
+        {
+            append(" ");
+            append(extra);
+        }
+    }
+
+    const char*
+    what() const noexcept override
+    {
+        return c_str();
+    }
 };
 
 template <class T>

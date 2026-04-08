@@ -513,12 +513,14 @@ STAmount::zeroed() const
     return STAmount(mAsset);
 }
 
-inline STAmount::operator bool() const noexcept
+inline STAmount::
+operator bool() const noexcept
 {
     return *this != beast::zero;
 }
 
-inline STAmount::operator Number() const
+inline STAmount::
+operator Number() const
 {
     if (native())
         return xrp();
@@ -780,7 +782,7 @@ getOrThrow(Json::Value const& v, ripple::SField const& field)
     using namespace ripple;
     Json::StaticString const& key = field.getJsonName();
     if (!v.isMember(key))
-        Throw<JsonMissingKeyError>(key);
+        Throw<Json::MissingKeyError>(key);
     Json::Value const& inner = v[key];
     return amountFromJson(field, inner);
 }
