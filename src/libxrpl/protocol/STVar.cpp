@@ -39,69 +39,7 @@
 namespace ripple {
 namespace detail {
 
-defaultObject_t defaultObject;
-nonPresentObject_t nonPresentObject;
-
 //------------------------------------------------------------------------------
-
-STVar::~STVar()
-{
-    destroy();
-}
-
-STVar::STVar(STVar const& other)
-{
-    if (other.p_ != nullptr)
-        p_ = other.p_->copy(max_size, &d_);
-}
-
-STVar::STVar(STVar&& other)
-{
-    if (other.on_heap())
-    {
-        p_ = other.p_;
-        other.p_ = nullptr;
-    }
-    else
-    {
-        p_ = other.p_->move(max_size, &d_);
-    }
-}
-
-STVar&
-STVar::operator=(STVar const& rhs)
-{
-    if (&rhs != this)
-    {
-        destroy();
-        if (rhs.p_)
-            p_ = rhs.p_->copy(max_size, &d_);
-        else
-            p_ = nullptr;
-    }
-
-    return *this;
-}
-
-STVar&
-STVar::operator=(STVar&& rhs)
-{
-    if (&rhs != this)
-    {
-        destroy();
-        if (rhs.on_heap())
-        {
-            p_ = rhs.p_;
-            rhs.p_ = nullptr;
-        }
-        else
-        {
-            p_ = rhs.p_->move(max_size, &d_);
-        }
-    }
-
-    return *this;
-}
 
 STVar::STVar(defaultObject_t, SField const& name) : STVar(name.fieldType, name)
 {
@@ -127,16 +65,6 @@ STVar::STVar(SerializedTypeID id, SField const& name)
     constructST(id, 0, name);
 }
 
-void
-STVar::destroy()
-{
-    if (on_heap())
-        delete p_;
-    else
-        p_->~STBase();
-
-    p_ = nullptr;
-}
 
 template <typename... Args>
     requires ValidConstructSTArgs<Args...>
@@ -226,6 +154,9 @@ STVar::constructST(SerializedTypeID id, int depth, Args&&... args)
             return;
         case STI_CURRENCY:
             construct<STCurrency>(std::forward<Args>(args)...);
+            return;
+        case STI_NUMBER:
+            construct<STNumber>(std::forward<Args>(args)...);
             return;
         default:
             Throw<std::runtime_error>("Unknown object type");
