@@ -666,8 +666,9 @@ Change::activateXahauGenesis()
             hookDef->setFieldH256(sfHookOn, hookOn);
             hookDef->setFieldH256(
                 sfHookNamespace,
-                ripple::uint256("0000000000000000000000000000000000000000000000"
-                                "000000000000000000"));
+                ripple::uint256(
+                    "0000000000000000000000000000000000000000000000"
+                    "000000000000000000"));
 
             hookDef->setFieldU16(sfHookApiVersion, 0);
             hookDef->setFieldVL(sfCreateCode, wasmBytes);
@@ -699,7 +700,8 @@ Change::activateXahauGenesis()
                 };
 
                 hookObj.setFieldArray(
-                    sfHookParameters, STArray(vec, sfHookParameters));
+                    sfHookParameters,
+                    STArray(std::move(vec), sfHookParameters));
             }
 
             hooks.push_back(hookObj);
@@ -731,9 +733,10 @@ Change::activateXahauGenesis()
     }
 
     // install hooks on layer 2 tables
-    auto const governHash = ripple::sha512Half_s(ripple::Slice(
-        XahauGenesis::GovernanceHook.data(),
-        XahauGenesis::GovernanceHook.size()));
+    auto const governHash = ripple::sha512Half_s(
+        ripple::Slice(
+            XahauGenesis::GovernanceHook.data(),
+            XahauGenesis::GovernanceHook.size()));
     for (auto const& t : l2_entries)
     {
         JLOG(j_.trace()) << "featureXahauGenesis: installing L2 table at: "
@@ -756,6 +759,8 @@ Change::activateXahauGenesis()
         // parameters
         {
             std::vector<STObject> vec;
+            vec.reserve(t.params.size());
+
             for (auto const& [k, v] : t.params)
             {
                 STObject param(sfHookParameter);
@@ -765,7 +770,7 @@ Change::activateXahauGenesis()
             };
 
             hookObj.setFieldArray(
-                sfHookParameters, STArray(vec, sfHookParameters));
+                sfHookParameters, STArray(std::move(vec), sfHookParameters));
         }
 
         hookReserve += SetHook::computeHookReserve(hookObj);

@@ -25,13 +25,33 @@
 #include <xrpl/protocol/STBase.h>
 
 namespace ripple {
+namespace detail {
 
-// The template parameter could be an unsigned type, however there's a bug in
-// gdb (last checked in gdb 12.1) that prevents gdb from finding the RTTI
-// information of a template parameterized by an unsigned type. This RTTI
-// information is needed to write gdb pretty printers.
-template <int Bits>
-class STBitString final : public STBase, public CountedObject<STBitString<Bits>>
+/** A serialized fixed-width bit string field.
+
+    Represents a fixed-width bit string of exactly @p Bits bits in the
+    serialization protocol. @p ID identifies the field type.
+
+    This class is in the @c detail namespace because there is a 1-to-1
+    mapping between the width in bits and the field type, and properly
+    sized type aliases are declared below (@ref STUInt128, etc) making
+    sure that serialization identifers are consistent and correct.
+
+    @note As this is a class template, @ref STTypedBase<ID> is, itself,
+          a dependent base. As a result, any members inherited through
+          it, like @ref getFName, must be accessed via @c this-> or by
+          being explicitly qualified. This is a consequence of the way
+          that C++'s two-phase name lookup rules work.
+
+    @tparam Bits The width of the bitstring in bits (e.g. 128, 256).
+    @tparam ID   The @ref SerializedTypeID that identifies this field type
+                 in the binary serialization protocol.
+
+    @see STTypedBase, STUInt128, STUInt160, STUInt192, STUInt256
+*/
+template <int Bits, SerializedTypeID ID>
+class STBitString final : public STTypedBase<ID, STBitString<Bits, ID>>,
+                          public CountedObject<STBitString<Bits, ID>>
 {
     static_assert(Bits > 0, "Number of bits must be positive");
 
@@ -44,167 +64,84 @@ private:
 public:
     STBitString() = default;
 
-    STBitString(SField const& n);
-    STBitString(const value_type& v);
-    STBitString(SField const& n, const value_type& v);
-    STBitString(SerialIter& sit, SField const& name);
+    STBitString(SField const& n) : STTypedBase<ID, STBitString<Bits, ID>>(n)
+    {
+    }
 
-    SerializedTypeID
-    getSType() const override;
+    STBitString(const value_type& v) : value_(v)
+    {
+    }
 
-    std::string
-    getText() const override;
+    STBitString(SField const& n, const value_type& v)
+        : STTypedBase<ID, STBitString<Bits, ID>>(n), value_(v)
+    {
+    }
 
-    bool
-    isEquivalent(const STBase& t) const override;
+    STBitString(SerialIter& sit, SField const& name)
+        : STBitString(name, sit.getBitString<Bits>())
+    {
+    }
+
+    [[nodiscard]] std::string
+    getText() const override
+    {
+        return to_string(value_);
+    }
 
     void
-    add(Serializer& s) const override;
+    add(Serializer& s) const override
+    {
+        XRPL_ASSERT(
+            this->getFName().isBinary(),
+            "ripple::STBitString::add : field is binary");
+        XRPL_ASSERT(
+            this->getFName().fieldType == this->getSType(),
+            "ripple::STBitString::add : field type match");
+        s.addBitString(value_);
+    }
 
-    bool
-    isDefault() const override;
+    [[nodiscard]] bool
+    isDefault() const override
+    {
+        return value_ == beast::zero;
+    }
 
     template <typename Tag>
     void
-    setValue(base_uint<Bits, Tag> const& v);
+    setValue(base_uint<Bits, Tag> const& v)
+    {
+        value_ = v;
+    }
 
-    value_type const&
-    value() const;
+    [[nodiscard]] value_type const&
+    value() const noexcept
+    {
+        return value_;
+    }
 
-    operator value_type() const;
+    operator value_type() const noexcept
+    {
+        return value_;
+    }
 
-private:
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
+    friend bool
+    operator==(STBitString const& lhs, STBitString const& rhs) noexcept
+    {
+        return lhs.value() == rhs.value();
+    }
 
-    friend class detail::STVar;
+    friend class STVar;
 };
 
-using STUInt128 = STBitString<128>;
-using STUInt160 = STBitString<160>;
-using STUInt192 = STBitString<192>;
-using STUInt256 = STBitString<256>;
+}  // namespace detail
 
-template <int Bits>
-inline STBitString<Bits>::STBitString(SField const& n) : STBase(n)
-{
-}
-
-template <int Bits>
-inline STBitString<Bits>::STBitString(const value_type& v) : value_(v)
-{
-}
-
-template <int Bits>
-inline STBitString<Bits>::STBitString(SField const& n, const value_type& v)
-    : STBase(n), value_(v)
-{
-}
-
-template <int Bits>
-inline STBitString<Bits>::STBitString(SerialIter& sit, SField const& name)
-    : STBitString(name, sit.getBitString<Bits>())
-{
-}
-
-template <int Bits>
-STBase*
-STBitString<Bits>::copy(std::size_t n, void* buf) const
-{
-    return emplace(n, buf, *this);
-}
-
-template <int Bits>
-STBase*
-STBitString<Bits>::move(std::size_t n, void* buf)
-{
-    return emplace(n, buf, std::move(*this));
-}
-
-template <>
-inline SerializedTypeID
-STUInt128::getSType() const
-{
-    return STI_UINT128;
-}
-
-template <>
-inline SerializedTypeID
-STUInt160::getSType() const
-{
-    return STI_UINT160;
-}
-
-template <>
-inline SerializedTypeID
-STUInt192::getSType() const
-{
-    return STI_UINT192;
-}
-
-template <>
-inline SerializedTypeID
-STUInt256::getSType() const
-{
-    return STI_UINT256;
-}
-
-template <int Bits>
-std::string
-STBitString<Bits>::getText() const
-{
-    return to_string(value_);
-}
-
-template <int Bits>
-bool
-STBitString<Bits>::isEquivalent(const STBase& t) const
-{
-    const STBitString* v = dynamic_cast<const STBitString*>(&t);
-    return v && (value_ == v->value_);
-}
-
-template <int Bits>
-void
-STBitString<Bits>::add(Serializer& s) const
-{
-    XRPL_ASSERT(
-        getFName().isBinary(), "ripple::STBitString::add : field is binary");
-    XRPL_ASSERT(
-        getFName().fieldType == getSType(),
-        "ripple::STBitString::add : field type match");
-    s.addBitString<Bits>(value_);
-}
-
-template <int Bits>
-template <typename Tag>
-void
-STBitString<Bits>::setValue(base_uint<Bits, Tag> const& v)
-{
-    value_ = v;
-}
-
-template <int Bits>
-typename STBitString<Bits>::value_type const&
-STBitString<Bits>::value() const
-{
-    return value_;
-}
-
-template <int Bits>
-STBitString<Bits>::operator value_type() const
-{
-    return value_;
-}
-
-template <int Bits>
-bool
-STBitString<Bits>::isDefault() const
-{
-    return value_ == beast::zero;
-}
+using STUInt96 = detail::STBitString<96, STI_UINT96>;
+using STUInt128 = detail::STBitString<128, STI_UINT128>;
+using STUInt160 = detail::STBitString<160, STI_UINT160>;
+using STUInt192 = detail::STBitString<192, STI_UINT192>;
+using STUInt256 = detail::STBitString<256, STI_UINT256>;
+using STUInt384 = detail::STBitString<384, STI_UINT384>;
+using STUInt512 = detail::STBitString<512, STI_UINT512>;
 
 }  // namespace ripple
 

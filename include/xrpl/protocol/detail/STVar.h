@@ -20,6 +20,7 @@
 #ifndef RIPPLE_PROTOCOL_STVAR_H_INCLUDED
 #define RIPPLE_PROTOCOL_STVAR_H_INCLUDED
 
+#include <xrpl/basics/CountedObject.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STBase.h>
 #include <xrpl/protocol/Serializer.h>
@@ -65,7 +66,7 @@ concept ValidConstructSTArgs =
 
     @see STBase::copy, STBase::move, STObject
  */
-class STVar
+class STVar : public CountedObject<STVar>
 {
     /** This is the largest "small object" that we can accommodate.
 
@@ -115,7 +116,7 @@ public:
         destroy();
     }
 
-    STVar(STVar const& other)
+    STVar(STVar const& other) : CountedObject(other)
     {
         if (other.p_ != nullptr)
             p_ = other.p_->copy(max_size, d_);

@@ -32,8 +32,8 @@ static inline std::pair<Currency, Currency>
 tokenPairKey(STObject const& pair)
 {
     return std::make_pair(
-        pair.getFieldCurrency(sfBaseAsset).currency(),
-        pair.getFieldCurrency(sfQuoteAsset).currency());
+        pair.getFieldCurrency(sfBaseAsset).value(),
+        pair.getFieldCurrency(sfQuoteAsset).value());
 }
 
 NotTEC

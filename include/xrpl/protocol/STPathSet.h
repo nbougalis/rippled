@@ -173,7 +173,8 @@ public:
 //------------------------------------------------------------------------------
 
 // A set of zero or more payment paths
-class STPathSet final : public STBase, public CountedObject<STPathSet>
+class STPathSet final : public STTypedBase<STI_PATHSET, STPathSet>,
+                        public CountedObject<STPathSet>
 {
     std::vector<STPath> value;
 
@@ -188,14 +189,8 @@ public:
 
     Json::Value getJson(JsonOptions) const override;
 
-    SerializedTypeID
-    getSType() const override;
-
     bool
     assembleAdd(STPath const& base, STPathElement const& tail);
-
-    bool
-    isEquivalent(const STBase& t) const override;
 
     bool
     isDefault() const override;
@@ -226,13 +221,13 @@ public:
     void
     emplace_back(Args&&... args);
 
-private:
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
-
     friend class detail::STVar;
+
+    friend bool
+    operator==(STPathSet const& lhs, STPathSet const& rhs) noexcept
+    {
+        return lhs.value == rhs.value;
+    }
 };
 
 // ------------ STPathElement ------------
@@ -468,7 +463,7 @@ STPath::reserve(size_t s)
 
 // ------------ STPathSet ------------
 
-inline STPathSet::STPathSet(SField const& n) : STBase(n)
+inline STPathSet::STPathSet(SField const& n) : STTypedBase(n)
 {
 }
 

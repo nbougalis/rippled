@@ -39,7 +39,8 @@ namespace ripple {
  * without paying the storage cost of duplicating asset information
  * that may be deduced from the context.
  */
-class STNumber : public STBase, public CountedObject<STNumber>
+class STNumber final : public STTypedBase<STI_NUMBER, STNumber>,
+                       public CountedObject<STNumber>
 {
 private:
     Number value_;
@@ -51,8 +52,6 @@ public:
     explicit STNumber(SField const& field, Number const& value = Number());
     STNumber(SerialIter& sit, SField const& field);
 
-    SerializedTypeID
-    getSType() const override;
     std::string
     getText() const override;
     void
@@ -64,8 +63,6 @@ public:
     setValue(Number const& v);
 
     bool
-    isEquivalent(STBase const& t) const override;
-    bool
     isDefault() const override;
 
     operator Number() const
@@ -73,11 +70,11 @@ public:
         return value_;
     }
 
-private:
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
+    friend bool
+    operator==(STNumber const& lhs, STNumber const& rhs) noexcept
+    {
+        return lhs.value_ == rhs.value_;
+    }
 };
 
 std::ostream&

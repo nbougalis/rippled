@@ -22,6 +22,7 @@
 
 #include <xrpl/basics/CountedObject.h>
 #include <xrpl/basics/Slice.h>
+#include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/chrono.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/basics/exception_buffer.h>
@@ -52,6 +53,22 @@ throwFieldNotFound(SField const& field)
     Throw<std::runtime_error>("Field not found: " + field.getName());
 }
 
+/** A serialized object that contains a collection of named fields.
+
+    An STObject is a container type that holds a heterogeneous collection
+    of @ref STBase-derived fields, each identified by an @ref SField.
+
+    It provides the foundation for all structured serialized types in the
+    protocol, including transactions, ledger entries, and inner objects.
+
+    Unlike the leaf serialized types (e.g. @ref STAccount), STObject does
+    not derive from @ref STTypedBase since other classes must derive from
+    it (e.g. @ref STTx). Those classes each represent distinct high-level
+    types (e.g. @ref STI_TRANSACTION) with distinct @ref SerializedTypeID
+    values.
+
+    @see STBase, STTypedBase, STTx, STLedgerEntry
+*/
 class STObject : public STBase, public CountedObject<STObject>
 {
     // Proxy value for a STBase derived class
@@ -94,9 +111,9 @@ public:
 
     STObject&
     operator=(STObject const&) = default;
-    STObject(STObject&&);
+    STObject(STObject&&) noexcept;
     STObject&
-    operator=(STObject&& other);
+    operator=(STObject&& other) noexcept;
 
     STObject(const SOTemplate& type, SField const& name);
     STObject(const SOTemplate& type, SerialIter& sit, SField const& name);
@@ -135,7 +152,10 @@ public:
     set(SerialIter& u, int depth = 0);
 
     SerializedTypeID
-    getSType() const override;
+    getSType() const noexcept override
+    {
+        return STI_OBJECT;
+    }
 
     bool
     isEquivalent(const STBase& t) const override;
@@ -147,10 +167,36 @@ public:
     add(Serializer& s) const override;
 
     std::string
-    getFullText() const override;
+    getFullText() const override
+    {
+        std::string ret;
+
+        if (getFName().hasName())
+        {
+            ret = getFName().getName();
+            ret += " = {";
+        }
+        else
+            ret = "{";
+
+        ret += range_to_string(v_, [](detail::STVar const& object) {
+            return object->getFullText();
+        });
+
+        return ret + "}";
+    }
 
     std::string
-    getText() const override;
+    getText() const override
+    {
+        return "{" +
+            range_to_string(
+                   v_,
+                   [](detail::STVar const& object) {
+                       return object->getText();
+                   }) +
+            "}";
+    }
 
     // TODO(tom): options should be an enum.
     Json::Value
@@ -169,9 +215,12 @@ public:
     int
     getCount() const;
 
-    bool setFlag(std::uint32_t);
-    bool clearFlag(std::uint32_t);
-    bool isFlag(std::uint32_t) const;
+    bool
+    setFlag(std::uint32_t);
+    bool
+    clearFlag(std::uint32_t);
+    bool
+    isFlag(std::uint32_t) const;
 
     std::uint32_t
     getFlags() const;
@@ -803,7 +852,8 @@ STObject::ValueProxy<T>::operator-=(U const& u)
 }
 
 template <class T>
-STObject::ValueProxy<T>::operator value_type() const
+STObject::ValueProxy<T>::
+operator value_type() const
 {
     return this->value();
 }
@@ -817,7 +867,8 @@ STObject::ValueProxy<T>::ValueProxy(STObject* st, TypedField<T> const* f)
 //------------------------------------------------------------------------------
 
 template <class T>
-STObject::OptionalProxy<T>::operator bool() const noexcept
+STObject::OptionalProxy<T>::
+operator bool() const noexcept
 {
     return engaged();
 }
@@ -830,8 +881,8 @@ STObject::OptionalProxy<T>::operator*() const -> value_type
 }
 
 template <class T>
-STObject::OptionalProxy<T>::operator typename STObject::OptionalProxy<
-    T>::optional_type() const
+STObject::OptionalProxy<T>::
+operator typename STObject::OptionalProxy<T>::optional_type() const
 {
     return optional_value();
 }
@@ -1139,8 +1190,7 @@ STObject::setFieldH160(SField const& field, base_uint<160, Tag> const& v)
     if (rf->getSType() == STI_NOTPRESENT)
         rf = makeFieldPresent(field);
 
-    using Bits = STBitString<160>;
-    if (auto cf = dynamic_cast<Bits*>(rf))
+    if (auto cf = dynamic_cast<STUInt160*>(rf))
         cf->setValue(v);
     else
         Throw<std::runtime_error>("Wrong field type");

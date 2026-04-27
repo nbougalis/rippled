@@ -49,7 +49,7 @@ STPathElement::get_hash(STPathElement const& element)
     return (hash_account ^ hash_currency ^ hash_issuer);
 }
 
-STPathSet::STPathSet(SerialIter& sit, SField const& name) : STBase(name)
+STPathSet::STPathSet(SerialIter& sit, SField const& name) : STTypedBase(name)
 {
     std::vector<STPathElement> path;
     for (;;)
@@ -101,18 +101,6 @@ STPathSet::STPathSet(SerialIter& sit, SField const& name) : STBase(name)
     }
 }
 
-STBase*
-STPathSet::copy(std::size_t n, void* buf) const
-{
-    return emplace(n, buf, *this);
-}
-
-STBase*
-STPathSet::move(std::size_t n, void* buf)
-{
-    return emplace(n, buf, std::move(*this));
-}
-
 bool
 STPathSet::assembleAdd(STPath const& base, STPathElement const& tail)
 {  // assemble base+tail and add it to the set if it's not a duplicate
@@ -132,13 +120,6 @@ STPathSet::assembleAdd(STPath const& base, STPathElement const& tail)
         }
     }
     return true;
-}
-
-bool
-STPathSet::isEquivalent(const STBase& t) const
-{
-    const STPathSet* v = dynamic_cast<const STPathSet*>(&t);
-    return v && (value == v->value);
 }
 
 bool
@@ -198,12 +179,6 @@ STPathSet::getJson(JsonOptions options) const
         ret.append(it.getJson(options));
 
     return ret;
-}
-
-SerializedTypeID
-STPathSet::getSType() const
-{
-    return STI_PATHSET;
 }
 
 void

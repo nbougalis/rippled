@@ -29,188 +29,54 @@
 
 namespace ripple {
 
-template <>
-STInteger<unsigned char>::STInteger(SerialIter& sit, SField const& name)
-    : STInteger(name, sit.get8())
-{
-}
+namespace detail {
 
-template <>
-SerializedTypeID
-STUInt8::getSType() const
-{
-    return STI_UINT8;
-}
-
-template <>
 std::string
-STUInt8::getText() const
+specializedText(SField const& field, std::uint16_t value, std::string def)
 {
-    if (getFName() == sfTransactionResult)
+    if (field == sfTransactionResult)
     {
-        std::string token, human;
-
-        if (transResultInfo(TER::fromInt(value_), token, human))
-            return human;
-
-        JLOG(debugLog().error())
-            << "Unknown result code in metadata: " << value_;
+        if (auto ret = transHuman(TER::fromInt(value)); !ret.empty())
+            def = std::move(ret);
+    }
+    else if (field == sfLedgerEntryType)
+    {
+        if (auto item = LedgerFormats::getInstance().findByType(
+                safe_cast<LedgerEntryType>(value)))
+            def = item->getName();
+    }
+    else if (field == sfTransactionType)
+    {
+        if (auto item =
+                TxFormats::getInstance().findByType(safe_cast<TxType>(value)))
+            def = item->getName();
     }
 
-    return std::to_string(value_);
+    return def;
 }
 
-template <>
 Json::Value
-STUInt8::getJson(JsonOptions) const
+specializedJson(SField const& field, std::uint16_t value)
 {
-    if (getFName() == sfTransactionResult)
+    if (field == sfTransactionResult)
+        return transToken(TER::fromInt(value), std::to_string(value));
+
+    if (field == sfLedgerEntryType)
     {
-        std::string token, human;
-
-        if (transResultInfo(TER::fromInt(value_), token, human))
-            return token;
-
-        JLOG(debugLog().error())
-            << "Unknown result code in metadata: " << value_;
+        if (auto item = LedgerFormats::getInstance().findByType(
+                safe_cast<LedgerEntryType>(value)))
+            return item->getName();
     }
-
-    return value_;
-}
-
-//------------------------------------------------------------------------------
-
-template <>
-STInteger<std::uint16_t>::STInteger(SerialIter& sit, SField const& name)
-    : STInteger(name, sit.get16())
-{
-}
-
-template <>
-SerializedTypeID
-STUInt16::getSType() const
-{
-    return STI_UINT16;
-}
-
-template <>
-std::string
-STUInt16::getText() const
-{
-    if (getFName() == sfLedgerEntryType)
+    else if (field == sfTransactionType)
     {
-        auto item = LedgerFormats::getInstance().findByType(
-            safe_cast<LedgerEntryType>(value_));
-
-        if (item != nullptr)
+        if (auto item =
+                TxFormats::getInstance().findByType(safe_cast<TxType>(value)))
             return item->getName();
     }
 
-    if (getFName() == sfTransactionType)
-    {
-        auto item =
-            TxFormats::getInstance().findByType(safe_cast<TxType>(value_));
-
-        if (item != nullptr)
-            return item->getName();
-    }
-
-    return std::to_string(value_);
+    return static_cast<Json::UInt>(value);
 }
 
-template <>
-Json::Value
-STUInt16::getJson(JsonOptions) const
-{
-    if (getFName() == sfLedgerEntryType)
-    {
-        auto item = LedgerFormats::getInstance().findByType(
-            safe_cast<LedgerEntryType>(value_));
-
-        if (item != nullptr)
-            return item->getName();
-    }
-
-    if (getFName() == sfTransactionType)
-    {
-        auto item =
-            TxFormats::getInstance().findByType(safe_cast<TxType>(value_));
-
-        if (item != nullptr)
-            return item->getName();
-    }
-
-    return value_;
-}
-
-//------------------------------------------------------------------------------
-
-template <>
-STInteger<std::uint32_t>::STInteger(SerialIter& sit, SField const& name)
-    : STInteger(name, sit.get32())
-{
-}
-
-template <>
-SerializedTypeID
-STUInt32::getSType() const
-{
-    return STI_UINT32;
-}
-
-template <>
-std::string
-STUInt32::getText() const
-{
-    return std::to_string(value_);
-}
-
-template <>
-Json::Value
-STUInt32::getJson(JsonOptions) const
-{
-    return value_;
-}
-
-//------------------------------------------------------------------------------
-
-template <>
-STInteger<std::uint64_t>::STInteger(SerialIter& sit, SField const& name)
-    : STInteger(name, sit.get64())
-{
-}
-
-template <>
-SerializedTypeID
-STUInt64::getSType() const
-{
-    return STI_UINT64;
-}
-
-template <>
-std::string
-STUInt64::getText() const
-{
-    return std::to_string(value_);
-}
-
-template <>
-Json::Value
-STUInt64::getJson(JsonOptions) const
-{
-    std::array<char, 24> buf;
-
-    auto ret = std::to_chars(
-        buf.data(),
-        buf.data() + buf.size(),
-        value_,
-        getFName().shouldMeta(SField::sMD_BaseTen) ? 10 : 16);
-
-    XRPL_ASSERT(
-        ret.ec == std::errc(),
-        "ripple::STUInt64::getJson : to_chars succeeded");
-
-    return Json::Value(std::string_view(buf.data(), ret.ptr));
 }
 
 }  // namespace ripple

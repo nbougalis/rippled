@@ -107,7 +107,7 @@ areComparable(STAmount const& v1, STAmount const& v2)
     return false;
 }
 
-STAmount::STAmount(SerialIter& sit, SField const& name) : STBase(name)
+STAmount::STAmount(SerialIter& sit, SField const& name) : STTypedBase(name)
 {
     std::uint64_t value = sit.get64();
 
@@ -190,13 +190,13 @@ STAmount::STAmount(SerialIter& sit, SField const& name) : STBase(name)
 }
 
 STAmount::STAmount(SField const& name, std::int64_t mantissa)
-    : STBase(name), mAsset(xrpIssue()), mOffset(0)
+    : STTypedBase(name), mAsset(xrpIssue()), mOffset(0)
 {
     set(mantissa);
 }
 
 STAmount::STAmount(SField const& name, std::uint64_t mantissa, bool negative)
-    : STBase(name)
+    : STTypedBase(name)
     , mAsset(xrpIssue())
     , mValue(mantissa)
     , mOffset(0)
@@ -209,7 +209,7 @@ STAmount::STAmount(SField const& name, std::uint64_t mantissa, bool negative)
 }
 
 STAmount::STAmount(SField const& name, STAmount const& from)
-    : STBase(name)
+    : STTypedBase(name)
     , mAsset(from.mAsset)
     , mValue(from.mValue)
     , mOffset(from.mOffset)
@@ -250,18 +250,6 @@ std::unique_ptr<STAmount>
 STAmount::construct(SerialIter& sit, SField const& name)
 {
     return std::make_unique<STAmount>(sit, name);
-}
-
-STBase*
-STAmount::copy(std::size_t n, void* buf) const
-{
-    return emplace(n, buf, *this);
-}
-
-STBase*
-STAmount::move(std::size_t n, void* buf)
-{
-    return emplace(n, buf, std::move(*this));
 }
 
 //------------------------------------------------------------------------------
@@ -495,12 +483,6 @@ STAmount::setJson(Json::Value& elem) const
 //
 //------------------------------------------------------------------------------
 
-SerializedTypeID
-STAmount::getSType() const
-{
-    return STI_AMOUNT;
-}
-
 std::string
 STAmount::getFullText() const
 {
@@ -645,13 +627,6 @@ STAmount::add(Serializer& s) const
         s.addBitString(mAsset.get<Issue>().currency);
         s.addBitString(mAsset.get<Issue>().account);
     }
-}
-
-bool
-STAmount::isEquivalent(const STBase& t) const
-{
-    const STAmount* v = dynamic_cast<const STAmount*>(&t);
-    return v && (*v == *this);
 }
 
 bool

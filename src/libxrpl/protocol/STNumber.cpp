@@ -25,23 +25,17 @@
 namespace ripple {
 
 STNumber::STNumber(SField const& field, Number const& value)
-    : STBase(field), value_(value)
+    : STTypedBase(field), value_(value)
 {
 }
 
-STNumber::STNumber(SerialIter& sit, SField const& field) : STBase(field)
+STNumber::STNumber(SerialIter& sit, SField const& field) : STTypedBase(field)
 {
     // We must call these methods in separate statements
     // to guarantee their order of execution.
     auto mantissa = sit.geti64();
     auto exponent = sit.geti32();
     value_ = Number{mantissa, exponent};
-}
-
-SerializedTypeID
-STNumber::getSType() const
-{
-    return STI_NUMBER;
 }
 
 std::string
@@ -72,28 +66,6 @@ void
 STNumber::setValue(Number const& v)
 {
     value_ = v;
-}
-
-STBase*
-STNumber::copy(std::size_t n, void* buf) const
-{
-    return emplace(n, buf, *this);
-}
-
-STBase*
-STNumber::move(std::size_t n, void* buf)
-{
-    return emplace(n, buf, std::move(*this));
-}
-
-bool
-STNumber::isEquivalent(STBase const& t) const
-{
-    XRPL_ASSERT(
-        t.getSType() == this->getSType(),
-        "ripple::STNumber::isEquivalent : field type match");
-    STNumber const& v = dynamic_cast<STNumber const&>(t);
-    return value_ == v;
 }
 
 bool

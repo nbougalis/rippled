@@ -179,6 +179,34 @@ non_object_in_array(std::string_view item, Json::UInt index)
             " is not an object.  Arrays may only contain objects.");
 }
 
+template <typename ST>
+static std::optional<detail::STVar>
+parseBitString(
+    Json::Value const& value,
+    SField const& field,
+    std::string_view json_name,
+    std::string_view fieldName,
+    Json::Value& error)
+{
+    XRPL_ASSERT(
+        field.fieldType == ST::type_id,
+        "ripple::parseBitString : field type matches template parameter");
+
+    if (!value.isString())
+    {
+        error = bad_type(json_name, fieldName);
+        return std::nullopt;
+    }
+
+    auto const s = value.asString();
+
+    if (typename ST::value_type num; s.empty() || num.parseHex(s))
+        return detail::make_stvar<ST>(field, num);
+
+    error = invalid_data(json_name, fieldName);
+    return std::nullopt;
+}
+
 // This function is used by parseObject to parse any JSON type that doesn't
 // recurse.  Everything represented here is a leaf-type.
 static std::optional<detail::STVar>
@@ -332,71 +360,39 @@ parseLeaf(
             }
 
             case STI_UINT96:
-            case STI_UINT128:
-            case STI_UINT160:
-            case STI_UINT192:
-            case STI_UINT256:
-            case STI_UINT384:
-            case STI_UINT512: {
-                if (!value.isString())
-                {
-                    error = bad_type(json_name, fieldName);
-                    return ret;
-                }
-
-                auto parse = [&]<std::size_t Bits>(
-                                 base_uint<Bits>& num, std::string_view s) {
-                    if (!num.parseHex(s))
-                    {
-                        num.zero();
-
-                        if (!s.empty())
-                        {
-                            error = invalid_data(json_name, fieldName);
-                            return false;
-                        }
-                    }
-
-                    return true;
-                };
-
-                auto const s = value.asStringView();
-
-                if (field.fieldType == STI_UINT128)
-                {
-                    uint128 num;
-                    if (!parse(num, s))
-                        return ret;
-                    ret = detail::make_stvar<STUInt128>(field, num);
-                }
-                else if (field.fieldType == STI_UINT160)
-                {
-                    uint160 num;
-                    if (!parse(num, s))
-                        return ret;
-                    ret = detail::make_stvar<STUInt160>(field, num);
-                }
-                else if (field.fieldType == STI_UINT192)
-                {
-                    uint192 num;
-                    if (!parse(num, s))
-                        return ret;
-                    ret = detail::make_stvar<STUInt192>(field, num);
-                }
-                else if (field.fieldType == STI_UINT256)
-                {
-                    uint256 num;
-                    if (!parse(num, s))
-                        return ret;
-                    ret = detail::make_stvar<STUInt256>(field, num);
-                }
-                else
-                {
-                    error = invalid_data(json_name, fieldName);
-                    return ret;
-                }
+                ret = parseBitString<STUInt96>(
+                    value, field, json_name, fieldName, error);
                 break;
-            }
+
+            case STI_UINT128:
+                ret = parseBitString<STUInt128>(
+                    value, field, json_name, fieldName, error);
+                break;
+
+            case STI_UINT160:
+                ret = parseBitString<STUInt160>(
+                    value, field, json_name, fieldName, error);
+                break;
+
+            case STI_UINT192:
+                ret = parseBitString<STUInt192>(
+                    value, field, json_name, fieldName, error);
+                break;
+
+            case STI_UINT256:
+                ret = parseBitString<STUInt256>(
+                    value, field, json_name, fieldName, error);
+                break;
+
+            case STI_UINT384:
+                ret = parseBitString<STUInt384>(
+                    value, field, json_name, fieldName, error);
+                break;
+
+            case STI_UINT512:
+                ret = parseBitString<STUInt512>(
+                    value, field, json_name, fieldName, error);
+                break;
 
             case STI_VL: {
                 if (!value.isString())

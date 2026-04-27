@@ -21,6 +21,8 @@
 #define RIPPLE_PROTOCOL_STCURRENCY_H_INCLUDED
 
 #include <xrpl/basics/CountedObject.h>
+#include <xrpl/basics/contract.h>
+
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STBase.h>
 #include <xrpl/protocol/Serializer.h>
@@ -28,9 +30,9 @@
 
 namespace ripple {
 
-class STCurrency final : public STBase
+class STCurrency final : public STTypedBase<STI_CURRENCY, STCurrency>,
+                         public CountedObject<STCurrency>
 {
-private:
     Currency currency_{};
 
 public:
@@ -38,101 +40,96 @@ public:
 
     STCurrency() = default;
 
-    explicit STCurrency(SerialIter& sit, SField const& name);
+    explicit STCurrency(SField const& name, Currency const& currency)
+        : STTypedBase(name), currency_(currency)
+    {
+    }
 
-    explicit STCurrency(SField const& name, Currency const& currency);
+    explicit STCurrency(SerialIter& sit, SField const& name)
+        : STTypedBase(name), currency_(sit.get160())
+    {
+    }
 
-    explicit STCurrency(SField const& name);
+    explicit STCurrency(SField const& name) : STTypedBase(name)
+    {
+    }
 
-    Currency const&
-    currency() const;
+    [[nodiscard]] Currency const&
+    value() const noexcept
+    {
+        return currency_;
+    }
 
-    Currency const&
-    value() const noexcept;
+    [[nodiscard]] std::string
+    getText() const override
+    {
+        return to_string(currency_);
+    }
 
     void
-    setCurrency(Currency const& currency);
+    add(Serializer& s) const override
+    {
+        s.addBitString(currency_);
+    }
 
-    SerializedTypeID
-    getSType() const override;
-
-    std::string
-    getText() const override;
-
-    Json::Value getJson(JsonOptions) const override;
-
-    void
-    add(Serializer& s) const override;
-
-    bool
-    isEquivalent(const STBase& t) const override;
-
-    bool
-    isDefault() const override;
+    [[nodiscard]] bool
+    isDefault() const override
+    {
+        return isXRP(currency_);
+    }
 
 private:
     static std::unique_ptr<STCurrency>
-    construct(SerialIter&, SField const& name);
+    construct(SerialIter& sit, SField const& name)
+    {
+        return std::make_unique<STCurrency>(sit, name);
+    }
 
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
+    friend bool
+    operator==(STCurrency const& lhs, STCurrency const& rhs) noexcept
+    {
+        return lhs.currency_ == rhs.currency_;
+    }
+
+    friend auto
+    operator<=>(STCurrency const& lhs, STCurrency const& rhs) noexcept
+    {
+        return lhs.currency_ <=> rhs.currency_;
+    }
+
+    friend bool
+    operator==(STCurrency const& lhs, Currency const& rhs) noexcept
+    {
+        return lhs.currency_ == rhs;
+    }
+
+    friend auto
+    operator<=>(STCurrency const& lhs, Currency const& rhs) noexcept
+    {
+        return lhs.currency_ <=> rhs;
+    }
 
     friend class detail::STVar;
 };
 
-STCurrency
-currencyFromJson(SField const& name, Json::Value const& v);
-
-inline Currency const&
-STCurrency::currency() const
+inline STCurrency
+currencyFromJson(SField const& name, Json::Value const& v)
 {
-    return currency_;
-}
+    if (!v.isString())
+    {
+        Throw<std::runtime_error>(
+            "currencyFromJson currency must be a string Json value");
+    }
 
-inline Currency const&
-STCurrency::value() const noexcept
-{
-    return currency_;
-}
+    auto const currency = to_currency(v.asString());
+    if (currency == badCurrency() || currency == noCurrency())
+    {
+        Throw<std::runtime_error>(
+            "currencyFromJson currency must be a valid currency");
+    }
 
-inline void
-STCurrency::setCurrency(Currency const& currency)
-{
-    currency_ = currency;
+    return STCurrency{name, currency};
 }
-
-inline bool
-operator==(STCurrency const& lhs, STCurrency const& rhs)
-{
-    return lhs.currency() == rhs.currency();
-}
-
-inline bool
-operator!=(STCurrency const& lhs, STCurrency const& rhs)
-{
-    return !operator==(lhs, rhs);
-}
-
-inline bool
-operator<(STCurrency const& lhs, STCurrency const& rhs)
-{
-    return lhs.currency() < rhs.currency();
-}
-
-inline bool
-operator==(STCurrency const& lhs, Currency const& rhs)
-{
-    return lhs.currency() == rhs;
-}
-
-inline bool
-operator<(STCurrency const& lhs, Currency const& rhs)
-{
-    return lhs.currency() < rhs;
-}
-
 }  // namespace ripple
 
 #endif

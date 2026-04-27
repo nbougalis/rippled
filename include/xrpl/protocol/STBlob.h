@@ -32,7 +32,8 @@
 namespace ripple {
 
 // variable length byte string
-class STBlob : public STBase, public CountedObject<STBlob>
+class STBlob final : public STTypedBase<STI_VL, STBlob>,
+                     public CountedObject<STBlob>
 {
     Buffer value_;
 
@@ -40,111 +41,99 @@ public:
     using value_type = Slice;
 
     STBlob() = default;
-    STBlob(STBlob const& rhs);
+    STBlob(STBlob const& rhs)
+        : STTypedBase(rhs), CountedObject(rhs), value_(rhs.data(), rhs.size())
+    {
+    }
 
-    STBlob(SField const& f, void const* data, std::size_t size);
-    STBlob(SField const& f, Buffer&& b);
-    STBlob(SField const& n);
-    STBlob(SerialIter&, SField const& name = sfGeneric);
+    STBlob(SField const& f, void const* data, std::size_t size)
+        : STTypedBase(f), value_(data, size)
+    {
+    }
 
-    std::size_t
-    size() const;
+    STBlob(SField const& f, Buffer&& b) : STTypedBase(f), value_(std::move(b))
+    {
+    }
 
-    std::uint8_t const*
-    data() const;
+    STBlob(SField const& n) : STTypedBase(n)
+    {
+    }
 
-    SerializedTypeID
-    getSType() const override;
+    STBlob(SerialIter& sit, SField const& name = sfGeneric)
+        : STTypedBase(name), value_(sit.getVL())
+    {
+    }
 
-    std::string
-    getText() const override;
+    [[nodiscard]] std::size_t
+    size() const noexcept
+    {
+        return value_.size();
+    }
+
+    [[nodiscard]] std::uint8_t const*
+    data() const noexcept
+    {
+        return value_.data();
+    }
+
+    [[nodiscard]] std::string
+    getText() const override
+    {
+        return strHex(value_);
+    }
 
     void
-    add(Serializer& s) const override;
+    add(Serializer& s) const override
+    {
+        XRPL_ASSERT(
+            getFName().isBinary(), "ripple::STBlob::add : field is binary");
+        XRPL_ASSERT(
+            (getFName().fieldType == STI_VL) ||
+                (getFName().fieldType == STI_ACCOUNT),
+            "ripple::STBlob::add : valid field type");
+        s.addVL(value_.data(), value_.size());
+    }
 
-    bool
-    isEquivalent(const STBase& t) const override;
-
-    bool
-    isDefault() const override;
+    [[nodiscard]] bool
+    isDefault() const override
+    {
+        return value_.empty();
+    }
 
     STBlob&
-    operator=(Slice const& slice);
+    operator=(Slice const& slice)
+    {
+        value_ = Buffer(slice.data(), slice.size());
+        return *this;
+    }
 
-    value_type
-    value() const noexcept;
+    [[nodiscard]] value_type
+    value() const noexcept
+    {
+        return value_;
+    }
 
     STBlob&
-    operator=(Buffer&& buffer);
+    operator=(Buffer&& buffer)
+    {
+        value_ = std::move(buffer);
+        return *this;
+    }
 
     void
-    setValue(Buffer&& b);
-
-private:
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
+    setValue(Buffer&& b)
+    {
+        value_ = std::move(b);
+    }
 
     friend class detail::STVar;
+
+    friend bool
+    operator==(STBlob const& lhs, STBlob const& rhs) noexcept
+    {
+        return lhs.value_ == rhs.value_;
+    }
 };
-
-inline STBlob::STBlob(STBlob const& rhs)
-    : STBase(rhs), CountedObject<STBlob>(rhs), value_(rhs.data(), rhs.size())
-{
-}
-
-inline STBlob::STBlob(SField const& f, void const* data, std::size_t size)
-    : STBase(f), value_(data, size)
-{
-}
-
-inline STBlob::STBlob(SField const& f, Buffer&& b)
-    : STBase(f), value_(std::move(b))
-{
-}
-
-inline STBlob::STBlob(SField const& n) : STBase(n)
-{
-}
-
-inline std::size_t
-STBlob::size() const
-{
-    return value_.size();
-}
-
-inline std::uint8_t const*
-STBlob::data() const
-{
-    return reinterpret_cast<std::uint8_t const*>(value_.data());
-}
-
-inline STBlob&
-STBlob::operator=(Slice const& slice)
-{
-    value_ = Buffer(slice.data(), slice.size());
-    return *this;
-}
-
-inline STBlob::value_type
-STBlob::value() const noexcept
-{
-    return value_;
-}
-
-inline STBlob&
-STBlob::operator=(Buffer&& buffer)
-{
-    value_ = std::move(buffer);
-    return *this;
-}
-
-inline void
-STBlob::setValue(Buffer&& b)
-{
-    value_ = std::move(b);
-}
 
 }  // namespace ripple
 

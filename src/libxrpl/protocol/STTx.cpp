@@ -110,12 +110,6 @@ STTx::move(std::size_t n, void* buf)
 }
 
 // STObject functions.
-SerializedTypeID
-STTx::getSType() const
-{
-    return STI_TRANSACTION;
-}
-
 std::string
 STTx::getFullText() const
 {

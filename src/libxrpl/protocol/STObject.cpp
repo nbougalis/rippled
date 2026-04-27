@@ -30,7 +30,7 @@
 
 namespace ripple {
 
-STObject::STObject(STObject&& other)
+STObject::STObject(STObject&& other) noexcept
     : STBase(other.getFName()), v_(std::move(other.v_)), mType(other.mType)
 {
 }
@@ -92,12 +92,6 @@ STObject::move(std::size_t n, void* buf)
     return emplace(n, buf, std::move(*this));
 }
 
-SerializedTypeID
-STObject::getSType() const
-{
-    return STI_OBJECT;
-}
-
 bool
 STObject::isDefault() const
 {
@@ -111,7 +105,7 @@ STObject::add(Serializer& s) const
 }
 
 STObject&
-STObject::operator=(STObject&& other)
+STObject::operator=(STObject&& other) noexcept
 {
     setFName(other.getFName());
     mType = other.mType;
@@ -287,56 +281,6 @@ STObject::hasMatchingEntry(const STBase& t)
         return false;
 
     return t == *o;
-}
-
-std::string
-STObject::getFullText() const
-{
-    std::string ret;
-    bool first = true;
-
-    if (getFName().hasName())
-    {
-        ret = getFName().getName();
-        ret += " = {";
-    }
-    else
-        ret = "{";
-
-    for (auto const& elem : v_)
-    {
-        if (elem->getSType() != STI_NOTPRESENT)
-        {
-            if (!first)
-                ret += ", ";
-            else
-                first = false;
-
-            ret += elem->getFullText();
-        }
-    }
-
-    ret += "}";
-    return ret;
-}
-
-std::string
-STObject::getText() const
-{
-    std::string ret = "{";
-    bool first = false;
-    for (auto const& elem : v_)
-    {
-        if (!first)
-        {
-            ret += ", ";
-            first = false;
-        }
-
-        ret += elem->getText();
-    }
-    ret += "}";
-    return ret;
 }
 
 bool

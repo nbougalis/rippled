@@ -46,7 +46,8 @@ namespace ripple {
 // Wire form:
 // High 8 bits are (offset+142), legal range is, 80 to 22 inclusive
 // Low 56 bits are value, legal range is 10^15 to (10^16 - 1) inclusive
-class STAmount final : public STBase, public CountedObject<STAmount>
+class STAmount final : public STTypedBase<STI_AMOUNT, STAmount>,
+                       public CountedObject<STAmount>
 {
 public:
     using mantissa_type = std::uint64_t;
@@ -259,9 +260,6 @@ public:
     //
     //--------------------------------------------------------------------------
 
-    SerializedTypeID
-    getSType() const override;
-
     std::string
     getFullText() const override;
 
@@ -272,9 +270,6 @@ public:
 
     void
     add(Serializer& s) const override;
-
-    bool
-    isEquivalent(const STBase& t) const override;
 
     bool
     isDefault() const override;
@@ -295,11 +290,6 @@ private:
     void
     canonicalize();
 
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
-
     STAmount&
     operator=(IOUAmount const& iou);
 
@@ -317,7 +307,7 @@ STAmount::STAmount(
     exponent_type exponent,
     bool negative,
     unchecked)
-    : STBase(name)
+    : STTypedBase(name)
     , mAsset(asset)
     , mValue(mantissa)
     , mOffset(exponent)
@@ -343,7 +333,7 @@ STAmount::STAmount(
     std::uint64_t mantissa,
     int exponent,
     bool negative)
-    : STBase(name)
+    : STTypedBase(name)
     , mAsset(asset)
     , mValue(mantissa)
     , mOffset(exponent)

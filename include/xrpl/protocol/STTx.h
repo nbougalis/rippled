@@ -80,7 +80,10 @@ public:
 
     // STObject functions.
     SerializedTypeID
-    getSType() const override;
+    getSType() const noexcept override
+    {
+        return STI_TRANSACTION;
+    }
 
     std::string
     getFullText() const override;

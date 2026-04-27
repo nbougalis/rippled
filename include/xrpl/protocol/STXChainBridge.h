@@ -30,7 +30,9 @@ namespace ripple {
 class Serializer;
 class STObject;
 
-class STXChainBridge final : public STBase, public CountedObject<STXChainBridge>
+class STXChainBridge final
+    : public STTypedBase<STI_XCHAIN_BRIDGE, STXChainBridge>,
+      public CountedObject<STXChainBridge>
 {
     STAccount lockingChainDoor_{sfLockingChainDoor};
     STIssue lockingChainIssue_{sfLockingChainIssue};
@@ -98,16 +100,10 @@ public:
     Issue const&
     issue(ChainType ct) const;
 
-    SerializedTypeID
-    getSType() const override;
-
     Json::Value getJson(JsonOptions) const override;
 
     void
     add(Serializer& s) const override;
-
-    bool
-    isEquivalent(const STBase& t) const override;
 
     bool
     isDefault() const override;
@@ -118,11 +114,6 @@ public:
 private:
     static std::unique_ptr<STXChainBridge>
     construct(SerialIter&, SField const& name);
-
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
 
     friend bool
     operator==(STXChainBridge const& lhs, STXChainBridge const& rhs);

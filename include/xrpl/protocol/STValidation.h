@@ -95,6 +95,12 @@ public:
         NodeID const& nodeID,
         F&& f);
 
+    SerializedTypeID
+    getSType() const noexcept override
+    {
+        return STI_VALIDATION;
+    }
+
     // Hash of the validated ledger
     uint256
     getLedgerHash() const;

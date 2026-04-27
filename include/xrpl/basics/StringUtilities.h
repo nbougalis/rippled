@@ -115,6 +115,54 @@ strViewUnHex(std::string_view strSrc)
     return strUnHex(strSrc.size(), strSrc.cbegin(), strSrc.cend());
 }
 
+/** Join elements of a range into a string using a separator.
+
+    Applies @p accessor to each element in @p range and concatenates
+    the non-empty results, separated by @p sep.
+
+    @tparam Range    An iterable range type.
+    @tparam Accessor A callable that takes an element of @p range and returns
+                     a type convertible to @c std::string.
+
+    @param range    The range of elements to join.
+    @param accessor A callable used to convert each element to a string.
+    @param sep      The separator to insert between non-empty results.
+                    Defaults to @c ", ".
+
+    @return A string containing the non-empty results of @p accessor applied
+            to each element of @p range, separated by @p sep. Elements for
+            which @p accessor returns an empty string are skipped.
+*/
+template <typename Range, typename Accessor>
+    requires(
+        std::invocable<Accessor, std::ranges::range_reference_t<Range>> &&
+        std::convertible_to<
+            std::invoke_result_t<
+                Accessor,
+                std::ranges::range_reference_t<Range>>,
+            std::string>)
+std::string
+range_to_string(
+    Range const& range,
+    Accessor&& accessor,
+    std::string_view sep = ", ")
+{
+    std::string ret;
+
+    for (int count = 0; auto const& elem : range)
+    {
+        if (auto text = accessor(elem); !text.empty())
+        {
+            if (count++)
+                ret += sep;
+
+            ret += text;
+        }
+    }
+
+    return ret;
+}
+
 struct parsedURL
 {
     explicit parsedURL() = default;

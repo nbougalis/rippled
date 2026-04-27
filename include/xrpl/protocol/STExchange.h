@@ -40,23 +40,23 @@ namespace ripple {
 template <class U, class T>
 struct STExchange;
 
-template <class U, class T>
-struct STExchange<STInteger<U>, T>
+template <typename Integer, SerializedTypeID ID, class T>
+struct STExchange<detail::STInteger<Integer, ID>, T>
 {
     explicit STExchange() = default;
 
-    using value_type = U;
+    using value_type = Integer;
 
     static void
-    get(std::optional<T>& t, STInteger<U> const& u)
+    get(std::optional<T>& t, detail::STInteger<Integer, ID> const& u)
     {
         t = u.value();
     }
 
-    static std::unique_ptr<STInteger<U>>
+    static std::unique_ptr<detail::STInteger<Integer, ID>>
     set(SField const& f, T const& t)
     {
-        return std::make_unique<STInteger<U>>(f, t);
+        return std::make_unique<detail::STInteger<Integer, ID>>(f, t);
     }
 };
 
@@ -142,8 +142,9 @@ template <class U, class T>
 void
 set(STObject& st, TypedField<U> const& f, T&& t)
 {
-    st.set(STExchange<U, typename std::decay<T>::type>::set(
-        f, std::forward<T>(t)));
+    st.set(
+        STExchange<U, typename std::decay<T>::type>::set(
+            f, std::forward<T>(t)));
 }
 
 /** Set a blob field using an init function. */
