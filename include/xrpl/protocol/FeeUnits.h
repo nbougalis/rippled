@@ -138,11 +138,8 @@ public:
     /** Instances with the same unit, and a type that is
         "safe" to convert to this one can be converted
         implicitly */
-    template <
-        class Other,
-        class = std::enable_if_t<
-            is_compatible_v<Other> &&
-            is_safetocasttovalue_v<value_type, Other>>>
+    template <typename Other>
+        requires(is_compatible_v<Other> && can_safely_cast<value_type, Other>)
     constexpr TaggedFee(TaggedFee<unit_type, Other> const& fee)
         : TaggedFee(safe_cast<value_type>(fee.fee()))
     {

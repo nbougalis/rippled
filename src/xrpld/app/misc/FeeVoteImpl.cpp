@@ -253,9 +253,9 @@ FeeVoteImpl::doVoting(
                 using xrptype = XRPAmount::value_type;
                 auto const vote = *field;
                 if (vote <= std::numeric_limits<xrptype>::max() &&
-                    isLegalAmountSigned(XRPAmount{unsafe_cast<xrptype>(vote)}))
+                    isLegalAmountSigned(XRPAmount{checked_cast<xrptype>(vote)}))
                     value.addVote(
-                        XRPAmount{unsafe_cast<XRPAmount::value_type>(vote)});
+                        XRPAmount{checked_cast<XRPAmount::value_type>(vote)});
                 else
                     // Invalid amounts will be treated as if they're
                     // not provided. Don't throw because this value is
