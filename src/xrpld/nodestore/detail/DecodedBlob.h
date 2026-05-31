@@ -25,7 +25,7 @@
 namespace ripple {
 namespace NodeStore {
 
-/** Parsed key/value blob into NodeObject components.
+/** Convert a key and an associated blob into a NodeObject.
 
     This will extract the information required to construct a NodeObject. It
     also does consistency checking and returns the result, so it is possible
@@ -35,31 +35,27 @@ namespace NodeStore {
 
     @note This defines the database format of a NodeObject!
 */
-class DecodedBlob
+inline boost::intrusive_ptr<NodeObject>
+decodeNodeObject(void const* key, void const* data, std::size_t size)
 {
-public:
-    /** Construct the decoded blob from raw data. */
-    DecodedBlob(void const* key, void const* value, int valueBytes);
+    if (size <= 9)
+        return {};
 
-    /** Determine if the decoding was successful. */
-    bool
-    wasOk() const noexcept
+    auto const* p = static_cast<std::uint8_t const*>(data);
+    auto const type = safe_cast<NodeObjectType>(p[8]);
+
+    switch (type)
     {
-        return m_success;
+        case hotUNKNOWN:
+        case hotLEDGER:
+        case hotACCOUNT_NODE:
+        case hotTRANSACTION_NODE:
+            return NodeObject::createObject(
+                type, std::span{p + 9, size - 9}, uint256::fromVoid(key));
+        default:
+            return {};
     }
-
-    /** Create a NodeObject from this data. */
-    std::shared_ptr<NodeObject>
-    createObject();
-
-private:
-    bool m_success;
-
-    void const* m_key;
-    NodeObjectType m_objectType;
-    unsigned char const* m_objectData;
-    int m_dataBytes;
-};
+}
 
 }  // namespace NodeStore
 }  // namespace ripple

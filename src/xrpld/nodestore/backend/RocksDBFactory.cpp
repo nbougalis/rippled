@@ -273,7 +273,7 @@ public:
     //--------------------------------------------------------------------------
 
     Status
-    fetch(void const* key, std::shared_ptr<NodeObject>* pObject) override
+    fetch(void const* key, boost::intrusive_ptr<NodeObject>* pObject) override
     {
         XRPL_ASSERT(
             m_db,
@@ -291,13 +291,9 @@ public:
 
         if (getStatus.ok())
         {
-            DecodedBlob decoded(key, string.data(), string.size());
+            *pObject = decodeNodeObject(key, string.data(), string.size());
 
-            if (decoded.wasOk())
-            {
-                *pObject = decoded.createObject();
-            }
-            else
+            if (*pObject == nullptr)
             {
                 // Decoding failed, probably corrupted!
                 //
@@ -325,26 +321,8 @@ public:
         return status;
     }
 
-    std::pair<std::vector<std::shared_ptr<NodeObject>>, Status>
-    fetchBatch(std::vector<uint256 const*> const& hashes) override
-    {
-        std::vector<std::shared_ptr<NodeObject>> results;
-        results.reserve(hashes.size());
-        for (auto const& h : hashes)
-        {
-            std::shared_ptr<NodeObject> nObj;
-            Status status = fetch(h->begin(), &nObj);
-            if (status != ok)
-                results.push_back({});
-            else
-                results.push_back(nObj);
-        }
-
-        return {results, ok};
-    }
-
     void
-    store(std::shared_ptr<NodeObject> const& object) override
+    store(boost::intrusive_ptr<NodeObject> const& object) override
     {
         m_batch.store(object);
     }
@@ -385,7 +363,7 @@ public:
     }
 
     void
-    for_each(std::function<void(std::shared_ptr<NodeObject>)> f) override
+    for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) override
     {
         XRPL_ASSERT(
             m_db,
@@ -398,19 +376,18 @@ public:
         {
             if (it->key().size() == m_keyBytes)
             {
-                DecodedBlob decoded(
-                    it->key().data(), it->value().data(), it->value().size());
+                if (auto decoded = decodeNodeObject(
+                        it->key().data(),
+                        it->value().data(),
+                        it->value().size()))
+                {
+                    f(decoded);
+                    continue;
+                }
 
-                if (decoded.wasOk())
-                {
-                    f(decoded.createObject());
-                }
-                else
-                {
-                    // Uh oh, corrupted data!
-                    JLOG(m_journal.fatal())
-                        << "Corrupt NodeObject #" << it->key().ToString(true);
-                }
+                // Uh oh, corrupted data!
+                JLOG(m_journal.fatal())
+                    << "Corrupt NodeObject #" << it->key().ToString(true);
             }
             else
             {

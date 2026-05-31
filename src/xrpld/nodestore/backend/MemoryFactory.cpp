@@ -35,12 +35,11 @@ struct MemoryDB
 
     std::mutex mutex;
     bool open = false;
-    std::map<uint256 const, std::shared_ptr<NodeObject>> table;
+    std::map<uint256 const, boost::intrusive_ptr<NodeObject>> table;
 };
 
 class MemoryFactory : public Factory
 {
-private:
     std::mutex mutex_;
     std::map<std::string, MemoryDB, boost::beast::iless> map_;
 
@@ -78,9 +77,6 @@ static MemoryFactory memoryFactory;
 
 class MemoryBackend : public Backend
 {
-private:
-    using Map = std::map<uint256 const, std::shared_ptr<NodeObject>>;
-
     std::string name_;
     beast::Journal const journal_;
     MemoryDB* db_{nullptr};
@@ -129,7 +125,7 @@ public:
     //--------------------------------------------------------------------------
 
     Status
-    fetch(void const* key, std::shared_ptr<NodeObject>* pObject) override
+    fetch(void const* key, boost::intrusive_ptr<NodeObject>* pObject) override
     {
         XRPL_ASSERT(
             db_, "ripple::NodeStore::MemoryBackend::fetch : non-null database");
@@ -137,41 +133,23 @@ public:
 
         std::lock_guard _(db_->mutex);
 
-        Map::iterator iter = db_->table.find(hash);
-        if (iter == db_->table.end())
+        if (auto iter = db_->table.find(hash); iter != db_->table.end())
         {
-            pObject->reset();
-            return notFound;
-        }
-        *pObject = iter->second;
-        return ok;
-    }
-
-    std::pair<std::vector<std::shared_ptr<NodeObject>>, Status>
-    fetchBatch(std::vector<uint256 const*> const& hashes) override
-    {
-        std::vector<std::shared_ptr<NodeObject>> results;
-        results.reserve(hashes.size());
-        for (auto const& h : hashes)
-        {
-            std::shared_ptr<NodeObject> nObj;
-            Status status = fetch(h->begin(), &nObj);
-            if (status != ok)
-                results.push_back({});
-            else
-                results.push_back(nObj);
+            *pObject = iter->second;
+            return ok;
         }
 
-        return {results, ok};
+        pObject->reset();
+        return notFound;
     }
 
     void
-    store(std::shared_ptr<NodeObject> const& object) override
+    store(boost::intrusive_ptr<NodeObject> const& object) override
     {
         XRPL_ASSERT(
             db_, "ripple::NodeStore::MemoryBackend::store : non-null database");
         std::lock_guard _(db_->mutex);
-        db_->table.emplace(object->getHash(), object);
+        db_->table.emplace(object->key(), object);
     }
 
     void
@@ -187,7 +165,7 @@ public:
     }
 
     void
-    for_each(std::function<void(std::shared_ptr<NodeObject>)> f) override
+    for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) override
     {
         XRPL_ASSERT(
             db_,

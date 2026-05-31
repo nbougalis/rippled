@@ -33,25 +33,37 @@ BatchWriter::BatchWriter(Callback& callback, Scheduler& scheduler)
 
 BatchWriter::~BatchWriter()
 {
-    waitForWriting();
+    // Block until any scheduled write task has fully drained.
+    std::unique_lock sl(mWriteMutex);
+
+    while (mWritePending)
+        mWriteCondition.wait(sl);
 }
 
 void
-BatchWriter::store(std::shared_ptr<NodeObject> const& object)
+BatchWriter::store(boost::intrusive_ptr<NodeObject> object)
 {
-    std::unique_lock<decltype(mWriteMutex)> sl(mWriteMutex);
+    std::unique_lock sl(mWriteMutex);
 
-    // If the batch has reached its limit, we wait
-    // until the batch writer is finished
+    // If the batch has reached its limit, we wait until the batch
+    // writer is finished:
     while (mWriteSet.size() >= batchWriteLimitSize)
         mWriteCondition.wait(sl);
 
-    mWriteSet.push_back(object);
+    mWriteSet.emplace_back(std::move(object));
 
     if (!mWritePending)
     {
         mWritePending = true;
 
+        // This is why we need to use a recursive mutex here: we hold the
+        // lock at this point, and if the scheduler cannot queue the task
+        // it will invoke performScheduledTask synchronously, which tries
+        // to acquire the mutex which we already hold.
+        //
+        // Long story short: do not move this call out from under the lock
+        // or downgrade the mutex without first addressing the synchronous
+        // fallback, otherwise we can deadlock or strand writes.
         m_scheduler.scheduleTask(*this);
     }
 }
@@ -67,39 +79,31 @@ BatchWriter::getWriteLoad()
 void
 BatchWriter::performScheduledTask()
 {
-    writeBatch();
-}
-
-void
-BatchWriter::writeBatch()
-{
-    for (;;)
+    while (true)
     {
-        std::vector<std::shared_ptr<NodeObject>> set;
-
+        Batch set;
         set.reserve(batchWritePreallocationSize);
 
         {
             std::lock_guard sl(mWriteMutex);
 
             mWriteSet.swap(set);
-            XRPL_ASSERT(
-                mWriteSet.empty(),
-                "ripple::NodeStore::BatchWriter::writeBatch : writes not set");
             mWriteLoad = set.size();
+
+            // This covers both the backpressured store case and the
+            // destructor waiting for writes to complete.
+            mWriteCondition.notify_all();
 
             if (set.empty())
             {
                 mWritePending = false;
-                mWriteCondition.notify_all();
-
-                // VFALCO NOTE Fix this function to not return from the middle
                 return;
             }
         }
 
         BatchWriteReport report;
         report.writeCount = set.size();
+
         auto const before = std::chrono::steady_clock::now();
 
         m_callback.writeBatch(set);
@@ -109,15 +113,6 @@ BatchWriter::writeBatch()
 
         m_scheduler.onBatchWrite(report);
     }
-}
-
-void
-BatchWriter::waitForWriting()
-{
-    std::unique_lock<decltype(mWriteMutex)> sl(mWriteMutex);
-
-    while (mWritePending)
-        mWriteCondition.wait(sl);
 }
 
 }  // namespace NodeStore

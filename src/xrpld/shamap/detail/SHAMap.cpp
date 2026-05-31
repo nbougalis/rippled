@@ -174,7 +174,7 @@ SHAMap::fetchNodeFromDB(SHAMapHash const& hash) const
 std::shared_ptr<SHAMapTreeNode>
 SHAMap::finishFetch(
     SHAMapHash const& hash,
-    std::shared_ptr<NodeObject> const& object) const
+    boost::intrusive_ptr<NodeObject> const& object) const
 {
     XRPL_ASSERT(backed_, "ripple::SHAMap::finishFetch : is backed");
 
@@ -191,7 +191,7 @@ SHAMap::finishFetch(
         }
 
         auto node =
-            SHAMapTreeNode::makeFromPrefix(makeSlice(object->getData()), hash);
+            SHAMapTreeNode::makeFromPrefix(makeSlice(object->data()), hash);
         if (node)
             canonicalize(hash, node);
         return node;
@@ -463,7 +463,7 @@ SHAMap::descendAsync(
                 hash.as_uint256(),
                 ledgerSeq_,
                 [this, hash, cb{std::move(callback)}](
-                    std::shared_ptr<NodeObject> const& object) {
+                    boost::intrusive_ptr<NodeObject> const& object) {
                     auto node = finishFetch(hash, object);
                     cb(node, hash);
                 });

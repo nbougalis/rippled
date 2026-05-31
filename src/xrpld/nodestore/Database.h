@@ -90,20 +90,15 @@ public:
 
     /** Store the object.
 
-        The caller's Blob parameter is overwritten.
-
         @param type The type of object.
-        @param data The payload of the object. The caller's
-                    variable is overwritten.
+        @param data The payload of the object.
         @param hash The 256-bit hash of the payload data.
         @param ledgerSeq The sequence of the ledger the object belongs to.
-
-        @return `true` if the object was stored?
     */
     virtual void
     store(
         NodeObjectType type,
-        Blob&& data,
+        std::span<std::uint8_t const> data,
         uint256 const& hash,
         std::uint32_t ledgerSeq) = 0;
 
@@ -136,7 +131,7 @@ public:
         @param fetchType the type of fetch, synchronous or asynchronous.
         @return The object, or nullptr if it couldn't be retrieved.
     */
-    std::shared_ptr<NodeObject>
+    boost::intrusive_ptr<NodeObject>
     fetchNodeObject(
         uint256 const& hash,
         std::uint32_t ledgerSeq = 0,
@@ -159,7 +154,8 @@ public:
     asyncFetch(
         uint256 const& hash,
         std::uint32_t ledgerSeq,
-        std::function<void(std::shared_ptr<NodeObject> const&)>&& callback);
+        std::function<void(boost::intrusive_ptr<NodeObject> const&)>&&
+            callback);
 
     /** Store a ledger from a different database.
 
@@ -183,13 +179,13 @@ public:
         return storeCount_;
     }
 
-    std::uint32_t
+    std::uint64_t
     getFetchTotalCount() const
     {
         return fetchTotalCount_;
     }
 
-    std::uint32_t
+    std::uint64_t
     getFetchHitCount() const
     {
         return fetchHitCount_;
@@ -201,7 +197,7 @@ public:
         return storeSz_;
     }
 
-    std::uint32_t
+    std::uint64_t
     getFetchSize() const
     {
         return fetchSz_;
@@ -234,10 +230,7 @@ public:
 protected:
     beast::Journal const j_;
     Scheduler& scheduler_;
-    int fdRequired_{0};
-
-    std::atomic<std::uint32_t> fetchHitCount_{0};
-    std::atomic<std::uint32_t> fetchSz_{0};
+    int fdRequired_ = 0;
 
     // The default is XRP_LEDGER_EARLIEST_SEQ (32570) to match the XRP ledger
     // network's earliest allowed ledger sequence. Can be set through the
@@ -258,8 +251,8 @@ protected:
         XRPL_ASSERT(
             count <= sz,
             "ripple::NodeStore::Database::storeStats : valid inputs");
-        storeCount_ += count;
-        storeSz_ += sz;
+        storeCount_.fetch_add(count, std::memory_order_relaxed);
+        storeSz_.fetch_add(sz, std::memory_order_relaxed);
     }
 
     // Called by the public import function
@@ -271,19 +264,25 @@ protected:
     storeLedger(Ledger const& srcLedger, std::shared_ptr<Backend> dstBackend);
 
     void
-    updateFetchMetrics(uint64_t fetches, uint64_t hits, uint64_t duration)
+    updateFetchMetrics(
+        uint64_t fetches,
+        uint64_t hits,
+        std::chrono::microseconds duration)
     {
-        fetchTotalCount_ += fetches;
-        fetchHitCount_ += hits;
-        fetchDurationUs_ += duration;
+        fetchTotalCount_.fetch_add(fetches, std::memory_order_relaxed);
+        fetchHitCount_.fetch_add(hits, std::memory_order_relaxed);
+        fetchDurationUs_.fetch_add(duration.count(), std::memory_order_relaxed);
     }
 
 private:
-    std::atomic<std::uint64_t> storeCount_{0};
-    std::atomic<std::uint64_t> storeSz_{0};
-    std::atomic<std::uint64_t> fetchTotalCount_{0};
-    std::atomic<std::uint64_t> fetchDurationUs_{0};
-    std::atomic<std::uint64_t> storeDurationUs_{0};
+    std::atomic<std::uint64_t> storeCount_ = 0;
+    std::atomic<std::uint64_t> storeSz_ = 0;
+    std::atomic<std::uint64_t> fetchTotalCount_ = 0;
+    std::atomic<std::uint64_t> fetchHitCount_ = 0;
+    std::atomic<std::uint64_t> fetchSz_ = 0;
+
+    std::atomic<std::chrono::microseconds::rep> fetchDurationUs_ = 0;
+    std::atomic<std::chrono::microseconds::rep> storeDurationUs_ = 0;
 
     mutable std::mutex readLock_;
     std::condition_variable readCondVar_;
@@ -293,14 +292,14 @@ private:
         uint256,
         std::vector<std::pair<
             std::uint32_t,
-            std::function<void(std::shared_ptr<NodeObject> const&)>>>>
+            std::function<void(boost::intrusive_ptr<NodeObject> const&)>>>>
         read_;
 
     std::atomic<bool> readStopping_ = false;
     std::atomic<int> readThreads_ = 0;
     std::atomic<int> runningThreads_ = 0;
 
-    virtual std::shared_ptr<NodeObject>
+    virtual boost::intrusive_ptr<NodeObject>
     fetchNodeObject(
         uint256 const& hash,
         std::uint32_t ledgerSeq,
@@ -315,10 +314,7 @@ private:
         @see import
     */
     virtual void
-    for_each(std::function<void(std::shared_ptr<NodeObject>)> f) = 0;
-
-    void
-    threadEntry();
+    for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) = 0;
 };
 
 }  // namespace NodeStore

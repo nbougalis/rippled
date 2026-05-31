@@ -78,8 +78,11 @@ public:
     }
 
     void
-    store(NodeObjectType type, Blob&& data, uint256 const& hash, std::uint32_t)
-        override;
+    store(
+        NodeObjectType type,
+        std::span<std::uint8_t const> data,
+        uint256 const& hash,
+        std::uint32_t) override;
 
     void
     sync() override;
@@ -95,7 +98,7 @@ private:
     std::shared_ptr<Backend> archiveBackend_;
     mutable std::mutex mutex_;
 
-    std::shared_ptr<NodeObject>
+    boost::intrusive_ptr<NodeObject>
     fetchNodeObject(
         uint256 const& hash,
         std::uint32_t,
@@ -103,7 +106,7 @@ private:
         bool duplicate) override;
 
     void
-    for_each(std::function<void(std::shared_ptr<NodeObject>)> f) override;
+    for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) override;
 };
 
 }  // namespace NodeStore

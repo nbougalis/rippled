@@ -21,11 +21,17 @@
 #define RIPPLE_NODESTORE_DATABASENODEIMP_H_INCLUDED
 
 #include <xrpld/nodestore/Database.h>
+#include <xrpld/nodestore/detail/DatabaseCache.h>
 #include <xrpl/basics/TaggedCache.h>
 #include <xrpl/basics/chrono.h>
+#include <xrpl/basics/safe_cast.h>
+
+#include <span>
+#include <utility>
 
 namespace ripple {
 namespace NodeStore {
+
 class DatabaseNodeImp : public Database
 {
 public:
@@ -41,40 +47,40 @@ public:
         Section const& config,
         beast::Journal j)
         : Database(scheduler, readThreads, config, j)
+        , cache_(
+              j,
+              [&config]() -> std::size_t {
+                  std::size_t ret = 0;
+
+                  // Measurements on steady-state nodes show hit rates below
+                  // 1%, suggesting that upper cache tiers together with the
+                  // OS page cache make this layer largely redundant.
+                  //
+                  // Pending a thorough evaluation of the performance impact
+                  // of this cache (especially during ledger acquisition) it
+                  // makes sense to disable it.
+                  //
+                  // Because the 'cache_size' parameter is injected into the
+                  // configuration automatically, we need to introduce a new
+                  // option, that defaults to "false", so that operators can
+                  // opt in, if desired.
+                  if (get<bool>(config, "use_noc", false))
+                  {
+                      auto cs = get<int>(config, "cache_size");
+
+                      if (!std::in_range<std::size_t>(cs))
+                      {
+                          Throw<std::runtime_error>(
+                              "Specified negative value for cache_size");
+                      }
+
+                      ret = checked_cast<std::size_t>(cs);
+                  }
+
+                  return ret;
+              }())
         , backend_(std::move(backend))
     {
-        std::optional<int> cacheSize, cacheAge;
-
-        if (config.exists("cache_size"))
-        {
-            cacheSize = get<int>(config, "cache_size");
-            if (cacheSize.value() < 0)
-            {
-                Throw<std::runtime_error>(
-                    "Specified negative value for cache_size");
-            }
-        }
-
-        if (config.exists("cache_age"))
-        {
-            cacheAge = get<int>(config, "cache_age");
-            if (cacheAge.value() < 0)
-            {
-                Throw<std::runtime_error>(
-                    "Specified negative value for cache_age");
-            }
-        }
-
-        if (cacheSize != 0 || cacheAge != 0)
-        {
-            cache_ = std::make_shared<TaggedCache<uint256, NodeObject>>(
-                "DatabaseNodeImp",
-                cacheSize.value_or(0),
-                std::chrono::minutes(cacheAge.value_or(0)),
-                stopwatch(),
-                j);
-        }
-
         XRPL_ASSERT(
             backend_,
             "ripple::NodeStore::DatabaseNodeImp::DatabaseNodeImp : non-null "
@@ -105,8 +111,11 @@ public:
     }
 
     void
-    store(NodeObjectType type, Blob&& data, uint256 const& hash, std::uint32_t)
-        override;
+    store(
+        NodeObjectType type,
+        std::span<std::uint8_t const> data,
+        uint256 const& hash,
+        std::uint32_t) override;
 
     bool
     isSameDB(std::uint32_t, std::uint32_t) override
@@ -121,14 +130,11 @@ public:
         backend_->sync();
     }
 
-    std::vector<std::shared_ptr<NodeObject>>
-    fetchBatch(std::vector<uint256> const& hashes);
-
     void
     asyncFetch(
         uint256 const& hash,
         std::uint32_t ledgerSeq,
-        std::function<void(std::shared_ptr<NodeObject> const&)>&& callback)
+        std::function<void(boost::intrusive_ptr<NodeObject> const&)>&& callback)
         override;
 
     bool
@@ -143,11 +149,12 @@ public:
 private:
     // Cache for database objects. This cache is not always initialized. Check
     // for null before using.
-    std::shared_ptr<TaggedCache<uint256, NodeObject>> cache_;
+    NodeObjectCache cache_;
+
     // Persistent key/value storage
     std::shared_ptr<Backend> backend_;
 
-    std::shared_ptr<NodeObject>
+    boost::intrusive_ptr<NodeObject>
     fetchNodeObject(
         uint256 const& hash,
         std::uint32_t,
@@ -155,7 +162,7 @@ private:
         bool duplicate) override;
 
     void
-    for_each(std::function<void(std::shared_ptr<NodeObject>)> f) override
+    for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) override
     {
         backend_->for_each(f);
     }

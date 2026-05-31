@@ -41,10 +41,6 @@ Database::Database(
     , requestBundle_(get<int>(config, "rq_bundle", 4))
     , readThreads_(std::max(1, readThreads))
 {
-    XRPL_ASSERT(
-        readThreads,
-        "ripple::NodeStore::Database::Database : nonzero threads input");
-
     if (earliestLedgerSeq_ < 1)
         Throw<std::runtime_error>("Invalid earliest_seq");
 
@@ -60,10 +56,10 @@ Database::Database(
                 beast::setCurrentThreadName(
                     "db prefetch #" + std::to_string(i));
 
-                decltype(read_) read;
-
                 while (true)
                 {
+                    decltype(read_) read;
+
                     {
                         std::unique_lock<std::mutex> lock(readLock_);
 
@@ -116,8 +112,6 @@ Database::Database(
                                           hash, req.first, FetchType::async));
                         }
                     }
-
-                    read.clear();
                 }
 
                 --runningThreads_;
@@ -184,7 +178,7 @@ void
 Database::asyncFetch(
     uint256 const& hash,
     std::uint32_t ledgerSeq,
-    std::function<void(std::shared_ptr<NodeObject> const&)>&& cb)
+    std::function<void(boost::intrusive_ptr<NodeObject> const&)>&& cb)
 {
     std::lock_guard lock(readLock_);
 
@@ -214,12 +208,12 @@ Database::importInternal(Backend& dstBackend, Database& srcDB)
 
         std::uint64_t sz{0};
         for (auto const& nodeObject : batch)
-            sz += nodeObject->getData().size();
+            sz += nodeObject->data().size();
         storeStats(batch.size(), sz);
         batch.clear();
     };
 
-    srcDB.for_each([&](std::shared_ptr<NodeObject> nodeObject) {
+    srcDB.for_each([&](boost::intrusive_ptr<NodeObject> nodeObject) {
         XRPL_ASSERT(
             nodeObject,
             "ripple::NodeStore::Database::importInternal : non-null node");
@@ -236,7 +230,7 @@ Database::importInternal(Backend& dstBackend, Database& srcDB)
 }
 
 // Perform a fetch and report the time it took
-std::shared_ptr<NodeObject>
+boost::intrusive_ptr<NodeObject>
 Database::fetchNodeObject(
     uint256 const& hash,
     std::uint32_t ledgerSeq,
@@ -253,10 +247,10 @@ Database::fetchNodeObject(
     fetchDurationUs_ += duration_cast<microseconds>(dur).count();
     if (nodeObject)
     {
-        ++fetchHitCount_;
-        fetchSz_ += nodeObject->getData().size();
+        fetchHitCount_.fetch_add(1, std::memory_order_relaxed);
+        fetchSz_ += nodeObject->data().size();
     }
-    ++fetchTotalCount_;
+    fetchTotalCount_.fetch_add(1, std::memory_order_relaxed);
 
     fetchReport.elapsed = duration_cast<milliseconds>(dur);
     scheduler_.onFetch(fetchReport);
@@ -288,7 +282,7 @@ Database::storeLedger(
     auto storeBatch = [&, fname = __func__]() {
         std::uint64_t sz{0};
         for (auto const& nodeObject : batch)
-            sz += nodeObject->getData().size();
+            sz += nodeObject->data().size();
 
         try
         {

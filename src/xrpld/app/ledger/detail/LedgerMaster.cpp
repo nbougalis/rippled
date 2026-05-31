@@ -1818,10 +1818,9 @@ LedgerMaster::getCloseTimeByHash(
     std::uint32_t index)
 {
     auto nodeObject = app_.getNodeStore().fetchNodeObject(ledgerHash, index);
-    if (nodeObject && (nodeObject->getData().size() >= 120))
+    if (nodeObject && (nodeObject->size() >= 120))
     {
-        SerialIter it(
-            nodeObject->getData().data(), nodeObject->getData().size());
+        SerialIter it(nodeObject->data().data(), nodeObject->data().size());
         if (safe_cast<HashPrefix>(it.get32()) == HashPrefix::ledgerMaster)
         {
             it.skip(

@@ -116,7 +116,7 @@ public:
     void
     store(
         NodeObjectType type,
-        Blob&& data,
+        std::span<std::uint8_t const> data,
         uint256 const& hash,
         std::uint32_t ledgerSeq) override;
     void
@@ -127,7 +127,7 @@ public:
     sweep() override;
 
 private:
-    std::shared_ptr<NodeObject>
+    boost::intrusive_ptr<NodeObject>
     fetchNodeObject(
         uint256 const& hash,
         std::uint32_t ledgerSeq,
@@ -141,11 +141,11 @@ private:
     bool
     likelyPinned(std::uint32_t ledgerSeq) const;
 
-    std::shared_ptr<NodeObject>
+    boost::intrusive_ptr<NodeObject>
     tryPersistent(uint256 const& hash, FetchReport& fetchReport);
 
     void
-    for_each(std::function<void(std::shared_ptr<NodeObject>)> f) override;
+    for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) override;
 };
 
 }  // namespace NodeStore

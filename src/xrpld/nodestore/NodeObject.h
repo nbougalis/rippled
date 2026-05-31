@@ -22,60 +22,62 @@
 
 #include <xrpl/basics/Blob.h>
 #include <xrpl/basics/CountedObject.h>
+#include <xrpl/basics/safe_cast.h>
 #include <xrpl/protocol/Protocol.h>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 // VFALCO NOTE Intentionally not in the NodeStore namespace
 
 namespace ripple {
 
-/** The types of node objects. */
-enum NodeObjectType : std::uint32_t {
-    hotUNKNOWN = 0,
-    hotLEDGER = 1,
-    hotACCOUNT_NODE = 3,
-    hotTRANSACTION_NODE = 4,
-    hotDUMMY = 512,  // an invalid or missing object
+namespace detail {
+constexpr std::uint16_t pinned_flag = 0x8000;
+}
 
-    // Uncached variants - these bypass the cache when stored.
-    // These are routing-only values that MUST be reduced to their hot
-    // equivalents before serialization (on-disk format is a single byte).
-    pinnedACCOUNT_NODE = 1003,
-    pinnedTRANSACTION_NODE = 1004,
-    pinnedLEDGER = 1005
+/** The types of node objects. */
+// clang-format off
+enum NodeObjectType : std::uint16_t {
+    hotUNKNOWN              = 0,
+    hotLEDGER               = 1,
+    hotACCOUNT_NODE         = 3,
+    hotTRANSACTION_NODE     = 4,
+
+    // Used for negative cache entries
+    hotDUMMY                = 512,
+
+    // Uncached variants. There are routing-only values, which essentially
+    // bypass the cache when these objects are stored; when stored on disk
+    // the values are reduced to their single-byte equivalent value.
+    pinnedLEDGER            = detail::pinned_flag + hotLEDGER,
+    pinnedACCOUNT_NODE      = detail::pinned_flag + hotACCOUNT_NODE,
+    pinnedTRANSACTION_NODE  = detail::pinned_flag + hotTRANSACTION_NODE,
 };
+// clang-format on
 
 /** Returns true if the type is a pinned (routing-only) variant. */
 inline bool
-isPinnedType(NodeObjectType type)
+isPinnedType(NodeObjectType type) noexcept
 {
-    return type == pinnedACCOUNT_NODE || type == pinnedTRANSACTION_NODE ||
-        type == pinnedLEDGER;
+    return (safe_cast(type) & detail::pinned_flag) != 0;
 }
 
 /** Map pinned types back to their serializable hot equivalents.
-    Returns the type unchanged if it is not a pinned variant.
+
+    @param type The node object type to convert
+    @return the corresponding unpinned type, if the input is a pinned type;
+            the input type unchanged otherwise.
 */
 inline NodeObjectType
-toHotType(NodeObjectType type)
+toHotType(NodeObjectType type) noexcept
 {
-    switch (type)
-    {
-        case pinnedACCOUNT_NODE:
-            return hotACCOUNT_NODE;
-        case pinnedTRANSACTION_NODE:
-            return hotTRANSACTION_NODE;
-        case pinnedLEDGER:
-            return hotLEDGER;
-        default:
-            return type;
-    }
+    return checked_cast<NodeObjectType>(safe_cast(type) & ~detail::pinned_flag);
 }
 
 /** A simple object that the Ledger uses to store entries.
-    NodeObjects are comprised of a type, a hash, and a blob.
-    They can be uniquely identified by the hash, which is a half-SHA512 of
-    the blob. The blob is a variable length block of serialized data. The
-    type identifies what the blob contains.
+
+    NodeObjects are comprised of a type and a serialized data blob. They can
+    be uniquely identified by the SHA512-Half hash of the data blob.
 
     @note No checking is performed to make sure the hash matches the data.
     @see SHAMap
@@ -86,22 +88,12 @@ public:
     static constexpr std::size_t keyBytes = 32;
 
 private:
-    // This hack is used to make the constructor effectively private
-    // except for when we use it in the call to make_shared.
-    // There's no portable way to make make_shared<> a friend work.
-    struct PrivateAccess
-    {
-        explicit PrivateAccess() = default;
-    };
-
-public:
-    // This constructor is private, use createObject instead.
     NodeObject(
         NodeObjectType type,
-        Blob&& data,
-        uint256 const& hash,
-        PrivateAccess);
+        std::span<std::uint8_t const> data,
+        uint256 const& hash) noexcept;
 
+public:
     /** Create an object from fields.
 
         The caller's variable is modified during this call. The
@@ -113,25 +105,89 @@ public:
                     is overwritten.
         @param hash The 256-bit hash of the payload data.
     */
-    static std::shared_ptr<NodeObject>
-    createObject(NodeObjectType type, Blob&& data, uint256 const& hash);
+    static boost::intrusive_ptr<NodeObject>
+    createObject(
+        NodeObjectType type,
+        std::span<std::uint8_t const> data,
+        uint256 const& hash) noexcept;
 
     /** Returns the type of this object. */
     NodeObjectType
-    getType() const;
+    type() const
+    {
+        return type_;
+    }
 
     /** Returns the hash of the data. */
     uint256 const&
-    getHash() const;
+    key() const
+    {
+        return hash_;
+    }
+
+    /** Returns the size (in bytes) of the data associated with this object. */
+    std::size_t
+    size() const noexcept
+    {
+        return size_;
+    }
 
     /** Returns the underlying data. */
-    Blob const&
-    getData() const;
+    std::span<std::uint8_t const>
+    data() const noexcept
+    {
+        return {
+            reinterpret_cast<std::uint8_t const*>(this) + sizeof(*this), size_};
+    }
+
+    /** Support for boost::intrusive_ptr. */
+    /** @{ */
+    friend void
+    intrusive_ptr_add_ref(NodeObject const* p) noexcept
+    {
+        std::uint16_t cur = p->refcount_.load(std::memory_order_relaxed);
+
+        do
+        {
+            XRPL_ASSERT(
+                cur != 0,
+                "ripple::NodeObject::intrusive_ptr_add_ref : refcount was 0!");
+
+            // In the (effectively impossible) even that the count is
+            // saturated, we treat this object as pinned: it will not
+            // be deallocated during the lifetime of the process.
+            if (cur == std::numeric_limits<std::uint16_t>::max()) [[unlikely]]
+                return;
+        } while (!p->refcount_.compare_exchange_weak(
+            cur,
+            static_cast<std::uint16_t>(cur + 1),
+            std::memory_order_relaxed,
+            std::memory_order_relaxed));
+    }
+
+    friend void
+    intrusive_ptr_release(NodeObject const* p) noexcept;
+    /** @} */
+
+    /** Returns true if there is only a single reference to this node object. */
+    bool
+    unique() const noexcept
+    {
+        return refcount_.load(std::memory_order_relaxed) == 1;
+    }
 
 private:
-    NodeObjectType const mType;
-    uint256 const mHash;
-    Blob const mData;
+    /** The reference count (for boost::intrusive_ptr) which is never zero! */
+    mutable std::atomic<std::uint16_t> refcount_;
+
+    /** The type of the node object. */
+    NodeObjectType const type_;
+
+    /** The size (in bytes) of the data associated with this object. */
+    std::uint32_t size_;
+
+    /** The hash of this node object. */
+    uint256 const hash_;
 };
 
 }  // namespace ripple

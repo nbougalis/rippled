@@ -56,7 +56,7 @@ DatabasePinnedImp::DatabasePinnedImp(
 void
 DatabasePinnedImp::store(
     NodeObjectType type,
-    Blob&& data,
+    std::span<std::uint8_t const> data,
     uint256 const& hash,
     std::uint32_t ledgerSeq)
 {
@@ -76,7 +76,7 @@ DatabasePinnedImp::store(
 
         auto nObj = NodeObject::createObject(type, std::move(data), hash);
         persistent_->store(nObj);
-        storeStats(1, nObj->getData().size());
+        storeStats(1, nObj->size());
     }
     else
     {
@@ -91,7 +91,7 @@ DatabasePinnedImp::store(
     }
 }
 
-std::shared_ptr<NodeObject>
+boost::intrusive_ptr<NodeObject>
 DatabasePinnedImp::fetchNodeObject(
     uint256 const& hash,
     std::uint32_t ledgerSeq,
@@ -208,7 +208,8 @@ DatabasePinnedImp::sweep()
 }
 
 void
-DatabasePinnedImp::for_each(std::function<void(std::shared_ptr<NodeObject>)> f)
+DatabasePinnedImp::for_each(
+    std::function<void(boost::intrusive_ptr<NodeObject>)> f)
 {
     // Visit both rotating and persistent backends
     rotating_.for_each(f);
@@ -244,12 +245,12 @@ DatabasePinnedImp::likelyPinned(std::uint32_t ledgerSeq) const
     return ranges && boost::icl::contains(*ranges, ledgerSeq);
 }
 
-std::shared_ptr<NodeObject>
+boost::intrusive_ptr<NodeObject>
 DatabasePinnedImp::tryPersistent(uint256 const& hash, FetchReport& fetchReport)
 {
     try
     {
-        std::shared_ptr<NodeObject> obj;
+        boost::intrusive_ptr<NodeObject> obj;
 
         if (persistent_->fetch(hash.data(), &obj) == ok && obj)
         {

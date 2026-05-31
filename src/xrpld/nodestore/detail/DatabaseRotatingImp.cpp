@@ -121,11 +121,11 @@ DatabaseRotatingImp::sync()
 void
 DatabaseRotatingImp::store(
     NodeObjectType type,
-    Blob&& data,
+    std::span<std::uint8_t const> data,
     uint256 const& hash,
     std::uint32_t)
 {
-    auto nObj = NodeObject::createObject(type, std::move(data), hash);
+    auto nObj = NodeObject::createObject(type, data, hash);
 
     auto const backend = [&] {
         std::lock_guard lock(mutex_);
@@ -133,7 +133,7 @@ DatabaseRotatingImp::store(
     }();
 
     backend->store(nObj);
-    storeStats(1, nObj->getData().size());
+    storeStats(1, nObj->size());
 }
 
 void
@@ -142,7 +142,7 @@ DatabaseRotatingImp::sweep()
     // nothing to do
 }
 
-std::shared_ptr<NodeObject>
+boost::intrusive_ptr<NodeObject>
 DatabaseRotatingImp::fetchNodeObject(
     uint256 const& hash,
     std::uint32_t,
@@ -151,7 +151,7 @@ DatabaseRotatingImp::fetchNodeObject(
 {
     auto fetch = [&](std::shared_ptr<Backend> const& backend) {
         Status status;
-        std::shared_ptr<NodeObject> nodeObject;
+        boost::intrusive_ptr<NodeObject> nodeObject;
         try
         {
             status = backend->fetch(hash.data(), &nodeObject);
@@ -179,7 +179,7 @@ DatabaseRotatingImp::fetchNodeObject(
     };
 
     // See if the node object exists in the cache
-    std::shared_ptr<NodeObject> nodeObject;
+    boost::intrusive_ptr<NodeObject> nodeObject;
 
     auto [writable, archive] = [&] {
         std::lock_guard lock(mutex_);
@@ -214,7 +214,7 @@ DatabaseRotatingImp::fetchNodeObject(
 
 void
 DatabaseRotatingImp::for_each(
-    std::function<void(std::shared_ptr<NodeObject>)> f)
+    std::function<void(boost::intrusive_ptr<NodeObject>)> f)
 {
     auto [writable, archive] = [&] {
         std::lock_guard lock(mutex_);

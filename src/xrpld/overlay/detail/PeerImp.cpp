@@ -2695,8 +2695,7 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMGetObjectByHash> const& m)
                     protocol::TMIndexedObject& newObj = *reply.add_objects();
                     newObj.set_hash(hash.begin(), hash.size());
                     newObj.set_data(
-                        &nodeObject->getData().front(),
-                        nodeObject->getData().size());
+                        nodeObject->data().data(), nodeObject->data().size());
 
                     if (obj.has_nodeid())
                         newObj.set_index(obj.nodeid());

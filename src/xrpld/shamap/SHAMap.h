@@ -583,7 +583,7 @@ private:
     std::shared_ptr<SHAMapTreeNode>
     finishFetch(
         SHAMapHash const& hash,
-        std::shared_ptr<NodeObject> const& object) const;
+        boost::intrusive_ptr<NodeObject> const& object) const;
 };
 
 inline void

@@ -206,7 +206,7 @@ public:
     }
 
     Status
-    fetch(void const* key, std::shared_ptr<NodeObject>* pno) override
+    fetch(void const* key, boost::intrusive_ptr<NodeObject>* pno) override
     {
         Status status;
         pno->reset();
@@ -214,16 +214,13 @@ public:
         db_.fetch(
             key,
             [key, pno, &status](void const* data, std::size_t size) {
-                nudb::detail::buffer bf;
+                scratch_buffer bf;
                 auto const result = nodeobject_decompress(data, size, bf);
-                DecodedBlob decoded(key, result.first, result.second);
-                if (!decoded.wasOk())
-                {
+                *pno = decodeNodeObject(key, result.first, result.second);
+                if (*pno)
+                    status = ok;
+                else
                     status = dataCorrupt;
-                    return;
-                }
-                *pno = decoded.createObject();
-                status = ok;
             },
             ec);
         if (ec == nudb::error::key_not_found)
@@ -233,30 +230,12 @@ public:
         return status;
     }
 
-    std::pair<std::vector<std::shared_ptr<NodeObject>>, Status>
-    fetchBatch(std::vector<uint256 const*> const& hashes) override
-    {
-        std::vector<std::shared_ptr<NodeObject>> results;
-        results.reserve(hashes.size());
-        for (auto const& h : hashes)
-        {
-            std::shared_ptr<NodeObject> nObj;
-            Status status = fetch(h->begin(), &nObj);
-            if (status != ok)
-                results.push_back({});
-            else
-                results.push_back(nObj);
-        }
-
-        return {results, ok};
-    }
-
     void
-    do_insert(std::shared_ptr<NodeObject> const& no)
+    do_insert(boost::intrusive_ptr<NodeObject> const& no)
     {
         EncodedBlob e(no);
         nudb::error_code ec;
-        nudb::detail::buffer bf;
+        scratch_buffer bf;
         auto const result = nodeobject_compress(e.getData(), e.getSize(), bf);
         db_.insert(e.getKey(), result.first, result.second, ec);
         if (ec && ec != nudb::error::key_exists)
@@ -264,7 +243,7 @@ public:
     }
 
     void
-    store(std::shared_ptr<NodeObject> const& no) override
+    store(boost::intrusive_ptr<NodeObject> const& no) override
     {
         BatchWriteReport report;
         report.writeCount = 1;
@@ -294,7 +273,7 @@ public:
     }
 
     void
-    for_each(std::function<void(std::shared_ptr<NodeObject>)> f) override
+    for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) override
     {
         auto const dp = db_.dat_path();
         auto const kp = db_.key_path();
@@ -311,15 +290,16 @@ public:
                 void const* data,
                 std::size_t size,
                 nudb::error_code&) {
-                nudb::detail::buffer bf;
+                scratch_buffer bf;
                 auto const result = nodeobject_decompress(data, size, bf);
-                DecodedBlob decoded(key, result.first, result.second);
-                if (!decoded.wasOk())
+                if (auto decoded =
+                        decodeNodeObject(key, result.first, result.second))
                 {
-                    ec = make_error_code(nudb::error::missing_value);
+                    f(decoded);
                     return;
                 }
-                f(decoded.createObject());
+
+                ec = make_error_code(nudb::error::missing_value);
             },
             nudb::no_progress{},
             ec);

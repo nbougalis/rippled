@@ -27,18 +27,14 @@
 namespace ripple {
 namespace NodeStore {
 
-enum {
-    // This is only used to pre-allocate the array for
-    // batch objects and does not affect the amount written.
-    //
-    batchWritePreallocationSize = 256,
+// This value is used to pre-allocate storage inside batch objects
+// and does not affect the amount written.
+constexpr inline std::size_t batchWritePreallocationSize = 256;
 
-    // This sets a limit on the maximum number of writes
-    // in a batch. Actual usage can be twice this since
-    // we have a new batch growing as we write the old.
-    //
-    batchWriteLimitSize = 65536
-};
+// This sets a limit on the maximum number of writes in a batch, but
+// actual usage can be twice this since we have a new batch growing
+// as we write the old.
+constexpr inline std::size_t batchWriteLimitSize = 65536;
 
 /** Return codes from Backend operations. */
 enum Status {
@@ -52,7 +48,7 @@ enum Status {
 };
 
 /** A batch of NodeObjects to write at once. */
-using Batch = std::vector<std::shared_ptr<NodeObject>>;
+using Batch = std::vector<boost::intrusive_ptr<NodeObject>>;
 
 }  // namespace NodeStore
 

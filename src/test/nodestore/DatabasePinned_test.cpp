@@ -47,7 +47,7 @@ class DatabasePinned_test : public beast::unit_test::suite
 
     // Make a NodeObject with deterministic but unique-per-call hash so
     // we can store it and fetch it back.
-    static std::shared_ptr<NodeObject>
+    static boost::intrusive_ptr<NodeObject>
     makeObject(NodeObjectType type, std::uint8_t marker)
     {
         Blob data(64, marker);
@@ -145,16 +145,21 @@ class DatabasePinned_test : public beast::unit_test::suite
         {
             NodeObjectType type;
             std::uint8_t marker;
-            std::shared_ptr<NodeObject> obj;
+            boost::intrusive_ptr<NodeObject> obj;
+
+            Item(NodeObjectType type, std::uint8_t marker)
+                : type(type), marker(marker)
+            {
+            }
         };
 
         std::vector<Item> items{
-            {pinnedLEDGER, 0x01, nullptr},
-            {pinnedACCOUNT_NODE, 0x02, nullptr},
-            {pinnedTRANSACTION_NODE, 0x03, nullptr},
-            {hotLEDGER, 0x04, nullptr},
-            {hotACCOUNT_NODE, 0x05, nullptr},
-            {hotTRANSACTION_NODE, 0x06, nullptr},
+            {pinnedLEDGER, 0x01},
+            {pinnedACCOUNT_NODE, 0x02},
+            {pinnedTRANSACTION_NODE, 0x03},
+            {hotLEDGER, 0x04},
+            {hotACCOUNT_NODE, 0x05},
+            {hotTRANSACTION_NODE, 0x06},
         };
 
         for (auto& it : items)
@@ -164,19 +169,18 @@ class DatabasePinned_test : public beast::unit_test::suite
             // Pass a copy of the data because store() takes Blob&&.
             nodeStore.store(
                 it.type,
-                Blob(it.obj->getData()),
-                it.obj->getHash(),
+                Blob(it.obj->data().begin(), it.obj->data().end()),
+                it.obj->key(),
                 /*ledgerSeq=*/100);
         }
 
         for (auto const& it : items)
         {
-            auto const fetched =
-                nodeStore.fetchNodeObject(it.obj->getHash(), 100);
+            auto const fetched = nodeStore.fetchNodeObject(it.obj->key(), 100);
             BEAST_EXPECT(fetched != nullptr);
             if (!fetched)
                 continue;
-            BEAST_EXPECT(fetched->getData() == it.obj->getData());
+            BEAST_EXPECT(std::ranges::equal(fetched->data(), it.obj->data()));
         }
     }
 

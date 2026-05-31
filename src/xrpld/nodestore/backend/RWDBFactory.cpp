@@ -86,7 +86,7 @@ public:
     }
 
     Status
-    fetch(void const* key, std::shared_ptr<NodeObject>* pObject) override
+    fetch(void const* key, boost::intrusive_ptr<NodeObject>* pObject) override
     {
         if (!isOpen_)
             return notFound;
@@ -98,35 +98,15 @@ public:
         if (it == table_.end())
             return notFound;
 
-        nudb::detail::buffer bf;
+        scratch_buffer bf;
         auto const result =
             nodeobject_decompress(it->second.data(), it->second.size(), bf);
-        DecodedBlob decoded(hash.data(), result.first, result.second);
-        if (!decoded.wasOk())
-            return dataCorrupt;
-        *pObject = decoded.createObject();
-        return ok;
-    }
-
-    std::pair<std::vector<std::shared_ptr<NodeObject>>, Status>
-    fetchBatch(std::vector<uint256 const*> const& hashes) override
-    {
-        std::vector<std::shared_ptr<NodeObject>> results;
-        results.reserve(hashes.size());
-        for (auto const& h : hashes)
-        {
-            std::shared_ptr<NodeObject> nObj;
-            Status status = fetch(h->begin(), &nObj);
-            if (status != ok)
-                results.push_back({});
-            else
-                results.push_back(nObj);
-        }
-        return {results, ok};
+        *pObject = decodeNodeObject(hash.data(), result.first, result.second);
+        return *pObject ? ok : dataCorrupt;
     }
 
     void
-    store(std::shared_ptr<NodeObject> const& object) override
+    store(boost::intrusive_ptr<NodeObject> const& object) override
     {
         if (!isOpen_)
             return;
@@ -135,7 +115,7 @@ public:
             return;
 
         EncodedBlob encoded(object);
-        nudb::detail::buffer bf;
+        scratch_buffer bf;
         auto const result =
             nodeobject_compress(encoded.getData(), encoded.getSize(), bf);
 
@@ -144,7 +124,7 @@ public:
             static_cast<const std::uint8_t*>(result.first) + result.second);
 
         std::lock_guard lock(mutex_);
-        table_[object->getHash()] = std::move(compressed);
+        table_[object->key()] = std::move(compressed);
     }
 
     void
@@ -160,7 +140,7 @@ public:
     }
 
     void
-    for_each(std::function<void(std::shared_ptr<NodeObject>)> f) override
+    for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) override
     {
         if (!isOpen_)
             return;
@@ -168,13 +148,12 @@ public:
         std::lock_guard lock(mutex_);
         for (const auto& entry : table_)
         {
-            nudb::detail::buffer bf;
+            scratch_buffer bf;
             auto const result = nodeobject_decompress(
                 entry.second.data(), entry.second.size(), bf);
-            DecodedBlob decoded(
-                entry.first.data(), result.first, result.second);
-            if (decoded.wasOk())
-                f(decoded.createObject());
+            if (auto decoded = decodeNodeObject(
+                    entry.first.data(), result.first, result.second))
+                f(decoded);
         }
     }
 

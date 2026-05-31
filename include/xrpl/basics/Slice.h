@@ -36,6 +36,15 @@
 
 namespace ripple {
 
+namespace detail {
+
+template <class T>
+concept is_byte_like = std::same_as<std::remove_cv_t<T>, char> ||
+    std::same_as<std::remove_cv_t<T>, unsigned char> ||
+    std::same_as<std::remove_cv_t<T>, uint8_t>;
+
+}
+
 /** An immutable linear range of bytes.
 
     A fully constructed Slice is guaranteed to be in a valid state.
@@ -44,7 +53,6 @@ namespace ripple {
 */
 class Slice
 {
-private:
     std::uint8_t const* data_ = nullptr;
     std::size_t size_ = 0;
 
@@ -230,27 +238,24 @@ operator<<(Stream& s, Slice const& v)
 }
 
 template <class T, std::size_t N>
-std::enable_if_t<
-    std::is_same<T, char>::value || std::is_same<T, unsigned char>::value,
-    Slice>
+    requires detail::is_byte_like<T>
+Slice
 makeSlice(std::array<T, N> const& a)
 {
     return Slice(a.data(), a.size());
 }
 
 template <class T, std::size_t N>
-std::enable_if_t<
-    std::is_same<T, char>::value || std::is_same<T, unsigned char>::value,
-    Slice>
+    requires detail::is_byte_like<T>
+Slice
 makeSlice(std::span<T, N> const& a)
 {
     return Slice(a.data(), a.size());
 }
 
 template <class T, class Alloc>
-std::enable_if_t<
-    std::is_same<T, char>::value || std::is_same<T, unsigned char>::value,
-    Slice>
+    requires detail::is_byte_like<T>
+Slice
 makeSlice(std::vector<T, Alloc> const& v)
 {
     return Slice(v.data(), v.size());

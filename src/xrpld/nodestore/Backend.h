@@ -21,8 +21,8 @@
 #define RIPPLE_NODESTORE_BACKEND_H_INCLUDED
 
 #include <xrpld/nodestore/Types.h>
-#include <atomic>
 #include <cstdint>
+#include <memory>
 #include <optional>
 
 namespace ripple {
@@ -96,11 +96,7 @@ public:
         @return The result of the operation.
     */
     virtual Status
-    fetch(void const* key, std::shared_ptr<NodeObject>* pObject) = 0;
-
-    /** Fetch a batch synchronously. */
-    virtual std::pair<std::vector<std::shared_ptr<NodeObject>>, Status>
-    fetchBatch(std::vector<uint256 const*> const& hashes) = 0;
+    fetch(void const* key, boost::intrusive_ptr<NodeObject>* pObject) = 0;
 
     /** Store a single object.
         Depending on the implementation this may happen immediately
@@ -109,7 +105,7 @@ public:
         @param object The object to store.
     */
     virtual void
-    store(std::shared_ptr<NodeObject> const& object) = 0;
+    store(boost::intrusive_ptr<NodeObject> const& object) = 0;
 
     /** Store a group of objects.
         @note This function will not be called concurrently with
@@ -128,7 +124,7 @@ public:
         @see import
     */
     virtual void
-    for_each(std::function<void(std::shared_ptr<NodeObject>)> f) = 0;
+    for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) = 0;
 
     /** Estimate the number of write operations pending. */
     virtual int
@@ -159,6 +155,95 @@ public:
     getBlockSize() const
     {
         return std::nullopt;
+    }
+};
+
+/** Growable buffer with SBO support satisfying the BufferFactory concept.
+
+    @warning The existing contents of the buffer may be lost across memory
+             allocation requests.
+
+    @note This class is intended for use as a function-local. It cannot be
+          copied or moved.
+ */
+class scratch_buffer
+{
+    /** The size of the inline storage buffer. */
+    static constexpr std::size_t fixed_size = 4096;
+
+    /** The heap buffer for this object, if any. */
+    std::unique_ptr<std::uint8_t[]> heap_;
+
+    /** The size that the caller has requested. */
+    std::size_t size_ = 0;
+
+    /** The size that we have available. Always >= size_. */
+    std::size_t capacity_ = fixed_size;
+
+    /** The internal buffer for this object. The alignas is important. */
+    alignas(std::max_align_t) std::uint8_t local_[fixed_size];
+
+public:
+    scratch_buffer() noexcept = default;
+
+    scratch_buffer(scratch_buffer const&) = delete;
+    scratch_buffer&
+    operator=(scratch_buffer const&) = delete;
+
+    scratch_buffer(scratch_buffer&&) = delete;
+    scratch_buffer&
+    operator=(scratch_buffer&&) = delete;
+
+    /** Returns the number of bytes that are available to the caller.
+
+        @note This may be less than the capacity, but it is a contract
+              violation for the caller to use any of the excess, since
+              the capacity of the buffer is an implementation detail.
+     */
+    std::size_t
+    size() const noexcept
+    {
+        return size_;
+    }
+
+    /** Returns the buffer associated with this object.
+
+        @note The returned pointer will remain valid at least until the next
+              call to operator().
+
+        @returns A non-null pointer that can hold at least @ref size() bytes.
+     */
+    std::uint8_t*
+    get() noexcept
+    {
+        if (auto ret = heap_.get())
+            return ret;
+
+        return local_;
+    }
+
+    /** Request the buffer to be at least the given size.
+
+        The call may or may not resize the buffer, depending on whether the
+        request can be satisfied without reallocations.
+
+        @warning Any buffer pointers previously returned from this function
+                 or by @ref get() should be considered invalidated and must
+                 not be accessed.
+
+        @returns A pointer that can hold at least @ref size() bytes.
+     */
+    void*
+    operator()(std::size_t size)
+    {
+        if (size > capacity_)
+        {
+            heap_ = std::make_unique_for_overwrite<std::uint8_t[]>(size);
+            capacity_ = size;
+        }
+
+        size_ = size;
+        return get();
     }
 };
 

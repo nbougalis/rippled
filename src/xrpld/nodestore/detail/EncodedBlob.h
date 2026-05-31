@@ -22,6 +22,7 @@
 
 #include <xrpld/nodestore/NodeObject.h>
 #include <xrpl/basics/Buffer.h>
+#include <xrpl/basics/contract.h>
 #include <xrpl/beast/utility/instrumentation.h>
 #include <boost/align/align_up.hpp>
 #include <algorithm>
@@ -47,8 +48,11 @@ namespace NodeStore {
 
           We leverage that fact to preallocate enough memory to handle most
           payloads as part of this object, eliminating the need for dynamic
-          allocation. As of this writing ~94% of objects require fewer than
-          1024 payload bytes.
+          allocation. As of this writing ~98% of objects fit comfortably in
+          600 bytes.
+
+          This class is not intended to be copied or moved. Turning it into
+          a function is a better approach.
  */
 
 class EncodedBlob
@@ -56,19 +60,11 @@ class EncodedBlob
     /** The 32-byte key of the serialized object. */
     std::array<std::uint8_t, 32> key_;
 
-    /** A pre-allocated buffer for the serialized object.
-
-         The buffer is large enough for the 9 byte prefix and at least
-         1024 more bytes. The precise size is calculated automatically
-         at compile time so as to avoid wasting space on padding bytes.
-     */
-    std::array<
-        std::uint8_t,
-        boost::alignment::align_up(9 + 1024, alignof(std::uint32_t))>
-        payload_;
-
     /** The size of the serialized data. */
     std::uint32_t size_;
+
+    /** A pre-allocated buffer for the serialized object. */
+    std::array<std::uint8_t, 724> payload_;
 
     /** A pointer to the serialized data.
 
@@ -78,26 +74,19 @@ class EncodedBlob
     std::uint8_t* const ptr_;
 
 public:
-    explicit EncodedBlob(std::shared_ptr<NodeObject> const& obj)
+    explicit EncodedBlob(boost::intrusive_ptr<NodeObject> const& obj)
         : size_([&obj]() {
-            XRPL_ASSERT(
-                obj,
-                "ripple::NodeStore::EncodedBlob::EncodedBlob : non-null input");
-
-            if (!obj)
-                throw std::runtime_error(
-                    "EncodedBlob: unseated std::shared_ptr used.");
-
-            return obj->getData().size() + 9;
+            return checked_cast<decltype(size_)>(obj->size() + 9);
         }())
         , ptr_(
               (size_ <= payload_.size()) ? payload_.data()
                                          : new std::uint8_t[size_])
     {
         std::fill_n(ptr_, 8, std::uint8_t{0});
-        ptr_[8] = static_cast<std::uint8_t>(obj->getType());
-        std::copy_n(obj->getData().data(), obj->getData().size(), ptr_ + 9);
-        std::copy_n(obj->getHash().data(), obj->getHash().size(), key_.data());
+        ptr_[8] = static_cast<std::uint8_t>(obj->type());
+        if (auto data = obj->data(); !data.empty())
+            std::copy_n(data.data(), data.size(), ptr_ + 9);
+        std::copy_n(obj->key().data(), obj->key().size(), key_.data());
     }
 
     ~EncodedBlob()
@@ -112,10 +101,18 @@ public:
             delete[] ptr_;
     }
 
+    EncodedBlob(EncodedBlob const&) = delete;
+    EncodedBlob&
+    operator=(EncodedBlob const&) = delete;
+
+    EncodedBlob(EncodedBlob&&) = delete;
+    EncodedBlob&
+    operator=(EncodedBlob&&) = delete;
+
     [[nodiscard]] void const*
     getKey() const noexcept
     {
-        return static_cast<void const*>(key_.data());
+        return key_.data();
     }
 
     [[nodiscard]] std::size_t
@@ -127,7 +124,7 @@ public:
     [[nodiscard]] void const*
     getData() const noexcept
     {
-        return static_cast<void const*>(ptr_);
+        return ptr_;
     }
 };
 

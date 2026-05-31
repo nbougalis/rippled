@@ -68,7 +68,7 @@ public:
         write the batch out.
     */
     void
-    store(std::shared_ptr<NodeObject> const& object);
+    store(boost::intrusive_ptr<NodeObject> object);
 
     /** Get an estimate of the amount of writing I/O pending. */
     int
@@ -77,19 +77,15 @@ public:
 private:
     void
     performScheduledTask() override;
-    void
-    writeBatch();
-    void
-    waitForWriting();
-
-private:
-    using LockType = std::recursive_mutex;
-    using CondvarType = std::condition_variable_any;
 
     Callback& m_callback;
     Scheduler& m_scheduler;
-    LockType mWriteMutex;
-    CondvarType mWriteCondition;
+
+    // We use a recursive mutex on purpose, because of reentrancy
+    // concerns. For details, see BatchWriter::store.
+    std::recursive_mutex mWriteMutex;
+
+    std::condition_variable_any mWriteCondition;
     int mWriteLoad;
     bool mWritePending;
     Batch mWriteSet;

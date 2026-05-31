@@ -55,19 +55,13 @@ public:
     }
 
     Status
-    fetch(void const*, std::shared_ptr<NodeObject>*) override
+    fetch(void const*, boost::intrusive_ptr<NodeObject>*) override
     {
         return notFound;
     }
 
-    std::pair<std::vector<std::shared_ptr<NodeObject>>, Status>
-    fetchBatch(std::vector<uint256 const*> const& hashes) override
-    {
-        return {};
-    }
-
     void
-    store(std::shared_ptr<NodeObject> const& object) override
+    store(boost::intrusive_ptr<NodeObject> const& object) override
     {
     }
 
@@ -82,7 +76,7 @@ public:
     }
 
     void
-    for_each(std::function<void(std::shared_ptr<NodeObject>)> f) override
+    for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) override
     {
     }
 

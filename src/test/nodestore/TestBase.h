@@ -45,22 +45,26 @@ struct LessThan
 {
     bool
     operator()(
-        std::shared_ptr<NodeObject> const& lhs,
-        std::shared_ptr<NodeObject> const& rhs) const noexcept
+        boost::intrusive_ptr<NodeObject> const& lhs,
+        boost::intrusive_ptr<NodeObject> const& rhs) const noexcept
     {
-        return lhs->getHash() < rhs->getHash();
+        return lhs->key() < rhs->key();
     }
 };
 
 /** Returns `true` if objects are identical. */
 inline bool
 isSame(
-    std::shared_ptr<NodeObject> const& lhs,
-    std::shared_ptr<NodeObject> const& rhs)
+    boost::intrusive_ptr<NodeObject> const& lhs,
+    boost::intrusive_ptr<NodeObject> const& rhs)
 {
-    return (lhs->getType() == rhs->getType()) &&
-        (lhs->getHash() == rhs->getHash()) &&
-        (lhs->getData() == rhs->getData());
+    if (lhs->type() != rhs->type() || lhs->key() != rhs->key())
+        return false;
+
+    auto const lr = lhs->data();
+    auto const rr = rhs->data();
+
+    return std::equal(lr.begin(), lr.end(), rr.begin(), rr.end());
 }
 
 // Some common code for the unit tests
@@ -159,10 +163,10 @@ public:
 
         for (int i = 0; i < batch.size(); ++i)
         {
-            std::shared_ptr<NodeObject> object;
+            boost::intrusive_ptr<NodeObject> object;
 
             Status const status =
-                backend.fetch(batch[i]->getHash().cbegin(), &object);
+                backend.fetch(batch[i]->key().cbegin(), &object);
 
             BEAST_EXPECT(status == ok);
 
@@ -180,10 +184,10 @@ public:
     {
         for (int i = 0; i < batch.size(); ++i)
         {
-            std::shared_ptr<NodeObject> object;
+            boost::intrusive_ptr<NodeObject> object;
 
             Status const status =
-                backend.fetch(batch[i]->getHash().cbegin(), &object);
+                backend.fetch(batch[i]->key().cbegin(), &object);
 
             BEAST_EXPECT(status == notFound);
         }
@@ -195,14 +199,10 @@ public:
     {
         for (int i = 0; i < batch.size(); ++i)
         {
-            std::shared_ptr<NodeObject> const object(batch[i]);
-
-            Blob data(object->getData());
-
             db.store(
-                object->getType(),
-                std::move(data),
-                object->getHash(),
+                batch[i]->type(),
+                batch[i]->data(),
+                batch[i]->key(),
                 db.earliestLedgerSeq());
         }
     }
@@ -216,8 +216,7 @@ public:
 
         for (int i = 0; i < batch.size(); ++i)
         {
-            std::shared_ptr<NodeObject> object =
-                db.fetchNodeObject(batch[i]->getHash(), 0);
+            auto object = db.fetchNodeObject(batch[i]->key(), 0);
 
             if (object != nullptr)
                 pCopy->push_back(object);

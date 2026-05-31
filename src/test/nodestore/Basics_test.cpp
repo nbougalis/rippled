@@ -60,18 +60,11 @@ public:
         {
             EncodedBlob encoded(batch[i]);
 
-            DecodedBlob decoded(
+            auto decoded = decodeNodeObject(
                 encoded.getKey(), encoded.getData(), encoded.getSize());
 
-            BEAST_EXPECT(decoded.wasOk());
-
-            if (decoded.wasOk())
-            {
-                std::shared_ptr<NodeObject> const object(
-                    decoded.createObject());
-
-                BEAST_EXPECT(isSame(batch[i], object));
-            }
+            if (BEAST_EXPECT(decoded))
+                BEAST_EXPECT(isSame(batch[i], decoded));
         }
     }
 

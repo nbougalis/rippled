@@ -241,7 +241,7 @@ InboundLedger::tryDB(NodeStore::Database& srcDB)
 {
     if (!mHaveHeader)
     {
-        auto makeLedger = [&, this](Blob const& data) {
+        auto makeLedger = [&, this](std::span<std::uint8_t const> data) {
             JLOG(journal_.trace()) << "Ledger header found in fetch pack";
             mLedger = std::make_shared<Ledger>(
                 deserializePrefixedHeader(makeSlice(data)),
@@ -264,7 +264,8 @@ InboundLedger::tryDB(NodeStore::Database& srcDB)
         {
             JLOG(journal_.trace()) << "Ledger header found in local store";
 
-            makeLedger(nodeObject->getData());
+            makeLedger(nodeObject->data());
+
             if (failed_)
                 return;
 
@@ -272,9 +273,11 @@ InboundLedger::tryDB(NodeStore::Database& srcDB)
             auto& dstDB{mLedger->stateMap().family().db()};
             if (std::addressof(dstDB) != std::addressof(srcDB))
             {
-                Blob blob{nodeObject->getData()};
                 dstDB.store(
-                    hotLEDGER, std::move(blob), hash_, mLedger->info().seq);
+                    hotLEDGER,
+                    {nodeObject->data().begin(), nodeObject->data().end()},
+                    hash_,
+                    mLedger->info().seq);
             }
         }
         else
@@ -1023,8 +1026,9 @@ InboundLedger::getNeededHashes()
             mLedger->txMap().family().db(), app_.getLedgerMaster());
         for (auto const& h : neededTxHashes(4, &filter))
         {
-            ret.push_back(std::make_pair(
-                protocol::TMGetObjectByHash::otTRANSACTION_NODE, h));
+            ret.push_back(
+                std::make_pair(
+                    protocol::TMGetObjectByHash::otTRANSACTION_NODE, h));
         }
     }
 
