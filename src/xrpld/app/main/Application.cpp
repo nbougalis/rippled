@@ -490,8 +490,6 @@ public:
               get_io_service())
         , grpcServer_(std::make_unique<GRPCServer>(*this))
     {
-        initAccountIdCache(config_->getValueFor(SizedItem::accountIdCacheSize));
-
         add(m_resourceManager.get());
 
         //

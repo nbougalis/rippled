@@ -62,8 +62,7 @@ enum class SizedItem : std::size_t {
     lgrDBCache,
     openFinalLimit,
     burstSize,
-    ramSizeGB,
-    accountIdCacheSize,
+    ramSizeGB
 };
 
 /** Fee schedule for startup / standalone, and to vote for.
