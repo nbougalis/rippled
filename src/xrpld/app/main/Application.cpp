@@ -230,11 +230,8 @@ public:
 
     boost::asio::signal_set m_signals;
 
-    // Once we get C++20, we could use `std::atomic_flag` for `isTimeToStop`
-    // and eliminate the need for the condition variable and the mutex.
-    std::condition_variable stoppingCondition_;
-    mutable std::mutex stoppingMutex_;
-    std::atomic<bool> isTimeToStop = false;
+    // Set to true when we need to stop. The main thread waits on this.
+    std::atomic<bool> stop_ = false;
 
     std::atomic<bool> checkSigs_;
 
@@ -1587,10 +1584,8 @@ ApplicationImp::run()
         getLoadManager().activateDeadlockDetector();
     }
 
-    {
-        std::unique_lock<std::mutex> lk{stoppingMutex_};
-        stoppingCondition_.wait(lk, [this] { return isTimeToStop.load(); });
-    }
+    // Now wait for the stop signal:
+    stop_.wait(false);
 
     JLOG(m_journal.debug()) << "Application stopping";
 
@@ -1673,14 +1668,14 @@ ApplicationImp::run()
 void
 ApplicationImp::signalStop(std::string msg)
 {
-    if (!isTimeToStop.exchange(true))
+    if (!stop_.exchange(true))
     {
-        if (msg.empty())
-            JLOG(m_journal.warn()) << "Server stopping";
-        else
-            JLOG(m_journal.warn()) << "Server stopping: " << msg;
+        if (!msg.empty())
+            msg = ": " + msg;
 
-        stoppingCondition_.notify_all();
+        JLOG(m_journal.warn()) << "Server stopping" << msg;
+
+        stop_.notify_all();
     }
 }
 
@@ -1699,7 +1694,7 @@ ApplicationImp::checkSigs(bool check)
 bool
 ApplicationImp::isStopping() const
 {
-    return isTimeToStop.load();
+    return stop_.load();
 }
 
 int
