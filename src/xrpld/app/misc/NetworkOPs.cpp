@@ -164,9 +164,9 @@ public:
         beast::Journal journal,
         beast::insight::Collector::ptr const& collector)
         : app_(app)
+        , mode_(start_valid ? OperatingMode::FULL : OperatingMode::DISCONNECTED)
         , m_journal(journal)
         , m_localTX(make_LocalTxs())
-        , mMode(start_valid ? OperatingMode::FULL : OperatingMode::DISCONNECTED)
         , heartbeatTimer_(io_svc)
         , clusterTimer_(io_svc)
         , accountHistoryTxTimer_(io_svc)
@@ -199,16 +199,39 @@ public:
 
 public:
     OperatingMode
-    getOperatingMode() const override;
+    getOperatingMode() const noexcept override
+    {
+        return mode_.get();
+    }
 
-    std::string
-    strOperatingMode(OperatingMode const mode, bool const admin) const override;
+    std::string_view
+    strOperatingMode(OperatingMode const mode, bool const admin = false)
+        const noexcept override
+    {
+        if (mode == OperatingMode::FULL && admin)
+        {
+            if (auto const cm = mConsensus.mode();
+                cm != ConsensusMode::wrongLedger)
+            {
+                if (cm == ConsensusMode::proposing)
+                    return "proposing";
 
-    std::string
-    strOperatingMode(bool const admin = false) const override;
+                if (mConsensus.validating())
+                    return "validating";
+            }
+        }
 
-    StateAccounting::CounterData
-    getStateAccountingData() override;
+        return to_string(mode);
+    }
+
+    std::string_view
+    strOperatingMode(bool admin = false) const noexcept override
+    {
+        return strOperatingMode(mode_.get(), admin);
+    }
+
+    StateAccounting::Snapshot
+    getStateAccountingData() const noexcept override;
 
     //
     // Transaction operations.
@@ -337,8 +360,8 @@ public:
     bool
     isFull() override;
 
-    void
-    setMode(OperatingMode om) override;
+    OperatingMode
+    adjustMode(OperatingMode om) noexcept override;
 
     bool
     isBlocked() override;
@@ -531,8 +554,8 @@ public:
         waitHandlerCounter_.join("NetworkOPs", 1s, m_journal);
     }
 
-    void
-    stateAccounting(Json::Value& obj) override;
+    Json::Value
+    stateAccounting() override;
 
 private:
     void
@@ -646,14 +669,17 @@ private:
     void
     setAccountHistoryJobTimer(SubAccountHistoryInfoWeak subInfo);
 
+    /** The global application object. */
     Application& app_;
+
+    /** Tracks the current state and duration in each state. */
+    StateAccounting mode_;
+
     beast::Journal m_journal;
 
     std::unique_ptr<LocalTxs> m_localTX;
 
     std::recursive_mutex mSubLock;
-
-    std::atomic<OperatingMode> mMode;
 
     std::atomic<bool> needNetworkLedger_{false};
     std::atomic<bool> amendmentBlocked_{false};
@@ -708,8 +734,6 @@ private:
     std::mutex mMutex;
     DispatchState mDispatchState = DispatchState::none;
     std::vector<TransactionStatus> mTransactions;
-
-    StateAccounting accounting_;
 
     std::set<uint256> pendingValidations_;
     std::mutex validationsMutex_;
@@ -787,22 +811,11 @@ static auto const genesisAccountId = calcAccountID(
         .first);
 
 //------------------------------------------------------------------------------
-inline OperatingMode
-NetworkOPsImp::getOperatingMode() const
-{
-    return mMode;
-}
-
-inline std::string
-NetworkOPsImp::strOperatingMode(bool const admin /* = false */) const
-{
-    return strOperatingMode(mMode, admin);
-}
 
 inline void
 NetworkOPsImp::setStandAlone()
 {
-    setMode(OperatingMode::FULL);
+    adjustMode(OperatingMode::FULL);
 }
 
 inline void
@@ -826,7 +839,7 @@ NetworkOPsImp::isNeedNetworkLedger()
 inline bool
 NetworkOPsImp::isFull()
 {
-    return !needNetworkLedger_ && (mMode == OperatingMode::FULL);
+    return !needNetworkLedger_ && (mode_.get() == OperatingMode::FULL);
 }
 
 std::string
@@ -936,6 +949,7 @@ NetworkOPsImp::processHeartbeatTimer()
 {
     RclConsensusLogger clog(
         "Heartbeat Timer", mConsensus.validating(), m_journal);
+
     {
         std::unique_lock lock{app_.getMasterMutex()};
 
@@ -943,60 +957,47 @@ NetworkOPsImp::processHeartbeatTimer()
         LoadManager& mgr(app_.getLoadManager());
         mgr.resetDeadlockDetector();
 
-        std::size_t const numPeers = app_.overlay().size();
+        auto curom = mode_.get();
 
         // do we have sufficient peers? If not, we are disconnected.
-        if (numPeers < minPeerCount_)
+        if (std::size_t const numPeers = app_.overlay().size();
+            numPeers < minPeerCount_)
         {
-            if (mMode != OperatingMode::DISCONNECTED)
+            adjustMode(OperatingMode::DISCONNECTED);
+
+            if (curom != OperatingMode::DISCONNECTED)
             {
-                setMode(OperatingMode::DISCONNECTED);
-                std::stringstream ss;
-                ss << "Node count (" << numPeers << ") has fallen "
-                   << "below required minimum (" << minPeerCount_ << ").";
-                JLOG(m_journal.warn()) << ss.str();
-                CLOG(clog.ss()) << "set mode to DISCONNECTED: " << ss.str();
-            }
-            else
-            {
+                JLOG(m_journal.warn())
+                    << "Heartbeat: node count (" << numPeers << ") fell "
+                    << "below required minimum (" << minPeerCount_ << ")";
+
                 CLOG(clog.ss())
-                    << "already DISCONNECTED. too few peers (" << numPeers
-                    << "), need at least " << minPeerCount_;
+                    << "Node count (" << numPeers << ") fell "
+                    << "below required minimum (" << minPeerCount_ << "). ";
             }
 
             // MasterMutex lock need not be held to call setHeartbeatTimer()
             lock.unlock();
+
             // We do not call mConsensus.timerEntry until there are enough
             // peers providing meaningful inputs to consensus
             setHeartbeatTimer();
-
             return;
         }
 
-        if (mMode == OperatingMode::DISCONNECTED)
+        // Refresh our current operating mode, transitioning to connected if
+        // we were previously disconnected.
+        if (auto const m =
+                adjustMode(std::max(curom, OperatingMode::CONNECTED));
+            m != curom)
         {
-            setMode(OperatingMode::CONNECTED);
             JLOG(m_journal.info())
-                << "Node count (" << numPeers << ") is sufficient.";
-            CLOG(clog.ss()) << "setting mode to CONNECTED based on " << numPeers
-                            << " peers. ";
-        }
+                << "Heartbeat: transitioned from " << to_string(curom) << " to "
+                << to_string(m);
 
-        // Check if the last validated ledger forces a change between these
-        // states.
-        auto origMode = mMode.load();
-        CLOG(clog.ss()) << "mode: " << strOperatingMode(origMode, true);
-        if (mMode == OperatingMode::SYNCING)
-            setMode(OperatingMode::SYNCING);
-        else if (mMode == OperatingMode::CONNECTED)
-            setMode(OperatingMode::CONNECTED);
-        auto newMode = mMode.load();
-        if (origMode != newMode)
-        {
-            CLOG(clog.ss())
-                << ", changing to " << strOperatingMode(newMode, true);
+            CLOG(clog.ss()) << "Transitioned from " << to_string(curom)
+                            << " to " << to_string(m) << ". ";
         }
-        CLOG(clog.ss()) << ". ";
     }
 
     mConsensus.timerEntry(app_.timeKeeper().closeTime(), clog.ss());
@@ -1009,7 +1010,7 @@ NetworkOPsImp::processHeartbeatTimer()
         mLastConsensusPhase = currPhase;
         CLOG(clog.ss()) << " changed to " << to_string(mLastConsensusPhase);
     }
-    CLOG(clog.ss()) << ". ";
+    CLOG(clog.ss()) << ".";
 
     setHeartbeatTimer();
 }
@@ -1061,27 +1062,6 @@ NetworkOPsImp::processClusterTimer()
 }
 
 //------------------------------------------------------------------------------
-
-std::string
-NetworkOPsImp::strOperatingMode(OperatingMode const mode, bool const admin)
-    const
-{
-    if (mode == OperatingMode::FULL && admin)
-    {
-        auto const consensusMode = mConsensus.mode();
-        if (consensusMode != ConsensusMode::wrongLedger)
-        {
-            if (consensusMode == ConsensusMode::proposing)
-                return "proposing";
-
-            if (mConsensus.validating())
-                return "validating";
-        }
-    }
-
-    return {StateAccounting::states_[static_cast<std::size_t>(mode)].c_str()};
-}
-
 void
 NetworkOPsImp::submitTransaction(std::shared_ptr<STTx const> const& iTrans)
 {
@@ -1488,7 +1468,7 @@ NetworkOPsImp::apply(std::unique_lock<std::mutex>& batchLock)
             }
 
             if ((e.applied ||
-                 ((mMode != OperatingMode::FULL) &&
+                 ((mode_.get() != OperatingMode::FULL) &&
                   (e.failType != FailHard::yes) && e.local) ||
                  (e.result == terQUEUED)) &&
                 !enforceFailHard)
@@ -1638,7 +1618,7 @@ void
 NetworkOPsImp::setAmendmentBlocked()
 {
     amendmentBlocked_ = true;
-    setMode(OperatingMode::CONNECTED);
+    adjustMode(OperatingMode::CONNECTED);
 }
 
 inline bool
@@ -1669,7 +1649,7 @@ void
 NetworkOPsImp::setUNLBlocked()
 {
     unlBlocked_ = true;
-    setMode(OperatingMode::CONNECTED);
+    adjustMode(OperatingMode::CONNECTED);
 }
 
 inline void
@@ -1709,7 +1689,7 @@ NetworkOPsImp::checkLastClosedLedger(
     // Will rely on peer LCL if no trusted validations exist
     hash_map<uint256, std::uint32_t> peerCounts;
     peerCounts[closedLedger] = 0;
-    if (mMode >= OperatingMode::TRACKING)
+    if (mode_.get() >= OperatingMode::TRACKING)
         peerCounts[closedLedger]++;
 
     for (auto& peer : peerList)
@@ -1767,10 +1747,8 @@ NetworkOPsImp::checkLastClosedLedger(
                            << getJson({*ourClosed, {}});
     JLOG(m_journal.info()) << "Net LCL " << closedLedger;
 
-    if ((mMode == OperatingMode::TRACKING) || (mMode == OperatingMode::FULL))
-    {
-        setMode(OperatingMode::CONNECTED);
-    }
+    if (auto const m = mode_.get(); m >= OperatingMode::TRACKING)
+        adjustMode(OperatingMode::CONNECTED);
 
     if (consensus)
     {
@@ -1856,10 +1834,10 @@ NetworkOPsImp::beginConsensus(
     if (!prevLedger)
     {
         // this shouldn't happen unless we jump ledgers
-        if (mMode == OperatingMode::FULL)
+        if (mode_.get() == OperatingMode::FULL)
         {
             JLOG(m_journal.warn()) << "Don't have LCL, going to tracking";
-            setMode(OperatingMode::TRACKING);
+            adjustMode(OperatingMode::TRACKING);
             CLOG(clog) << "beginConsensus Don't have LCL, going to tracking. ";
         }
 
@@ -1942,18 +1920,19 @@ NetworkOPsImp::endConsensus(std::unique_ptr<std::stringstream> const& clog)
 {
     uint256 deadLedger = m_ledgerMaster.getClosedLedger()->info().parentHash;
 
-    for (auto const& it : app_.overlay().getActivePeers())
+    auto const peers = app_.overlay().getActivePeers();
+
+    for (auto const& p : peers)
     {
-        if (it && (it->getClosedLedgerHash() == deadLedger))
+        if (p->getClosedLedgerHash() == deadLedger)
         {
             JLOG(m_journal.trace()) << "Killing obsolete peer status";
-            it->cycleStatus();
+            p->cycleStatus();
         }
     }
 
     uint256 networkClosed;
-    bool ledgerChange =
-        checkLastClosedLedger(app_.overlay().getActivePeers(), networkClosed);
+    bool ledgerChange = checkLastClosedLedger(peers, networkClosed);
 
     if (networkClosed.isZero())
     {
@@ -1961,35 +1940,34 @@ NetworkOPsImp::endConsensus(std::unique_ptr<std::stringstream> const& clog)
         return;
     }
 
-    // WRITEME: Unless we are in FULL and in the process of doing a consensus,
-    // we must count how many nodes share our LCL, how many nodes disagree with
-    // our LCL, and how many validations our LCL has. We also want to check
-    // timing to make sure there shouldn't be a newer LCL. We need this
-    // information to do the next three tests.
-
-    if (((mMode == OperatingMode::CONNECTED) ||
-         (mMode == OperatingMode::SYNCING)) &&
-        !ledgerChange)
+    // TODO: Unless we are in FULL and in the process of consensus, we should
+    //       count how many validations our LCL has, as well as determine how
+    //       many nodes agree/disagree with us about the LCL. We also want to
+    //       check timing to make sure there shouldn't be a newer LCL.
+    if (!ledgerChange)
     {
-        // Count number of peers that agree with us and UNL nodes whose
-        // validations we have for LCL.  If the ledger is good enough, go to
-        // TRACKING - TODO
-        if (!needNetworkLedger_)
-            setMode(OperatingMode::TRACKING);
-    }
-
-    if (((mMode == OperatingMode::CONNECTED) ||
-         (mMode == OperatingMode::TRACKING)) &&
-        !ledgerChange)
-    {
-        // check if the ledger is good enough to go to FULL
-        // Note: Do not go to FULL if we don't have the previous ledger
-        // check if the ledger is bad enough to go to CONNECTE  D -- TODO
-        auto current = m_ledgerMaster.getCurrentLedger();
-        if (app_.timeKeeper().now() < (current->info().parentCloseTime +
-                                       2 * current->info().closeTimeResolution))
+        if (auto const m = mode_.get();
+            m == OperatingMode::CONNECTED || m == OperatingMode::SYNCING)
         {
-            setMode(OperatingMode::FULL);
+            // TODO: Count the number of peers that agree with us and the UNL
+            //       validators with validations for the LCL, to decide if we
+            //       should go to TRACKING.
+            if (!needNetworkLedger_)
+                adjustMode(OperatingMode::TRACKING);
+        }
+
+        if (auto const m = mode_.get();
+            m == OperatingMode::CONNECTED || m == OperatingMode::TRACKING)
+        {
+            // TODO: If the ledger is "bad enough" we should go to CONNECTED.
+
+            if (auto current = m_ledgerMaster.getCurrentLedger();
+                app_.timeKeeper().now() <
+                (current->info().parentCloseTime +
+                 2 * current->info().closeTimeResolution))
+            {
+                adjustMode(OperatingMode::FULL);
+            }
         }
     }
 
@@ -1999,10 +1977,8 @@ NetworkOPsImp::endConsensus(std::unique_ptr<std::stringstream> const& clog)
 void
 NetworkOPsImp::consensusViewChange()
 {
-    if ((mMode == OperatingMode::FULL) || (mMode == OperatingMode::TRACKING))
-    {
-        setMode(OperatingMode::CONNECTED);
-    }
+    if (mode_.get() >= OperatingMode::TRACKING)
+        adjustMode(OperatingMode::CONNECTED);
 }
 
 void
@@ -2318,33 +2294,66 @@ NetworkOPsImp::pubPeerStatus(std::function<Json::Value(void)> const& func)
     }
 }
 
-void
-NetworkOPsImp::setMode(OperatingMode om)
+/** Resolve a proposed operating mode against current conditions and apply it.
+
+    @param om The proposed operating mode, which is adjusted based on the
+              current conditions:
+
+              - If the validated ledger is recent (i.e. its age is under one
+                minute), then @ref OperatingMode::CONNECTED will be promoted
+                to @ref OperatingMode::SYNCING.
+
+              - If the validated ledger is stale (i.e. its age is greater or
+                equal to one minute), then @ref OperatingMode::SYNCING will
+                be demoted to @ref OperatingMode::CONNECTED.
+
+              - If the server is blocked, then the requested mode is clamped
+                to @ref OperatingMode::CONNECTED.
+
+    @return The mode actually in effect after resolution. This may be different
+            from the proposed mode and may, in fact, be the same as the current
+            mode, which means no actual mode change took place.
+
+    @note While this is free of data races (the mode store is atomic and the
+          accounting is mutex-guarded) and concurrent calls should linearize
+          on the mode store (and not corrupt state) the order of transitions
+          would not be well-defined.
+*/
+OperatingMode
+NetworkOPsImp::adjustMode(OperatingMode mode) noexcept
 {
     using namespace std::chrono_literals;
-    if (om == OperatingMode::CONNECTED)
+
+    auto const requested = mode;
+
+    // Reconcile the proposed mode with how current our validated ledger is.
+    if (mode == OperatingMode::CONNECTED)
     {
         if (app_.getLedgerMaster().getValidatedLedgerAge() < 1min)
-            om = OperatingMode::SYNCING;
+            mode = OperatingMode::SYNCING;
     }
-    else if (om == OperatingMode::SYNCING)
+    else if (mode == OperatingMode::SYNCING)
     {
         if (app_.getLedgerMaster().getValidatedLedgerAge() >= 1min)
-            om = OperatingMode::CONNECTED;
+            mode = OperatingMode::CONNECTED;
     }
 
-    if ((om > OperatingMode::CONNECTED) && isBlocked())
-        om = OperatingMode::CONNECTED;
+    // While blocked we cannot honestly claim any mode above CONNECTED.
+    if (mode > OperatingMode::CONNECTED && isBlocked())
+        mode = OperatingMode::CONNECTED;
 
-    if (mMode == om)
-        return;
+    // mode_.set() stores the mode we want to switch to and returns the
+    // previous one; if both are the same, the operation is a no-op and
+    // we do nothing. We only ever announce a genuine change.
+    if (auto old = mode_.set(mode); old != mode)
+    {
+        JLOG(m_journal.info())
+            << "operating mode: " << to_string(old) << " -> " << to_string(mode)
+            << " (requested: " << to_string(requested) << ")";
+        pubServer();
+    }
 
-    mMode = om;
-
-    accounting_.mode(om);
-
-    JLOG(m_journal.info()) << "STATE->" << strOperatingMode();
-    pubServer();
+    return mode;
 }
 
 bool
@@ -2430,7 +2439,8 @@ NetworkOPsImp::getLedgerMaster()
 Json::Value
 NetworkOPsImp::getServerInfo(bool human, bool admin, bool counters)
 {
-    Json::Value info = Json::objectValue;
+    // This must come first.
+    Json::Value info = stateAccounting();
 
     // System-level warnings
     {
@@ -2785,7 +2795,6 @@ NetworkOPsImp::getServerInfo(bool human, bool admin, bool counters)
             info[jss::published_ledger] = lpPublished->info().seq;
     }
 
-    accounting_.json(info);
     info[jss::uptime] = UptimeClock::now().time_since_epoch().count();
     info[jss::jq_trans_overflow] =
         std::to_string(app_.overlay().getJqTransOverflow());
@@ -2938,7 +2947,7 @@ NetworkOPsImp::pubLedger(std::shared_ptr<ReadView const> const& lpAccepted)
 
             jvObj[jss::txn_count] = Json::UInt(alpAccepted->size());
 
-            if (mMode >= OperatingMode::SYNCING)
+            if (mode_.get() >= OperatingMode::SYNCING)
             {
                 jvObj[jss::validated_ledgers] =
                     app_.getLedgerMaster().getCompleteLedgers();
@@ -3993,7 +4002,7 @@ NetworkOPsImp::subLedger(InfoSub::ref isrListener, Json::Value& jvResult)
         jvResult[jss::reserve_inc] = lpClosed->fees().increment.jsonClipped();
     }
 
-    if ((mMode >= OperatingMode::SYNCING) && !isNeedNetworkLedger())
+    if ((mode_.get() >= OperatingMode::SYNCING) && !isNeedNetworkLedger())
     {
         jvResult[jss::validated_ledgers] =
             app_.getLedgerMaster().getCompleteLedgers();
@@ -4133,16 +4142,40 @@ NetworkOPsImp::subValidations(InfoSub::ref isrListener)
         .second;
 }
 
-void
-NetworkOPsImp::stateAccounting(Json::Value& obj)
+Json::Value
+NetworkOPsImp::stateAccounting()
 {
-    accounting_.json(obj);
+    Json::Value obj;
+
+    auto const snap = mode_.snapshot();
+
+    auto& states = obj[jss::state_accounting];
+
+    for (std::size_t i = 0; i < snap.counters.size(); ++i)
+    {
+        auto duration = snap.counters[i].dur;
+
+        if (i == safe_cast(snap.mode))
+            duration += snap.current;
+
+        auto& state = states[to_string(safe_cast<OperatingMode>(i))];
+
+        state[jss::transitions] = std::to_string(snap.counters[i].transitions);
+        state[jss::duration_us] = std::to_string(duration.count());
+    }
+
+    obj[jss::server_state_duration_us] = std::to_string(snap.current.count());
+
+    if (auto count = snap.initial_sync.count())
+        obj[jss::initial_sync_duration_us] = std::to_string(count);
+
+    return obj;
 }
 
-StateAccounting::CounterData
-NetworkOPsImp::getStateAccountingData()
+StateAccounting::Snapshot
+NetworkOPsImp::getStateAccountingData() const noexcept
 {
-    return accounting_.getCounterData();
+    return mode_.snapshot();
 }
 
 // <-- bool: true=erased, false=was not there
@@ -4580,39 +4613,32 @@ NetworkOPsImp::getBookPage(
 inline void
 NetworkOPsImp::collect_metrics()
 {
-    auto [counters, mode, start, initialSync] = accounting_.getCounterData();
-    auto const current = std::chrono::duration_cast<std::chrono::microseconds>(
-        std::chrono::steady_clock::now() - start);
-    counters[static_cast<std::size_t>(mode)].dur += current;
+    auto const snap = mode_.snapshot();
+
+    auto dur = [&](OperatingMode m) {
+        auto d = snap.counters[static_cast<std::size_t>(m)].dur;
+        if (m == snap.mode)
+            d += snap.current;
+        return d.count();
+    };
+
+    auto trans = [&](OperatingMode m) {
+        return snap.counters[static_cast<std::size_t>(m)].transitions;
+    };
 
     std::lock_guard lock(m_statsMutex);
-    m_stats.disconnected_duration.set(
-        counters[static_cast<std::size_t>(OperatingMode::DISCONNECTED)]
-            .dur.count());
-    m_stats.connected_duration.set(
-        counters[static_cast<std::size_t>(OperatingMode::CONNECTED)]
-            .dur.count());
-    m_stats.syncing_duration.set(
-        counters[static_cast<std::size_t>(OperatingMode::SYNCING)].dur.count());
-    m_stats.tracking_duration.set(
-        counters[static_cast<std::size_t>(OperatingMode::TRACKING)]
-            .dur.count());
-    m_stats.full_duration.set(
-        counters[static_cast<std::size_t>(OperatingMode::FULL)].dur.count());
 
-    m_stats.disconnected_transitions.set(
-        counters[static_cast<std::size_t>(OperatingMode::DISCONNECTED)]
-            .transitions);
-    m_stats.connected_transitions.set(
-        counters[static_cast<std::size_t>(OperatingMode::CONNECTED)]
-            .transitions);
-    m_stats.syncing_transitions.set(
-        counters[static_cast<std::size_t>(OperatingMode::SYNCING)].transitions);
-    m_stats.tracking_transitions.set(
-        counters[static_cast<std::size_t>(OperatingMode::TRACKING)]
-            .transitions);
-    m_stats.full_transitions.set(
-        counters[static_cast<std::size_t>(OperatingMode::FULL)].transitions);
+    m_stats.disconnected_duration.set(dur(OperatingMode::DISCONNECTED));
+    m_stats.connected_duration.set(dur(OperatingMode::CONNECTED));
+    m_stats.syncing_duration.set(dur(OperatingMode::SYNCING));
+    m_stats.tracking_duration.set(dur(OperatingMode::TRACKING));
+    m_stats.full_duration.set(dur(OperatingMode::FULL));
+
+    m_stats.disconnected_transitions.set(trans(OperatingMode::DISCONNECTED));
+    m_stats.connected_transitions.set(trans(OperatingMode::CONNECTED));
+    m_stats.syncing_transitions.set(trans(OperatingMode::SYNCING));
+    m_stats.tracking_transitions.set(trans(OperatingMode::TRACKING));
+    m_stats.full_transitions.set(trans(OperatingMode::FULL));
 }
 
 //------------------------------------------------------------------------------

@@ -287,19 +287,22 @@ PerfLogImp::report()
         return;
     lastLog_ = present;
 
-    Json::Value report(Json::objectValue);
+    // We need this to be first, because stateAccounting returns an object
+    // with keys that we expect to be at the top level.
+    Json::Value report = app_.getOPs().stateAccounting();
+
     report[jss::time] = to_string(std::chrono::floor<microseconds>(present));
     {
         std::lock_guard lock{counters_.jobsMutex_};
         report[jss::workers] =
             static_cast<unsigned int>(counters_.jobs_.size());
     }
+
     report[jss::hostid] = hostname_;
     report[jss::counters] = counters_.countersJson();
     report[jss::nodestore] = Json::objectValue;
     app_.getNodeStore().getCountsJson(report[jss::nodestore]);
     report[jss::current_activities] = counters_.currentJson();
-    app_.getOPs().stateAccounting(report);
 
     logFile_ << report << std::endl;
 }

@@ -80,12 +80,14 @@ public:
     //
 
     virtual OperatingMode
-    getOperatingMode() const = 0;
-    virtual std::string
+    getOperatingMode() const noexcept = 0;
+
+    virtual std::string_view
     strOperatingMode(OperatingMode const mode, bool const admin = false)
-        const = 0;
-    virtual std::string
-    strOperatingMode(bool const admin = false) const = 0;
+        const noexcept = 0;
+
+    virtual std::string_view
+    strOperatingMode(bool admin = false) const noexcept = 0;
 
     //--------------------------------------------------------------------------
     //
@@ -171,8 +173,8 @@ public:
     isNeedNetworkLedger() = 0;
     virtual bool
     isFull() = 0;
-    virtual void
-    setMode(OperatingMode om) = 0;
+    virtual OperatingMode
+    adjustMode(OperatingMode om) noexcept = 0;
     virtual bool
     isBlocked() = 0;
     virtual bool
@@ -210,8 +212,8 @@ public:
     virtual Json::Value
     getLedgerFetchInfo() = 0;
 
-    virtual StateAccounting::CounterData
-    getStateAccountingData() = 0;
+    virtual StateAccounting::Snapshot
+    getStateAccountingData() const noexcept = 0;
 
     /** Accepts the current transaction tree, return the new ledger's sequence
 
@@ -246,8 +248,8 @@ public:
     virtual void
     pubValidation(std::shared_ptr<STValidation> const& val) = 0;
 
-    virtual void
-    stateAccounting(Json::Value& obj) = 0;
+    virtual Json::Value
+    stateAccounting() = 0;
 };
 
 //------------------------------------------------------------------------------

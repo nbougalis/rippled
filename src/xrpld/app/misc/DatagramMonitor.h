@@ -739,16 +739,17 @@ private:
         header->node_size = app_.config().NODE_SIZE;
 
         // Get state accounting data
-        auto const [counters, mode, start, initialSync] =
-            app_.getOPs().getStateAccountingData();
+
+        auto const snapshot = app_.getOPs().getStateAccountingData();
 
         // Pack state metrics into header
-        for (size_t i = 0; i < 5; ++i)
+        for (size_t i = 0; i < snapshot.counters.size(); ++i)
         {
-            header->state_transitions[i] = counters[i].transitions;
-            header->state_durations[i] = counters[i].dur.count();
+            header->state_transitions[i] = snapshot.counters[i].transitions;
+            header->state_durations[i] = snapshot.counters[i].dur.count();
         }
-        header->initial_sync_us = initialSync;
+
+        header->initial_sync_us = snapshot.initial_sync.count();
 
         // Pack warning flags
         if (ops.isAmendmentBlocked())
