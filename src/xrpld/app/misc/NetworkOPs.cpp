@@ -644,18 +644,38 @@ private:
         {
         }
     };
+
+    /** A resolved account-history subscription: live listener plus its index.
+
+        Pairs a strong pointer to the subscriber's InfoSub sink with the shared
+        @ref SubAccountHistoryIndex which tracks that subscription's progress.
+
+        This is used at the point of delivery, where the listener has already
+        been locked and is known to be alive.
+     */
     struct SubAccountHistoryInfo
     {
         InfoSub::pointer sink_;
         std::shared_ptr<SubAccountHistoryIndex> index_;
     };
+
+    /** A stored account-history subscription holding a non-owning listener ref.
+
+        The weak pointer avoids keeping the subscriber's InfoSub alive solely
+        on behalf of the subscription; a destroyed listener, when detected by
+        a failed lock, is pruned.
+
+        To obtain a @ref SubAccountHistoryInfo for delivery, you must lock
+        @ref weak_ and use the resulting pointer.
+
+        The @ref SubAccountHistoryIndex is shared with the streaming job and
+        outlives individual delivery attempts.
+     */
     struct SubAccountHistoryInfoWeak
     {
-        InfoSub::wptr sinkWptr_;
+        InfoSub::wptr weak_;
         std::shared_ptr<SubAccountHistoryIndex> index_;
     };
-    using SubAccountHistoryMapType =
-        hash_map<AccountID, hash_map<std::uint64_t, SubAccountHistoryInfoWeak>>;
 
     /**
      * @note called while holding mSubLock
@@ -702,7 +722,31 @@ private:
 
     subRpcMapType mRpcSubMap;
 
-    SubAccountHistoryMapType mSubAccountHistory;
+    /** Active account-history subscriptions, keyed by account.
+
+        Maps a subscribed account to the set of listeners, keyed by the
+        listener's InfoSub sequence number. Each entry pairs a weak pointer
+        to the listener with the shared streaming index that tracks progress
+        through that account's transaction history.
+
+        A subscription added before a validated ledger exists is deferred; see
+        @ref needSubAccountHistoryStart_.
+
+        @note Accessed only while holding mSubLock.
+    */
+    hash_map<AccountID, hash_map<std::uint64_t, SubAccountHistoryInfoWeak>>
+        mSubAccountHistory;
+
+    /** Guards one-time startup of delayed account-history streaming.
+
+        Account-history subscriptions that arrive before we have a validated
+        ledger are marked as deferred. @ref pubLedger uses this flag to scan
+        and activate such deferred subscriptions in @ref mSubAccountHistory
+        once, the first time a validated ledger is published.
+
+        @note Accessed only while holding mSubLock.
+    */
+    bool needSubAccountHistoryStart_ = true;
 
     enum SubTypes {
         sLedger,          // Accepted ledgers.
@@ -2051,14 +2095,17 @@ NetworkOPsImp::ServerFeeSummary::operator!=(
     return false;
 }
 
-// Need to cap to uint64 to uint32 due to JSON limitations
-static std::uint32_t
-trunc32(std::uint64_t v)
-{
-    constexpr std::uint64_t max32 = std::numeric_limits<std::uint32_t>::max();
+/** Simple saturating cast from 64-bit to 32-bit unsigned values.
 
-    return std::min(max32, v);
-};
+    We need this because the JSON code does not support 64-bit integers
+    and we internally use std::uint64_t to perform calculations.
+ */
+static inline std::uint32_t
+trunc32(std::uint64_t v) noexcept
+{
+    return checked_cast<std::uint32_t>(
+        std::min<std::uint64_t>(std::numeric_limits<std::uint32_t>::max(), v));
+}
 
 void
 NetworkOPsImp::pubServer()
@@ -2985,25 +3032,23 @@ NetworkOPsImp::pubLedger(std::shared_ptr<ReadView const> const& lpAccepted)
             }
         }
 
+        // On the first validated ledger, start delayed SubAccountHistory:
+        if (needSubAccountHistoryStart_)
         {
-            static bool firstTime = true;
-            if (firstTime)
+            for (auto& outer : mSubAccountHistory)
             {
-                // First validated ledger, start delayed SubAccountHistory
-                firstTime = false;
-                for (auto& outer : mSubAccountHistory)
+                for (auto& inner : outer.second)
                 {
-                    for (auto& inner : outer.second)
+                    auto& subInfo = inner.second;
+                    if (subInfo.index_->separationLedgerSeq_ == 0)
                     {
-                        auto& subInfo = inner.second;
-                        if (subInfo.index_->separationLedgerSeq_ == 0)
-                        {
-                            subAccountHistoryStart(
-                                alpAccepted->getLedger(), subInfo);
-                        }
+                        subAccountHistoryStart(
+                            alpAccepted->getLedger(), subInfo);
                     }
                 }
             }
+
+            needSubAccountHistoryStart_ = false;
         }
     }
 
@@ -3300,7 +3345,7 @@ NetworkOPsImp::pubAccountTransaction(
                             continue;
                         }
 
-                        if (auto isSptr = info.sinkWptr_.lock(); isSptr)
+                        if (auto isSptr = info.weak_.lock(); isSptr)
                         {
                             accountHistoryNotify.emplace_back(
                                 SubAccountHistoryInfo{isSptr, info.index_});
@@ -3540,7 +3585,7 @@ NetworkOPsImp::addAccountHistoryJob(SubAccountHistoryInfoWeak subInfo)
         JLOG(m_journal.error())
             << "AccountHistory job for account "
             << toBase58(subInfo.index_->accountId_) << " no database";
-        if (auto sptr = subInfo.sinkWptr_.lock(); sptr)
+        if (auto sptr = subInfo.weak_.lock(); sptr)
         {
             sptr->send(rpcError(rpcINTERNAL), true);
             unsubAccountHistory(sptr, subInfo.index_->accountId_, false);
@@ -3599,7 +3644,7 @@ NetworkOPsImp::addAccountHistoryJob(SubAccountHistoryInfoWeak subInfo)
 
             auto send = [&](Json::Value const& jvObj,
                             bool unsubscribe) -> bool {
-                if (auto sptr = subInfo.sinkWptr_.lock())
+                if (auto sptr = subInfo.weak_.lock())
                 {
                     sptr->send(jvObj, true);
                     if (unsubscribe)
@@ -3612,7 +3657,7 @@ NetworkOPsImp::addAccountHistoryJob(SubAccountHistoryInfoWeak subInfo)
 
             auto sendMultiApiJson = [&](MultiApiJson const& jvObj,
                                         bool unsubscribe) -> bool {
-                if (auto sptr = subInfo.sinkWptr_.lock())
+                if (auto sptr = subInfo.weak_.lock())
                 {
                     jvObj.visit(
                         sptr->getApiVersion(),  //
@@ -3657,7 +3702,7 @@ NetworkOPsImp::addAccountHistoryJob(SubAccountHistoryInfoWeak subInfo)
             while (lastLedgerSeq >= 2 && !subInfo.index_->stopHistorical_)
             {
                 int feeChargeCount = 0;
-                if (auto sptr = subInfo.sinkWptr_.lock(); sptr)
+                if (auto sptr = subInfo.weak_.lock(); sptr)
                 {
                     sptr->getConsumer().charge(Resource::feeMediumBurdenRPC);
                     ++feeChargeCount;
