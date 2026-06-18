@@ -90,7 +90,6 @@ parseSection(Section const& section)
 */
 class TrustedVotes
 {
-private:
     // Associates each trusted validator with the last votes we saw from them
     // and an expiration for that record.
     struct UpvotesAndTimeout
@@ -103,6 +102,7 @@ private:
          */
         std::optional<NetClock::time_point> timeout;
     };
+
     hash_map<PublicKey, UpvotesAndTimeout> recordedVotes_;
 
 public:
@@ -217,68 +217,66 @@ public:
         }
 
         // Now remove any expired records from recordedVotes_.
-        std::for_each(
-            recordedVotes_.begin(),
-            recordedVotes_.end(),
-            [&closeTime, newTimeout, &j](
-                decltype(recordedVotes_)::value_type& votes) {
-                auto const pkHuman =
-                    toBase58(TokenType::NodePublic, votes.first);
-                if (!votes.second.timeout)
-                {
-                    XRPL_ASSERT(
-                        votes.second.upVotes.empty(),
-                        "ripple::TrustedVotes::recordVotes : received no "
-                        "upvotes");
-                    JLOG(j.debug())
-                        << "recordVotes: Have not received any "
-                           "amendment votes from "
-                        << pkHuman << " since last timeout or startup";
-                }
-                else if (closeTime > votes.second.timeout)
-                {
-                    JLOG(j.debug())
-                        << "recordVotes: Timeout: Clearing votes from "
-                        << pkHuman;
-                    votes.second.timeout.reset();
-                    votes.second.upVotes.clear();
-                }
-                else if (votes.second.timeout != newTimeout)
-                {
-                    XRPL_ASSERT(
-                        votes.second.timeout < newTimeout,
-                        "ripple::TrustedVotes::recordVotes : votes not "
-                        "expired");
-                    using namespace std::chrono;
-                    auto const age = duration_cast<minutes>(
-                        newTimeout - *votes.second.timeout);
-                    JLOG(j.debug()) << "recordVotes: Using " << age.count()
-                                    << "min old cached votes from " << pkHuman;
-                }
-            });
+        for (auto& [pk, record] : recordedVotes_)
+        {
+            auto const pkHuman = toBase58(TokenType::NodePublic, pk);
+
+            if (!record.timeout)
+            {
+                XRPL_ASSERT(
+                    record.upVotes.empty(),
+                    "ripple::TrustedVotes::recordVotes : received no "
+                    "upvotes");
+
+                JLOG(j.debug()) << "recordVotes: Have not received any "
+                                   "amendment votes from "
+                                << pkHuman << " since last timeout or startup";
+            }
+            else if (closeTime > record.timeout)
+            {
+                JLOG(j.debug())
+                    << "recordVotes: Timeout: Clearing votes from " << pkHuman;
+                record.timeout.reset();
+                record.upVotes.clear();
+            }
+            else if (record.timeout != newTimeout)
+            {
+                XRPL_ASSERT(
+                    record.timeout < newTimeout,
+                    "ripple::TrustedVotes::recordVotes : votes not "
+                    "expired");
+
+                auto const age = duration_cast<std::chrono::minutes>(
+                    newTimeout - *record.timeout);
+                JLOG(j.debug()) << "recordVotes: Using " << age.count()
+                                << "min old cached votes from " << pkHuman;
+            }
+        }
     }
 
     // Return the information needed by AmendmentSet to determine votes.
     //
     // Call with AmendmentTable::mutex_ locked.
-    [[nodiscard]] std::pair<int, hash_map<uint256, int>>
+    [[nodiscard]] std::pair<std::uint32_t, hash_map<uint256, std::uint32_t>>
     getVotes(Rules const& rules, std::lock_guard<std::mutex> const& lock) const
     {
-        hash_map<uint256, int> ret;
-        int available = 0;
+        std::uint32_t available = 0;
+        hash_map<uint256, std::uint32_t> ret;
+
         for (auto& validatorVotes : recordedVotes_)
         {
             XRPL_ASSERT(
                 validatorVotes.second.timeout ||
                     validatorVotes.second.upVotes.empty(),
                 "ripple::TrustedVotes::getVotes : valid votes");
+
             if (validatorVotes.second.timeout)
                 ++available;
+
             for (uint256 const& amendment : validatorVotes.second.upVotes)
-            {
-                ret[amendment] += 1;
-            }
+                ++ret[amendment];
         }
+
         return {available, ret};
     }
 };
@@ -308,35 +306,29 @@ struct AmendmentState
     explicit AmendmentState() = default;
 };
 
+// Just making sure that these values are sane.
+static_assert(
+    postFixAmendmentMajorityCalcThreshold.num != 0 &&
+    std::in_range<std::uint32_t>(postFixAmendmentMajorityCalcThreshold.num) &&
+    std::in_range<std::uint32_t>(postFixAmendmentMajorityCalcThreshold.den));
+
+static_assert(
+    preFixAmendmentMajorityCalcThreshold.num != 0 &&
+    std::in_range<std::uint32_t>(preFixAmendmentMajorityCalcThreshold.num) &&
+    std::in_range<std::uint32_t>(preFixAmendmentMajorityCalcThreshold.den));
+
 /** The status of all amendments requested in a given window. */
 class AmendmentSet
 {
-private:
     // How many yes votes each amendment received
-    hash_map<uint256, int> votes_;
+    hash_map<uint256, std::uint32_t> votes_;
     Rules const& rules_;
-    // number of trusted validations
-    int trustedValidations_ = 0;
-    // number of votes needed
-    int threshold_ = 0;
 
-    void
-    computeThreshold(int trustedValidations, Rules const& rules)
-    {
-        threshold_ = !rules_.enabled(fixAmendmentMajorityCalc)
-            ? std::max(
-                  1L,
-                  static_cast<long>(
-                      (trustedValidations_ *
-                       preFixAmendmentMajorityCalcThreshold.num) /
-                      preFixAmendmentMajorityCalcThreshold.den))
-            : std::max(
-                  1L,
-                  static_cast<long>(
-                      (trustedValidations_ *
-                       postFixAmendmentMajorityCalcThreshold.num) /
-                      postFixAmendmentMajorityCalcThreshold.den));
-    }
+    // number of trusted validations
+    std::uint32_t trustedValidations_ = 0;
+
+    // number of votes needed; never 0.
+    std::uint32_t threshold_;
 
 public:
     AmendmentSet(
@@ -346,53 +338,75 @@ public:
         : rules_(rules)
     {
         // process validations for ledger before flag ledger.
-        auto [trustedCount, newVotes] = trustedVotes.getVotes(rules, lock);
+        std::tie(trustedValidations_, votes_) =
+            trustedVotes.getVotes(rules, lock);
 
-        trustedValidations_ = trustedCount;
-        votes_.swap(newVotes);
+        auto crunch = [](std::uint32_t value,
+                         std::intmax_t numerator,
+                         std::intmax_t denominator) {
+            return std::max<std::uint32_t>(
+                1,
+                (value * checked_cast<std::uint32_t>(numerator)) /
+                    checked_cast<std::uint32_t>(denominator));
+        };
 
-        computeThreshold(trustedValidations_, rules);
+        threshold_ = rules_.enabled(fixAmendmentMajorityCalc)
+            ? crunch(
+                  trustedValidations_,
+                  postFixAmendmentMajorityCalcThreshold.num,
+                  postFixAmendmentMajorityCalcThreshold.den)
+            : crunch(
+                  trustedValidations_,
+                  preFixAmendmentMajorityCalcThreshold.num,
+                  preFixAmendmentMajorityCalcThreshold.den);
     }
 
     bool
     passes(uint256 const& amendment) const
     {
-        auto const& it = votes_.find(amendment);
+        XRPL_ASSERT(
+            threshold_ != 0,
+            "ripple::AmendmentSet::passes : The amendment activation threshold "
+            "must be at least 1");
 
-        if (it == votes_.end())
-            return false;
+        if (auto const& it = votes_.find(amendment); it != votes_.end())
+        {
+            // In the past we used "greater than or equal to" and not strictly
+            // "greater than" when comparing against the threshold. This meant
+            // that an amendment could activate with a percentage fractionally
+            // less than 80% (204/256 = 0.796875).
+            if (!rules_.enabled(fixAmendmentMajorityCalc))
+                return it->second >= threshold_;
 
-        // Before this fix, it was possible for an amendment to activate with a
-        // percentage slightly less than 80% because we compared for "greater
-        // than or equal to" instead of strictly "greater than".
-        // One validator is an exception, otherwise it is not possible
-        // to gain majority.
-        if (!rules_.enabled(fixAmendmentMajorityCalc) ||
-            trustedValidations_ == 1)
-            return it->second >= threshold_;
+            // We need special handling for the single validator case, because
+            // if the threshold is also 1, then an amendment could never get
+            // activated.
+            if (trustedValidations_ == 1)
+                return it->second >= threshold_;
 
-        return it->second > threshold_;
+            return it->second > threshold_;
+        }
+
+        return false;
     }
 
-    int
+    std::uint32_t
     votes(uint256 const& amendment) const
     {
-        auto const& it = votes_.find(amendment);
+        if (auto const& it = votes_.find(amendment); it != votes_.end())
+            return it->second;
 
-        if (it == votes_.end())
-            return 0;
-
-        return it->second;
+        return 0;
     }
 
-    int
-    trustedValidations() const
+    std::uint32_t
+    trustedValidations() const noexcept
     {
         return trustedValidations_;
     }
 
-    int
-    threshold() const
+    std::uint32_t
+    threshold() const noexcept
     {
         return threshold_;
     }
@@ -875,7 +889,6 @@ AmendmentTableImpl::doVoting(
         if (enabledAmendments.contains(entry.first))
         {
             JLOG(j_.trace()) << entry.first << ": amendment already enabled";
-
             continue;
         }
 
@@ -1016,15 +1029,11 @@ AmendmentTableImpl::injectJson(
 
     if (!fs.enabled && lastVote_ && isAdmin)
     {
-        auto const votesTotal = lastVote_->trustedValidations();
-        auto const votesNeeded = lastVote_->threshold();
-        auto const votesFor = lastVote_->votes(id);
+        v[jss::count] = lastVote_->votes(id);
+        v[jss::validations] = lastVote_->trustedValidations();
 
-        v[jss::count] = votesFor;
-        v[jss::validations] = votesTotal;
-
-        if (votesNeeded)
-            v[jss::threshold] = votesNeeded;
+        if (auto const threshold = lastVote_->threshold())
+            v[jss::threshold] = threshold;
     }
 }
 
