@@ -72,38 +72,6 @@ Serializer::addInteger(std::uint64_t i)
 }
 
 int
-Serializer::addRaw(Blob const& vector)
-{
-    int ret = mData.size();
-    mData.insert(mData.end(), vector.begin(), vector.end());
-    return ret;
-}
-
-int
-Serializer::addRaw(Slice slice)
-{
-    int ret = mData.size();
-    mData.insert(mData.end(), slice.begin(), slice.end());
-    return ret;
-}
-
-int
-Serializer::addRaw(const Serializer& s)
-{
-    int ret = mData.size();
-    mData.insert(mData.end(), s.begin(), s.end());
-    return ret;
-}
-
-int
-Serializer::addRaw(const void* ptr, int len)
-{
-    int ret = mData.size();
-    mData.insert(mData.end(), (const char*)ptr, ((const char*)ptr) + len);
-    return ret;
-}
-
-int
 Serializer::addFieldID(int type, int name)
 {
     int ret = mData.size();
@@ -147,26 +115,6 @@ Serializer::add8(unsigned char byte)
     return ret;
 }
 
-bool
-Serializer::get8(int& byte, int offset) const
-{
-    if (offset >= mData.size())
-        return false;
-
-    byte = mData[offset];
-    return true;
-}
-
-bool
-Serializer::chop(int bytes)
-{
-    if (bytes > mData.size())
-        return false;
-
-    mData.resize(mData.size() - bytes);
-    return true;
-}
-
 uint256
 Serializer::getSHA512Half() const
 {
@@ -174,167 +122,34 @@ Serializer::getSHA512Half() const
 }
 
 int
-Serializer::addVL(Blob const& vector)
-{
-    int ret = addEncoded(vector.size());
-    addRaw(vector);
-    XRPL_ASSERT(
-        mData.size() ==
-            (ret + vector.size() + encodeLengthLength(vector.size())),
-        "ripple::Serializer::addVL : size matches expected");
-    return ret;
-}
-
-int
-Serializer::addVL(Slice const& slice)
-{
-    int ret = addEncoded(slice.size());
-    if (slice.size())
-        addRaw(slice.data(), slice.size());
-    return ret;
-}
-
-int
-Serializer::addVL(const void* ptr, int len)
-{
-    int ret = addEncoded(len);
-
-    if (len)
-        addRaw(ptr, len);
-
-    return ret;
-}
-
-int
 Serializer::addEncoded(int length)
 {
-    std::array<std::uint8_t, 4> bytes;
-    int numBytes = 0;
+    boost::container::static_vector<std::uint8_t, 4> bytes;
 
     if (length <= 192)
     {
-        bytes[0] = static_cast<unsigned char>(length);
-        numBytes = 1;
+        bytes.push_back(static_cast<std::uint8_t>(length));
     }
     else if (length <= 12480)
     {
         length -= 193;
-        bytes[0] = 193 + static_cast<unsigned char>(length >> 8);
-        bytes[1] = static_cast<unsigned char>(length & 0xff);
-        numBytes = 2;
+        bytes.push_back(193 + static_cast<std::uint8_t>(length >> 8));
+        bytes.push_back(static_cast<std::uint8_t>(length & 0xff));
     }
     else if (length <= 918744)
     {
         length -= 12481;
-        bytes[0] = 241 + static_cast<unsigned char>(length >> 16);
-        bytes[1] = static_cast<unsigned char>((length >> 8) & 0xff);
-        bytes[2] = static_cast<unsigned char>(length & 0xff);
-        numBytes = 3;
+        bytes.push_back(241 + static_cast<std::uint8_t>(length >> 16));
+        bytes.push_back(static_cast<std::uint8_t>((length >> 8) & 0xff));
+        bytes.push_back(static_cast<std::uint8_t>(length & 0xff));
     }
     else
         Throw<std::overflow_error>("lenlen");
 
-    return addRaw(&bytes[0], numBytes);
-}
-
-int
-Serializer::encodeLengthLength(int length)
-{
-    if (length < 0)
-        Throw<std::overflow_error>("len<0");
-
-    if (length <= 192)
-        return 1;
-
-    if (length <= 12480)
-        return 2;
-
-    if (length <= 918744)
-        return 3;
-
-    Throw<std::overflow_error>("len>918744");
-    return 0;  // Silence compiler warning.
-}
-
-int
-Serializer::decodeLengthLength(int b1)
-{
-    if (b1 < 0)
-        Throw<std::overflow_error>("b1<0");
-
-    if (b1 <= 192)
-        return 1;
-
-    if (b1 <= 240)
-        return 2;
-
-    if (b1 <= 254)
-        return 3;
-
-    Throw<std::overflow_error>("b1>254");
-    return 0;  // Silence compiler warning.
-}
-
-int
-Serializer::decodeVLLength(int b1)
-{
-    if (b1 < 0)
-        Throw<std::overflow_error>("b1<0");
-
-    if (b1 > 254)
-        Throw<std::overflow_error>("b1>254");
-
-    return b1;
-}
-
-int
-Serializer::decodeVLLength(int b1, int b2)
-{
-    if (b1 < 193)
-        Throw<std::overflow_error>("b1<193");
-
-    if (b1 > 240)
-        Throw<std::overflow_error>("b1>240");
-
-    return 193 + (b1 - 193) * 256 + b2;
-}
-
-int
-Serializer::decodeVLLength(int b1, int b2, int b3)
-{
-    if (b1 < 241)
-        Throw<std::overflow_error>("b1<241");
-
-    if (b1 > 254)
-        Throw<std::overflow_error>("b1>254");
-
-    return 12481 + (b1 - 241) * 65536 + b2 * 256 + b3;
+    return addRaw(makeSlice(bytes));
 }
 
 //------------------------------------------------------------------------------
-
-SerialIter::SerialIter(void const* data, std::size_t size) noexcept
-    : p_(reinterpret_cast<std::uint8_t const*>(data)), remain_(size)
-{
-}
-
-void
-SerialIter::reset() noexcept
-{
-    p_ -= used_;
-    remain_ += used_;
-    used_ = 0;
-}
-
-void
-SerialIter::skip(int length)
-{
-    if (remain_ < length)
-        Throw<std::runtime_error>("invalid SerialIter skip");
-    p_ += length;
-    used_ += length;
-    remain_ -= length;
-}
 
 unsigned char
 SerialIter::get8()
@@ -343,7 +158,6 @@ SerialIter::get8()
         Throw<std::runtime_error>("invalid SerialIter get8");
     unsigned char t = *p_;
     ++p_;
-    ++used_;
     --remain_;
     return t;
 }
@@ -355,7 +169,6 @@ SerialIter::get16()
         Throw<std::runtime_error>("invalid SerialIter get16");
     auto t = p_;
     p_ += 2;
-    used_ += 2;
     remain_ -= 2;
     return (std::uint64_t(t[0]) << 8) + std::uint64_t(t[1]);
 }
@@ -367,7 +180,6 @@ SerialIter::get32()
         Throw<std::runtime_error>("invalid SerialIter get32");
     auto t = p_;
     p_ += 4;
-    used_ += 4;
     remain_ -= 4;
     return (std::uint64_t(t[0]) << 24) + (std::uint64_t(t[1]) << 16) +
         (std::uint64_t(t[2]) << 8) + std::uint64_t(t[3]);
@@ -380,7 +192,6 @@ SerialIter::get64()
         Throw<std::runtime_error>("invalid SerialIter get64");
     auto t = p_;
     p_ += 8;
-    used_ += 8;
     remain_ -= 8;
     return (std::uint64_t(t[0]) << 56) + (std::uint64_t(t[1]) << 48) +
         (std::uint64_t(t[2]) << 40) + (std::uint64_t(t[3]) << 32) +
@@ -395,7 +206,6 @@ SerialIter::geti32()
         Throw<std::runtime_error>("invalid SerialIter geti32");
     auto t = p_;
     p_ += 4;
-    used_ += 4;
     remain_ -= 4;
     return boost::endian::load_big_s32(t);
 }
@@ -407,7 +217,6 @@ SerialIter::geti64()
         Throw<std::runtime_error>("invalid SerialIter geti64");
     auto t = p_;
     p_ += 8;
-    used_ += 8;
     remain_ -= 8;
     return boost::endian::load_big_s64(t);
 }
@@ -438,62 +247,6 @@ SerialIter::getFieldID(int& type, int& name)
     }
 }
 
-// getRaw for blob or buffer
-template <class T>
-T
-SerialIter::getRawHelper(int size)
-{
-    static_assert(
-        std::is_same<T, Blob>::value || std::is_same<T, Buffer>::value, "");
-    if (remain_ < size)
-        Throw<std::runtime_error>("invalid SerialIter getRaw");
-    T result(size);
-    if (size != 0)
-    {
-        // It's normally safe to call memcpy with size set to 0 (see the
-        // C99 standard 7.21.1/2). However, here this could mean that
-        // result.data would be null, which would trigger undefined behavior.
-        std::memcpy(result.data(), p_, size);
-        p_ += size;
-        used_ += size;
-        remain_ -= size;
-    }
-    return result;
-}
-
-// VFALCO DEPRECATED Returns a copy
-Blob
-SerialIter::getRaw(int size)
-{
-    return getRawHelper<Blob>(size);
-}
-
-int
-SerialIter::getVLDataLength()
-{
-    int b1 = get8();
-    int datLen;
-    int lenLen = Serializer::decodeLengthLength(b1);
-    if (lenLen == 1)
-    {
-        datLen = Serializer::decodeVLLength(b1);
-    }
-    else if (lenLen == 2)
-    {
-        int b2 = get8();
-        datLen = Serializer::decodeVLLength(b1, b2);
-    }
-    else
-    {
-        XRPL_ASSERT(
-            lenLen == 3, "ripple::SerialIter::getVLDataLength : lenLen is 3");
-        int b2 = get8();
-        int b3 = get8();
-        datLen = Serializer::decodeVLLength(b1, b2, b3);
-    }
-    return datLen;
-}
-
 Slice
 SerialIter::getSlice(std::size_t bytes)
 {
@@ -501,22 +254,36 @@ SerialIter::getSlice(std::size_t bytes)
         Throw<std::runtime_error>("invalid SerialIter getSlice");
     Slice s(p_, bytes);
     p_ += bytes;
-    used_ += bytes;
     remain_ -= bytes;
     return s;
 }
 
-// VFALCO DEPRECATED Returns a copy
-Blob
+Slice
 SerialIter::getVL()
 {
-    return getRaw(getVLDataLength());
-}
+    return getSlice([this]() {
+        std::size_t const b1 = get8();
 
-Buffer
-SerialIter::getVLBuffer()
-{
-    return getRawHelper<Buffer>(getVLDataLength());
+        if (b1 <= 192)
+            return b1;
+
+        if (b1 <= 240)
+        {
+            std::size_t const b2 = get8();
+
+            return 193 + (b1 - 193) * 256 + b2;
+        }
+
+        if (b1 <= 254)
+        {
+            std::size_t const b2 = get8();
+            std::size_t const b3 = get8();
+
+            return 12481 + (b1 - 241) * 65536 + b2 * 256 + b3;
+        }
+
+        Throw<std::invalid_argument>("incorrect vl encoding");
+    }());
 }
 
 }  // namespace ripple

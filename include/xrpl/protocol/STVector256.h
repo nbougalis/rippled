@@ -29,7 +29,19 @@ namespace ripple {
 
 class STVector256 : public STBase, public CountedObject<STVector256>
 {
+    // The container used here must guarantee that all the items are
+    // laid down contiguously in memory with no gaps or padding. The
+    // object itself must be free of padding and trivially copyable.
     std::vector<uint256> mValue;
+
+    static_assert(
+        std::ranges::contiguous_range<decltype(mValue)>,
+        "storage must be contiguous");
+
+    static_assert(
+        std::has_unique_object_representations_v<
+            std::ranges::range_value_t<decltype(mValue)>>,
+        "element must be padding-free and trivially copyable");
 
 public:
     using value_type = std::vector<uint256> const&;
@@ -66,7 +78,10 @@ public:
 
     /** Retrieve a copy of the vector we contain */
     explicit
-    operator std::vector<uint256>() const;
+    operator std::vector<uint256>() const
+    {
+        return mValue;
+    }
 
     std::size_t
     size() const;
@@ -156,12 +171,6 @@ inline void
 STVector256::setValue(const STVector256& v)
 {
     mValue = v.mValue;
-}
-
-/** Retrieve a copy of the vector we contain */
-inline STVector256::operator std::vector<uint256>() const
-{
-    return mValue;
 }
 
 inline std::size_t

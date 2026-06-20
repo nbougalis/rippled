@@ -64,11 +64,10 @@ STTx::STTx(STObject&& object) : STObject(std::move(object))
     tid_ = getHash(HashPrefix::transactionID);
 }
 
-STTx::STTx(SerialIter& sit) : STObject(sfTransaction)
+STTx::STTx(SerialIter sit) : STObject(sfTransaction)
 {
-    int length = sit.getBytesLeft();
-
-    if ((length < txMinSizeBytes) || (length > txMaxSizeBytes))
+    if (auto size = sit.getBytesLeft();
+        (size < txMinSizeBytes) || (size > txMaxSizeBytes))
         Throw<std::runtime_error>("Transaction length invalid");
 
     if (set(sit))
@@ -154,13 +153,25 @@ STTx::getMentionedAccounts() const
     return list;
 }
 
-static Blob
+/** Builds the canonical byte sequence that a transaction signs over.
+
+    Prepends the @ref HashPrefix::txSign prefix and appends the fields
+    that are present in the transaction, except for the signing fields
+    themselves (since the signature cannot cover itself).
+
+    @param that The transaction whose signing data is required.
+
+    @return For performance reasons, it returns a @ref Serializer that
+            owns the assembled bytes, since the callers do not need to
+            take ownership of the data.
+ */
+static Serializer
 getSigningData(STTx const& that)
 {
     Serializer s;
     s.add32(HashPrefix::txSign);
     that.addWithoutSigningFields(s);
-    return s.getData();
+    return s;
 }
 
 uint256
@@ -202,7 +213,7 @@ STTx::sign(PublicKey const& publicKey, SecretKey const& secretKey)
 {
     auto const data = getSigningData(*this);
 
-    auto const sig = ripple::sign(publicKey, secretKey, makeSlice(data));
+    auto const sig = ripple::sign(publicKey, secretKey, data.slice());
 
     setFieldVL(sfTxnSignature, sig);
     tid_ = getHash(HashPrefix::transactionID);
@@ -327,16 +338,16 @@ STTx::checkSingleSign(RequireFullyCanonicalSig requireCanonicalSig) const
         bool const fullyCanonical = (getFlags() & tfFullyCanonicalSig) ||
             (requireCanonicalSig == RequireFullyCanonicalSig::yes);
 
-        auto const spk = getFieldVL(sfSigningPubKey);
 
-        if (publicKeyType(makeSlice(spk)))
+
+        if (auto const spk = getFieldVL(sfSigningPubKey); publicKeyType(makeSlice(spk)))
         {
             Blob const signature = getFieldVL(sfTxnSignature);
-            Blob const data = getSigningData(*this);
+            auto const data = getSigningData(*this);
 
             validSig = isWildcardNetwork ||
                 verify(PublicKey(makeSlice(spk)),
-                       makeSlice(data),
+                       data.slice(),
                        makeSlice(signature),
                        fullyCanonical);
         }
@@ -670,8 +681,7 @@ sterilize(STTx const& stx)
 {
     Serializer s;
     stx.add(s);
-    SerialIter sit(s.slice());
-    return std::make_shared<STTx const>(std::ref(sit));
+    return std::make_shared<STTx const>(SerialIter{s.slice()});
 }
 
 bool

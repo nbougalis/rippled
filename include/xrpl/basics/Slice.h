@@ -23,16 +23,16 @@
 #include <xrpl/basics/contract.h>
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/utility/instrumentation.h>
+
 #include <algorithm>
-#include <array>
+#include <concepts>
 #include <cstdint>
-#include <cstring>
+#include <iterator>
 #include <limits>
+#include <ranges>
 #include <span>
 #include <stdexcept>
-#include <string>
 #include <type_traits>
-#include <vector>
 
 namespace ripple {
 
@@ -237,35 +237,13 @@ operator<<(Stream& s, Slice const& v)
     return s;
 }
 
-template <class T, std::size_t N>
-    requires detail::is_byte_like<T>
+template <class R>
+    requires std::ranges::contiguous_range<R> &&
+    detail::is_byte_like<std::ranges::range_value_t<R>>
 Slice
-makeSlice(std::array<T, N> const& a)
+makeSlice(R const& r) noexcept
 {
-    return Slice(a.data(), a.size());
-}
-
-template <class T, std::size_t N>
-    requires detail::is_byte_like<T>
-Slice
-makeSlice(std::span<T, N> const& a)
-{
-    return Slice(a.data(), a.size());
-}
-
-template <class T, class Alloc>
-    requires detail::is_byte_like<T>
-Slice
-makeSlice(std::vector<T, Alloc> const& v)
-{
-    return Slice(v.data(), v.size());
-}
-
-template <class Traits, class Alloc>
-Slice
-makeSlice(std::basic_string<char, Traits, Alloc> const& s)
-{
-    return Slice(s.data(), s.size());
+    return Slice(std::ranges::data(r), std::ranges::size(r));
 }
 
 }  // namespace ripple

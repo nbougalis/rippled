@@ -44,7 +44,7 @@ public:
     STAccount();
 
     STAccount(SField const& n);
-    STAccount(SField const& n, Buffer&& v);
+    STAccount(SField const& n, Slice v);
     STAccount(SerialIter& sit, SField const& name);
     STAccount(SField const& n, AccountID const& v);
 

@@ -38,34 +38,67 @@ addRaw(LedgerHeader const& info, Serializer& s, bool includeHash)
         s.addBitString(info.hash);
 }
 
-LedgerHeader
-deserializeHeader(Slice data, bool hasHash)
+static std::optional<LedgerHeader>
+deserializeHeaderImpl(SerialIter sit, bool hasHash)
 {
-    SerialIter sit(data.data(), data.size());
+    std::optional<LedgerHeader> header;
 
-    LedgerHeader header;
+    try
+    {
+        header.emplace();
 
-    header.seq = sit.get32();
-    header.drops = sit.get64();
-    header.parentHash = sit.get256();
-    header.txHash = sit.get256();
-    header.accountHash = sit.get256();
-    header.parentCloseTime =
-        NetClock::time_point{NetClock::duration{sit.get32()}};
-    header.closeTime = NetClock::time_point{NetClock::duration{sit.get32()}};
-    header.closeTimeResolution = NetClock::duration{sit.get8()};
-    header.closeFlags = sit.get8();
+        header->seq = sit.get32();
+        header->drops = sit.get64();
+        header->parentHash = sit.get256();
+        header->txHash = sit.get256();
+        header->accountHash = sit.get256();
+        header->parentCloseTime =
+            NetClock::time_point{NetClock::duration{sit.get32()}};
+        header->closeTime =
+            NetClock::time_point{NetClock::duration{sit.get32()}};
+        header->closeTimeResolution = NetClock::duration{sit.get8()};
+        header->closeFlags = sit.get8();
 
-    if (hasHash)
-        header.hash = sit.get256();
+        if (hasHash)
+            header->hash = sit.get256();
+    }
+    catch (...)
+    {
+    }
 
     return header;
 }
 
-LedgerHeader
+std::optional<LedgerHeader>
+deserializeHeader(Slice data, bool hasHash)
+{
+    return deserializeHeaderImpl(SerialIter{data}, hasHash);
+}
+
+std::optional<LedgerHeader>
 deserializePrefixedHeader(Slice data, bool hasHash)
 {
-    return deserializeHeader(data + 4, hasHash);
+    try
+    {
+        SerialIter sit{data};
+
+        // Previous versions of this code consumed the prefix but did not
+        // verify (or even look at) the value. We check to make sure that
+        // it contains the value we expect, and if it does not, we refuse
+        // to deserialize any data remaining in the buffer.
+        auto const prefix = safe_cast<HashPrefix>(sit.get32());
+
+        if (prefix == HashPrefix::ledgerMaster)
+            return deserializeHeaderImpl(sit, hasHash);
+
+        Throw<std::runtime_error>(
+            "Wrong prefix: " +
+            std::to_string(static_cast<std::uint32_t>(prefix)));
+    }
+    catch (std::exception const& ex)
+    {
+        return std::nullopt;
+    }
 }
 
 }  // namespace ripple

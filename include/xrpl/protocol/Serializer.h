@@ -21,45 +21,27 @@
 #define RIPPLE_PROTOCOL_SERIALIZER_H_INCLUDED
 
 #include <xrpl/basics/Blob.h>
-#include <xrpl/basics/Buffer.h>
 #include <xrpl/basics/Slice.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/basics/safe_cast.h>
-#include <xrpl/basics/strHex.h>
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/protocol/HashPrefix.h>
 #include <xrpl/protocol/SField.h>
 #include <cstdint>
-#include <cstring>
-#include <iomanip>
+
 #include <type_traits>
 
 namespace ripple {
 
 class Serializer
 {
-private:
-    // DEPRECATED
     Blob mData;
 
 public:
-    explicit Serializer(int n = 256)
+    explicit Serializer(std::size_t n = 256)
     {
         mData.reserve(n);
-    }
-
-    Serializer(void const* data, std::size_t size)
-    {
-        mData.resize(size);
-
-        if (size)
-        {
-            XRPL_ASSERT(
-                data,
-                "ripple::Serializer::Serializer(void const*) : non-null input");
-            std::memcpy(mData.data(), data, size);
-        }
     }
 
     Slice
@@ -83,6 +65,7 @@ public:
     // assemble functions
     int
     add8(unsigned char i);
+
     int
     add16(std::uint16_t i);
 
@@ -130,59 +113,50 @@ public:
     int
     addBitString(base_uint<Bits, Tag> const& v)
     {
-        return addRaw(v.data(), v.size());
+        return addRaw(makeSlice(v));
     }
 
     int
-    addRaw(Blob const& vector);
-    int
-    addRaw(Slice slice);
-    int
-    addRaw(const void* ptr, int len);
-    int
-    addRaw(const Serializer& s);
-
-    int
-    addVL(Blob const& vector);
-    int
-    addVL(Slice const& slice);
-    template <class Iter>
-    int
-    addVL(Iter begin, Iter end, int len);
-    int
-    addVL(const void* ptr, int len);
-
-    // disassemble functions
-    bool
-    get8(int&, int offset) const;
-
-    template <typename Integer>
-    bool
-    getInteger(Integer& number, int offset)
+    addRaw(Slice slice)
     {
-        static const auto bytes = sizeof(Integer);
-        if ((offset + bytes) > mData.size())
-            return false;
-        number = 0;
-
-        auto ptr = &mData[offset];
-        for (auto i = 0; i < bytes; ++i)
-        {
-            if (i)
-                number <<= 8;
-            number |= *ptr++;
-        }
-        return true;
+        int ret = mData.size();
+        mData.insert(mData.end(), slice.begin(), slice.end());
+        return ret;
     }
 
-    template <std::size_t Bits, typename Tag = void>
-    bool
-    getBitString(base_uint<Bits, Tag>& data, int offset) const
+    int
+    addRaw(Blob const& vector)
     {
-        auto success = (offset + (Bits / 8)) <= mData.size();
-        if (success)
-            memcpy(data.begin(), &(mData.front()) + offset, (Bits / 8));
-        return success;
+        return addRaw(makeSlice(vector));
+    }
+
+    int
+    addRaw(const Serializer& s)
+    {
+        return addRaw(s.slice());
+    }
+
+    int
+    addVL(Slice const& slice)
+    {
+        int ret = addEncoded(slice.size());
+        addRaw(slice);
+        return ret;
+    }
+
+    int
+    addVL(Blob const& vector)
+    {
+        return addVL(makeSlice(vector));
+    }
+
+    int
+    addVL(const void* ptr, int len)
+    {
+        if (len < 0) [[unlikely]]
+            Throw<std::logic_error>("Negative length");
+
+        return addVL(Slice{ptr, checked_cast<std::size_t>(len)});
     }
 
     int
@@ -237,15 +211,13 @@ public:
     std::string
     getString() const
     {
-        return std::string(static_cast<const char*>(getDataPtr()), size());
+        return std::string(reinterpret_cast<const char*>(mData.data()), mData.size());
     }
     void
     erase()
     {
         mData.clear();
     }
-    bool
-    chop(int num);
 
     // vector-like functions
     Blob ::iterator
@@ -253,90 +225,41 @@ public:
     {
         return mData.begin();
     }
+
     Blob ::iterator
     end()
     {
         return mData.end();
     }
+
     Blob ::const_iterator
     begin() const
     {
         return mData.begin();
     }
+
     Blob ::const_iterator
     end() const
     {
         return mData.end();
     }
-    void
-    reserve(size_t n)
-    {
-        mData.reserve(n);
-    }
-    void
-    resize(size_t n)
-    {
-        mData.resize(n);
-    }
-    size_t
-    capacity() const
-    {
-        return mData.capacity();
-    }
-
-    bool
-    operator==(Blob const& v) const
-    {
-        return v == mData;
-    }
-    bool
-    operator!=(Blob const& v) const
-    {
-        return v != mData;
-    }
-    bool
-    operator==(const Serializer& v) const
-    {
-        return v.mData == mData;
-    }
-    bool
-    operator!=(const Serializer& v) const
-    {
-        return v.mData != mData;
-    }
-
-    static int
-    decodeLengthLength(int b1);
-    static int
-    decodeVLLength(int b1);
-    static int
-    decodeVLLength(int b1, int b2);
-    static int
-    decodeVLLength(int b1, int b2, int b3);
 
 private:
-    static int
-    encodeLengthLength(int length);  // length to encode length
     int
     addEncoded(int length);
-};
 
-template <class Iter>
-int
-Serializer::addVL(Iter begin, Iter end, int len)
-{
-    int ret = addEncoded(len);
-    for (; begin != end; ++begin)
+    friend bool
+    operator==(Serializer const& lhs, Serializer const& rhs)
     {
-        addRaw(begin->data(), begin->size());
-#ifndef NDEBUG
-        len -= begin->size();
-#endif
+        return lhs.mData == rhs.mData;
     }
-    XRPL_ASSERT(
-        len == 0, "ripple::Serializer::addVL : length matches distance");
-    return ret;
-}
+
+    friend bool
+    operator==(Serializer const& lhs, Blob const& rhs)
+    {
+        return lhs.mData == rhs;
+    }
+};
 
 //------------------------------------------------------------------------------
 
@@ -344,13 +267,14 @@ Serializer::addVL(Iter begin, Iter end, int len)
 // Transitional adapter to new serialization interfaces
 class SerialIter
 {
-private:
     std::uint8_t const* p_;
     std::size_t remain_;
-    std::size_t used_ = 0;
 
 public:
-    SerialIter(void const* data, std::size_t size) noexcept;
+    SerialIter(void const* data, std::size_t size) noexcept
+        : p_(reinterpret_cast<std::uint8_t const*>(data)), remain_(size)
+    {
+    }
 
     SerialIter(Slice const& slice) : SerialIter(slice.data(), slice.size())
     {
@@ -369,13 +293,10 @@ public:
         return remain_ == 0;
     }
 
-    void
-    reset() noexcept;
-
-    int
+    std::size_t
     getBytesLeft() const noexcept
     {
-        return static_cast<int>(remain_);
+        return remain_;
     }
 
     // get functions throw on error
@@ -397,7 +318,20 @@ public:
 
     template <std::size_t Bits, class Tag = void>
     base_uint<Bits, Tag>
-    getBitString();
+    getBitString()
+    {
+        auto constexpr N = base_uint<Bits, Tag>::bytes;
+
+        if (remain_ < N)
+            Throw<std::runtime_error>("invalid SerialIter getBitString");
+
+        auto const x = p_;
+
+        p_ += N;
+        remain_ -= N;
+
+        return base_uint<Bits, Tag>(std::span<uint8_t const, N>{x, N});
+    }
 
     uint128
     get128()
@@ -426,51 +360,12 @@ public:
     void
     getFieldID(int& type, int& name);
 
-    // Returns the size of the VL if the
-    // next object is a VL. Advances the iterator
-    // to the beginning of the VL.
-    int
-    getVLDataLength();
-
     Slice
     getSlice(std::size_t bytes);
 
-    // VFALCO DEPRECATED Returns a copy
-    Blob
-    getRaw(int size);
-
-    // VFALCO DEPRECATED Returns a copy
-    Blob
+    Slice
     getVL();
-
-    void
-    skip(int num);
-
-    Buffer
-    getVLBuffer();
-
-    template <class T>
-    T
-    getRawHelper(int size);
 };
-
-template <std::size_t Bits, class Tag>
-base_uint<Bits, Tag>
-SerialIter::getBitString()
-{
-    auto constexpr N = base_uint<Bits, Tag>::bytes;
-
-    if (remain_ < N)
-        Throw<std::runtime_error>("invalid SerialIter getBitString");
-
-    auto const x = p_;
-
-    p_ += N;
-    used_ += N;
-    remain_ -= N;
-
-    return base_uint<Bits, Tag>(std::span<uint8_t const, N>{x, N});
-}
 
 }  // namespace ripple
 

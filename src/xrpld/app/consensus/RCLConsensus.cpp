@@ -626,8 +626,8 @@ RCLConsensus::Adaptor::doAccept(
                         << "Test applying disputed transaction that did"
                         << " not get in " << dispute.tx().id();
 
-                    SerialIter sit(dispute.tx().tx_->slice());
-                    auto txn = std::make_shared<STTx const>(sit);
+                    auto txn = std::make_shared<STTx const>(
+                        SerialIter{dispute.tx().tx_->slice()});
 
                     // Disputed pseudo-transactions that were not accepted
                     // can't be successfully applied in the next ledger

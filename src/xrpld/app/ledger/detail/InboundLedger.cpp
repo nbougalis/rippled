@@ -242,11 +242,14 @@ InboundLedger::tryDB(NodeStore::Database& srcDB)
     if (!mHaveHeader)
     {
         auto makeLedger = [&, this](std::span<std::uint8_t const> data) {
-            JLOG(journal_.trace()) << "Ledger header found in fetch pack";
+            auto header = deserializePrefixedHeader(makeSlice(data));
+
+            if (!header)
+                return;
+
             mLedger = std::make_shared<Ledger>(
-                deserializePrefixedHeader(makeSlice(data)),
-                app_.config(),
-                app_.getNodeFamily());
+                header.value(), app_.config(), app_.getNodeFamily());
+
             if (mLedger->info().hash != hash_ ||
                 (mSeq != 0 && mSeq != mLedger->info().seq))
             {
@@ -270,8 +273,8 @@ InboundLedger::tryDB(NodeStore::Database& srcDB)
                 return;
 
             // Store the ledger header if the source and destination differ
-            auto& dstDB{mLedger->stateMap().family().db()};
-            if (std::addressof(dstDB) != std::addressof(srcDB))
+            if (auto& dstDB{mLedger->stateMap().family().db()};
+                std::addressof(dstDB) != std::addressof(srcDB))
             {
                 dstDB.store(
                     hotLEDGER,
@@ -284,6 +287,7 @@ InboundLedger::tryDB(NodeStore::Database& srcDB)
         {
             // Try to fetch the ledger header from a fetch pack
             auto data = app_.getLedgerMaster().getFetchPack(hash_);
+
             if (!data)
                 return;
 
@@ -300,6 +304,7 @@ InboundLedger::tryDB(NodeStore::Database& srcDB)
 
         if (mSeq == 0)
             mSeq = mLedger->info().seq;
+
         mLedger->stateMap().setLedgerSeq(mSeq);
         mLedger->txMap().setLedgerSeq(mSeq);
         mHaveHeader = true;
@@ -822,9 +827,15 @@ InboundLedger::takeHeader(std::string const& data)
     if (complete_ || failed_ || mHaveHeader)
         return true;
 
+    auto header = deserializeHeader(makeSlice(data));
+
+    if (!header)
+        return false;
+
     auto* f = &app_.getNodeFamily();
-    mLedger = std::make_shared<Ledger>(
-        deserializeHeader(makeSlice(data)), app_.config(), *f);
+
+    mLedger = std::make_shared<Ledger>(header.value(), app_.config(), *f);
+
     if (mLedger->info().hash != hash_ ||
         (mSeq != 0 && mSeq != mLedger->info().seq))
     {
@@ -834,15 +845,17 @@ InboundLedger::takeHeader(std::string const& data)
         mLedger.reset();
         return false;
     }
+
     if (mSeq == 0)
         mSeq = mLedger->info().seq;
+
     mLedger->stateMap().setLedgerSeq(mSeq);
     mLedger->txMap().setLedgerSeq(mSeq);
     mHaveHeader = true;
 
     Serializer s(data.size() + 4);
     s.add32(HashPrefix::ledgerMaster);
-    s.addRaw(data.data(), data.size());
+    s.addRaw(makeSlice(data));
     f->db().store(hotLEDGER, std::move(s.modData()), hash_, mSeq);
 
     if (mLedger->info().txHash.isZero())

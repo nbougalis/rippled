@@ -32,7 +32,7 @@ STAccount::STAccount(SField const& n)
 {
 }
 
-STAccount::STAccount(SField const& n, Buffer&& v) : STAccount(n)
+STAccount::STAccount(SField const& n, Slice v) : STAccount(n)
 {
     if (v.empty())
         return;  // Zero is a valid size for a defaulted STAccount.
@@ -50,7 +50,7 @@ STAccount::STAccount(SField const& n, Buffer&& v) : STAccount(n)
 }
 
 STAccount::STAccount(SerialIter& sit, SField const& name)
-    : STAccount(name, sit.getVLBuffer())
+    : STAccount(name, sit.getVL())
 {
 }
 

@@ -1817,17 +1817,10 @@ LedgerMaster::getCloseTimeByHash(
     LedgerHash const& ledgerHash,
     std::uint32_t index)
 {
-    auto nodeObject = app_.getNodeStore().fetchNodeObject(ledgerHash, index);
-    if (nodeObject && (nodeObject->size() >= 120))
+    if (auto obj = app_.getNodeStore().fetchNodeObject(ledgerHash, index))
     {
-        SerialIter it(nodeObject->data().data(), nodeObject->data().size());
-        if (safe_cast<HashPrefix>(it.get32()) == HashPrefix::ledgerMaster)
-        {
-            it.skip(
-                4 + 8 + 32 +   // seq drops parentHash
-                32 + 32 + 4);  // txHash acctHash parentClose
-            return NetClock::time_point{NetClock::duration{it.get32()}};
-        }
+        if (auto header = deserializePrefixedHeader(makeSlice(obj->data())))
+            return header->closeTime;
     }
 
     return std::nullopt;

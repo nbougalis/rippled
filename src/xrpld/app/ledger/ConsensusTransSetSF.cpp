@@ -48,7 +48,12 @@ ConsensusTransSetSF::gotNode(
 
     m_nodeCache.insert(nodeHash, nodeData);
 
-    if ((type == SHAMapNodeType::tnTRANSACTION_NM) && (nodeData.size() > 16))
+    // The STTx constructor checks that a transaction has a minimum size
+    // of txMinSizeBytes, which is currently at 10 bytes. Here we impose
+    // a minimum of 13 bytes (after the prefix is stripped), so there is
+    // a discrepancy. Both minima are unrealistic and this is not likely
+    // to matter anyways.
+    if (type == SHAMapNodeType::tnTRANSACTION_NM && nodeData.size() > 16)
     {
         // this is a transaction, and we didn't have it
         JLOG(j_.debug())
@@ -56,18 +61,17 @@ ConsensusTransSetSF::gotNode(
 
         try
         {
-            // skip prefix
-            Serializer s(nodeData.data() + 4, nodeData.size() - 4);
-            SerialIter sit(s.slice());
-            auto stx = std::make_shared<STTx const>(std::ref(sit));
+            // Deserialize, skipping the prefix
+            auto stx = std::make_shared<STTx const>(
+                SerialIter{nodeData.data() + 4, nodeData.size() - 4});
             XRPL_ASSERT(
                 stx->getTransactionID() == nodeHash.as_uint256(),
                 "ripple::ConsensusTransSetSF::gotNode : transaction hash "
                 "match");
-            auto const pap = &app_;
-            app_.getJobQueue().addJob(jtTRANSACTION, "TXS->TXN", [pap, stx]() {
-                pap->getOPs().submitTransaction(stx);
-            });
+            app_.getJobQueue().addJob(
+                jtTRANSACTION, "TXS->TXN", [app = &app_, stx]() {
+                    app->getOPs().submitTransaction(stx);
+                });
         }
         catch (std::exception const& ex)
         {
@@ -81,28 +85,24 @@ ConsensusTransSetSF::gotNode(
 std::optional<Blob>
 ConsensusTransSetSF::getNode(SHAMapHash const& nodeHash) const
 {
-    Blob nodeData;
-    if (m_nodeCache.retrieve(nodeHash, nodeData))
+    if (Blob nodeData; m_nodeCache.retrieve(nodeHash, nodeData))
         return nodeData;
 
     auto txn =
         app_.getMasterTransaction().fetch_from_cache(nodeHash.as_uint256());
 
-    if (txn)
-    {
-        // this is a transaction, and we have it
-        JLOG(j_.trace()) << "Node in our acquiring TX set is TXN we have";
-        Serializer s;
-        s.add32(HashPrefix::transactionID);
-        txn->getSTransaction()->add(s);
-        XRPL_ASSERT(
-            sha512Half(s.slice()) == nodeHash.as_uint256(),
-            "ripple::ConsensusTransSetSF::getNode : transaction hash match");
-        nodeData = s.peekData();
-        return nodeData;
-    }
+    if (!txn)
+        return std::nullopt;
 
-    return std::nullopt;
+    // this is a transaction, and we have it
+    JLOG(j_.trace()) << "Node in our acquiring TX set is TXN we have";
+    Serializer s;
+    s.add32(HashPrefix::transactionID);
+    txn->getSTransaction()->add(s);
+    XRPL_ASSERT(
+        sha512Half(s.slice()) == nodeHash.as_uint256(),
+        "ripple::ConsensusTransSetSF::getNode : transaction hash match");
+    return std::move(s.modData());
 }
 
 }  // namespace ripple

@@ -121,15 +121,11 @@ TransactionMaster::fetch(
     if (!iTx)
     {
         if (type == SHAMapNodeType::tnTRANSACTION_NM)
-        {
-            SerialIter sit(item->slice());
-            txn = std::make_shared<STTx const>(std::ref(sit));
-        }
+            txn = std::make_shared<STTx const>(SerialIter{item->slice()});
         else if (type == SHAMapNodeType::tnTRANSACTION_MD)
         {
-            auto blob = SerialIter{item->slice()}.getVL();
-            txn = std::make_shared<STTx const>(
-                SerialIter{blob.data(), blob.size()});
+            SerialIter sit{item->slice()};
+            txn = std::make_shared<STTx const>(SerialIter{sit.getVL()});
         }
     }
     else

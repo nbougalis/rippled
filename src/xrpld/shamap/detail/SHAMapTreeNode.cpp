@@ -57,21 +57,14 @@ SHAMapTreeNode::makeTransactionWithMeta(
     SHAMapHash const& hash,
     bool hashValid)
 {
-    Serializer s(data.data(), data.size());
+    SerialIter sit{data};
 
-    uint256 tag;
-
-    if (s.size() < tag.bytes)
+    if (sit.getBytesLeft() < uint256::bytes)
         Throw<std::runtime_error>("Short TXN+MD node");
 
-    // FIXME: improve this interface so that the above check isn't needed
-    if (!s.getBitString(tag, s.size() - tag.bytes))
-        Throw<std::out_of_range>(
-            "Short TXN+MD node (" + std::to_string(s.size()) + ")");
+    auto payload = sit.getSlice(sit.getBytesLeft() - uint256::bytes);
 
-    s.chop(tag.bytes);
-
-    auto item = make_shamapitem(tag, s.slice());
+    auto item = make_shamapitem(sit.get256(), payload);
 
     if (hashValid)
         return std::make_shared<SHAMapTxPlusMetaLeafNode>(
@@ -86,24 +79,19 @@ SHAMapTreeNode::makeAccountState(
     SHAMapHash const& hash,
     bool hashValid)
 {
-    Serializer s(data.data(), data.size());
+    SerialIter sit{data};
 
-    uint256 tag;
-
-    if (s.size() < tag.bytes)
+    if (sit.getBytesLeft() < uint256::bytes)
         Throw<std::runtime_error>("short AS node");
 
-    // FIXME: improve this interface so that the above check isn't needed
-    if (!s.getBitString(tag, s.size() - tag.bytes))
-        Throw<std::out_of_range>(
-            "Short AS node (" + std::to_string(s.size()) + ")");
+    auto payload = sit.getSlice(sit.getBytesLeft() - uint256::bytes);
 
-    s.chop(tag.bytes);
+    auto const tag = sit.get256();
 
     if (tag.isZero())
         Throw<std::runtime_error>("Invalid AS node");
 
-    auto item = make_shamapitem(tag, s.slice());
+    auto item = make_shamapitem(tag, payload);
 
     if (hashValid)
         return std::make_shared<SHAMapAccountStateLeafNode>(

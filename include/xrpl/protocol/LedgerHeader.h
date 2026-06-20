@@ -27,6 +27,8 @@
 #include <xrpl/protocol/Serializer.h>
 #include <xrpl/protocol/XRPAmount.h>
 
+#include <optional>
+
 namespace ripple {
 
 /** Information about the notional ledger backing the view. */
@@ -90,12 +92,27 @@ getCloseAgree(LedgerHeader const& info)
 void
 addRaw(LedgerHeader const&, Serializer&, bool includeHash = false);
 
-/** Deserialize a ledger header from a byte array. */
-LedgerHeader
+/** Deserialize a ledger header from a byte array.
+
+    @param data The byte array to deserialize from.
+    @param hasHash Whether the data block contains the header hash.
+
+    @return The ledger header, if successful. An unseated optional otherwise.
+ */
+std::optional<LedgerHeader>
 deserializeHeader(Slice data, bool hasHash = false);
 
-/** Deserialize a ledger header (prefixed with 4 bytes) from a byte array. */
-LedgerHeader
+/** Deserialize a ledger header (prefixed with 4 bytes) from a byte array.
+
+    This function verifies that the data block contains the correct prefix,
+    which should be LedgerMaster::ledgerMaster.
+
+    @param data The byte array to deserialize from.
+    @param hasHash Whether the data block contains the header hash.
+
+    @return The ledger header, if successful. An unseated optional otherwise.
+ */
+std::optional<LedgerHeader>
 deserializePrefixedHeader(Slice data, bool hasHash = false);
 
 }  // namespace ripple

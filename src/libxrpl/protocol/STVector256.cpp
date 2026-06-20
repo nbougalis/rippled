@@ -26,7 +26,7 @@ namespace ripple {
 
 STVector256::STVector256(SerialIter& sit, SField const& name) : STBase(name)
 {
-    auto const slice = sit.getSlice(sit.getVLDataLength());
+    auto const slice = sit.getVL();
 
     if (slice.size() % uint256::size() != 0)
         Throw<std::runtime_error>(
@@ -73,7 +73,11 @@ STVector256::add(Serializer& s) const
     XRPL_ASSERT(
         getFName().fieldType == STI_VECTOR256,
         "ripple::STVector256::add : valid field type");
-    s.addVL(mValue.begin(), mValue.end(), mValue.size() * (256 / 8));
+
+    // We take advantage of the fact that the storage underlying std::vector
+    // is contiguous and that uint256 has no padding bits to write the whole
+    // vector out using a single operation.
+    s.addVL(Slice{mValue.data(), mValue.size() * uint256::bytes});
 }
 
 bool

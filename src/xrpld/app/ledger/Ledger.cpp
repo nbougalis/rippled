@@ -430,25 +430,21 @@ Ledger::addSLE(SLE const& sle)
 std::shared_ptr<STTx const>
 deserializeTx(SHAMapItem const& item)
 {
-    SerialIter sit(item.slice());
-    return std::make_shared<STTx const>(sit);
+    return std::make_shared<STTx const>(SerialIter{item.slice()});
 }
 
 std::pair<std::shared_ptr<STTx const>, std::shared_ptr<STObject const>>
 deserializeTxPlusMeta(SHAMapItem const& item)
 {
-    std::pair<std::shared_ptr<STTx const>, std::shared_ptr<STObject const>>
-        result;
-    SerialIter sit(item.slice());
-    {
-        SerialIter s(sit.getSlice(sit.getVLDataLength()));
-        result.first = std::make_shared<STTx const>(s);
-    }
-    {
-        SerialIter s(sit.getSlice(sit.getVLDataLength()));
-        result.second = std::make_shared<STObject const>(s, sfMetadata);
-    }
-    return result;
+    SerialIter sit{item.slice()};
+
+    std::pair<std::shared_ptr<STTx const>, std::shared_ptr<STObject const>> ret;
+
+    ret.first = std::make_shared<STTx const>(SerialIter{sit.getVL()});
+    ret.second =
+        std::make_shared<STObject const>(SerialIter{sit.getVL()}, sfMetadata);
+
+    return ret;
 }
 
 //------------------------------------------------------------------------------

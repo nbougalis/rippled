@@ -66,8 +66,8 @@ public:
     STTx&
     operator=(STTx const& other) = delete;
 
-    explicit STTx(SerialIter& sit);
-    explicit STTx(SerialIter&& sit);
+    explicit STTx(SerialIter sit);
+
     explicit STTx(STObject&& object);
 
     /** Constructs a transaction.
@@ -172,10 +172,6 @@ sterilize(STTx const& stx);
 /** Check whether a transaction is a pseudo-transaction */
 bool
 isPseudoTx(STObject const& tx);
-
-inline STTx::STTx(SerialIter&& sit) : STTx(sit)
-{
-}
 
 inline TxType
 STTx::getTxnType() const
