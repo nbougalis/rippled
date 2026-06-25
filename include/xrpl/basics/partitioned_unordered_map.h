@@ -54,8 +54,6 @@ template <
     typename Alloc = std::allocator<std::pair<const Key, Value>>>
 class partitioned_unordered_map
 {
-    std::size_t partitions_;
-
 public:
     using key_type = Key;
     using mapped_type = Value;
@@ -220,12 +218,6 @@ public:
     };
 
 private:
-    std::size_t
-    partitioner(Key const& key) const
-    {
-        return extract(key) % partitions_;
-    }
-
     template <class T>
     static void
     end(T& it)
@@ -252,28 +244,30 @@ public:
     partitioned_unordered_map(
         std::optional<std::size_t> partitions = std::nullopt)
     {
-        // Set partitions to the number of hardware threads if the parameter
-        // is either empty or set to 0.
-        partitions_ = partitions && *partitions
-            ? *partitions
-            : std::thread::hardware_concurrency();
-        map_.resize(partitions_);
-        XRPL_ASSERT(
-            partitions_,
-            "ripple::partitioned_unordered_map::partitioned_unordered_map : "
-            "nonzero partitions");
+        // Set partitions to the twice the number of hardware threads if
+        // the parameter is either empty or set to 0.
+        if (partitions.value_or(0) == 0)
+            partitions = std::clamp<std::size_t>(
+                std::thread::hardware_concurrency(), 4, 64);
+
+        // At this point, partitions has a value. If it was automatically
+        // selected, it's in the range of [4, 64]. But if it was manually
+        // specified, it can have any value, so we need to sanitize again
+        // to make sure the values make sense. The bounds differ here and
+        // do so on purpose: to afford the programmer flexibility.
+        map_.resize(std::clamp<std::size_t>(*partitions, 1, 128));
     }
 
     std::size_t
-    partitions() const
+    partitions() const noexcept
     {
-        return partitions_;
+        return map_.size();
     }
 
-    partition_map_type&
-    map()
+    map_type&
+    partition(std::size_t index)
     {
-        return map_;
+        return map_.at(index);
     }
 
     iterator
@@ -325,7 +319,7 @@ private:
     void
     find(key_type const& key, T& it) const
     {
-        it.ait_ = it.map_->begin() + partitioner(key);
+        it.ait_ = it.map_->begin() + partition_index(key);
         it.mit_ = it.ait_->find(key);
         if (it.mit_ == it.ait_->end())
             end(it);
@@ -354,12 +348,14 @@ public:
     {
         auto const& key = std::get<0>(keyTuple);
         iterator it(&map_);
-        it.ait_ = it.map_->begin() + partitioner(key);
+        it.ait_ = it.map_->begin() + partition_index(key);
         auto [eit, inserted] = it.ait_->emplace(
             std::piecewise_construct,
             std::forward<T>(keyTuple),
             std::forward<U>(valueTuple));
         it.mit_ = eit;
+        if (inserted)
+            size_.fetch_add(1, std::memory_order_relaxed);
         return {it, inserted};
     }
 
@@ -368,10 +364,12 @@ public:
     emplace(T&& key, U&& val)
     {
         iterator it(&map_);
-        it.ait_ = it.map_->begin() + partitioner(key);
+        it.ait_ = it.map_->begin() + partition_index(key);
         auto [eit, inserted] =
             it.ait_->emplace(std::forward<T>(key), std::forward<U>(val));
         it.mit_ = eit;
+        if (inserted)
+            size_.fetch_add(1, std::memory_order_relaxed);
         return {it, inserted};
     }
 
@@ -380,6 +378,8 @@ public:
     {
         for (auto& p : map_)
             p.clear();
+
+        size_.store(0, std::memory_order_relaxed);
     }
 
     iterator
@@ -388,6 +388,8 @@ public:
         iterator it(&map_);
         it.ait_ = position.ait_;
         it.mit_ = position.ait_->erase(position.mit_);
+
+        size_.fetch_sub(1, std::memory_order_relaxed);
 
         while (it.mit_ == it.ait_->end())
         {
@@ -401,21 +403,31 @@ public:
     }
 
     std::size_t
-    size() const
+    size() const noexcept
     {
-        std::size_t ret = 0;
-        for (auto& p : map_)
-            ret += p.size();
-        return ret;
+        return size_.load(std::memory_order_relaxed);
     }
 
     Value&
     operator[](Key const& key)
     {
-        return map_[partitioner(key)][key];
+        return map_[partition_index(key)][key];
+    }
+
+    std::size_t
+    partition_index(Key const& key) const noexcept
+    {
+        if (map_.size() == 1)
+            return 0;
+
+        return extract(key) % map_.size();
     }
 
 private:
+    // The number of items across all partitions
+    std::atomic<std::size_t> size_{0};
+
+    // The partitions
     mutable partition_map_type map_{};
 };
 

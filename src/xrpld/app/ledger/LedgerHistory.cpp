@@ -40,8 +40,9 @@ LedgerHistory::LedgerHistory(
           stopwatch(),
           app_.journal("TaggedCache"))
     , m_consensus_validated(
+          1,
           "ConsensusValidated",
-          64,
+          256,
           std::chrono::minutes{5},
           stopwatch(),
           app_.journal("TaggedCache"))

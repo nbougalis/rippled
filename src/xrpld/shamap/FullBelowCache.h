@@ -37,12 +37,9 @@ namespace detail {
 */
 class BasicFullBelowCache
 {
-private:
     using CacheType = KeyCache;
 
 public:
-    enum { defaultCacheTargetSize = 0 };
-
     using key_type = uint256;
     using clock_type = typename CacheType::clock_type;
 
@@ -59,9 +56,9 @@ public:
         beast::Journal j,
         beast::insight::Collector::ptr const& collector =
             beast::insight::NullCollector::New(),
-        std::size_t target_size = defaultCacheTargetSize,
+        std::size_t target_size = 0,
         std::chrono::seconds expiration = std::chrono::minutes{2})
-        : m_cache(name, target_size, expiration, clock, j, collector), m_gen(1)
+        : m_cache(name, target_size, expiration, clock, j, collector)
     {
     }
 
@@ -119,28 +116,28 @@ public:
 
     /** generation determines whether cached entry is valid */
     std::uint32_t
-    getGeneration(void) const
+    getGeneration() const noexcept
     {
-        return m_gen;
+        return m_gen.load(std::memory_order::relaxed);
     }
 
     void
     clear()
     {
         m_cache.clear();
-        ++m_gen;
+        m_gen.fetch_add(1, std::memory_order::relaxed);
     }
 
     void
     reset()
     {
         m_cache.clear();
-        m_gen = 1;
+        m_gen.store(1, std::memory_order::relaxed);
     }
 
 private:
     CacheType m_cache;
-    std::atomic<std::uint32_t> m_gen;
+    std::atomic<std::uint32_t> m_gen{1};
 };
 
 }  // namespace detail

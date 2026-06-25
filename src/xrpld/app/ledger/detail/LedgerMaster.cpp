@@ -2244,13 +2244,14 @@ LedgerMaster::addFetchPack(uint256 const& hash, std::shared_ptr<Blob> data)
 std::optional<Blob>
 LedgerMaster::getFetchPack(uint256 const& hash)
 {
-    Blob data;
-    if (fetch_packs_.retrieve(hash, data))
+    if (Blob data; fetch_packs_.retrieve(hash, data))
     {
         fetch_packs_.del(hash, false);
+
         if (hash == sha512Half(makeSlice(data)))
             return data;
     }
+
     return std::nullopt;
 }
 

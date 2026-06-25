@@ -24,13 +24,21 @@
 #include <xrpl/basics/UnorderedContainers.h>
 #include <xrpl/basics/hardened_hash.h>
 #include <xrpl/beast/clock/abstract_clock.h>
+#include <xrpl/beast/core/CurrentThreadName.h>
 #include <xrpl/beast/insight/Insight.h>
+
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <functional>
+#include <map>
 #include <mutex>
+#include <numeric>
 #include <thread>
 #include <type_traits>
 #include <vector>
+
+#include <condition_variable>
 
 namespace ripple {
 
@@ -52,7 +60,7 @@ template <
     bool IsKeyCache = false,
     class Hash = hardened_hash<>,
     class KeyEqual = std::equal_to<Key>,
-    class Mutex = std::recursive_mutex>
+    class Mutex = std::mutex>
 class TaggedCache
 {
 public:
@@ -61,10 +69,10 @@ public:
     using mapped_type = T;
     using clock_type = beast::abstract_clock<std::chrono::steady_clock>;
 
-public:
     TaggedCache(
+        std::size_t partitions,
         std::string const& name,
-        int size,
+        std::size_t size,
         clock_type::duration expiration,
         clock_type& clock,
         beast::Journal journal,
@@ -74,23 +82,41 @@ public:
         , m_clock(clock)
         , m_stats(
               name,
-              std::bind(&TaggedCache::collect_metrics, this),
+              [this]() {
+                  m_stats.size.set(getCacheSize());
+
+                  beast::insight::Gauge::value_type hit_rate(0);
+
+                  {
+                      std::lock_guard lock(m_mutex);
+
+                      if (auto const total(m_hits + m_misses); total != 0)
+                          hit_rate = (m_hits * 100) / total;
+                  }
+
+                  m_stats.hit_rate.set(hit_rate);
+              },
               collector)
         , m_name(name)
         , m_target_size(size)
         , m_target_age(expiration)
         , m_cache_count(0)
+        , m_cache(partitions)
         , m_hits(0)
         , m_misses(0)
     {
     }
 
-public:
-    /** Return the clock associated with the cache. */
-    clock_type&
-    clock()
+    TaggedCache(
+        std::string const& name,
+        std::size_t size,
+        clock_type::duration expiration,
+        clock_type& clock,
+        beast::Journal journal,
+        beast::insight::Collector::ptr const& collector =
+            beast::insight::NullCollector::New())
+        : TaggedCache(0, name, size, expiration, clock, journal, collector)
     {
-        return m_clock;
     }
 
     /** Returns the number of items in the container. */
@@ -99,42 +125,6 @@ public:
     {
         std::lock_guard lock(m_mutex);
         return m_cache.size();
-    }
-
-    void
-    setTargetSize(int s)
-    {
-        std::lock_guard lock(m_mutex);
-        m_target_size = s;
-
-        if (s > 0)
-        {
-            for (auto& partition : m_cache.map())
-            {
-                partition.rehash(static_cast<std::size_t>(
-                    (s + (s >> 2)) /
-                        (partition.max_load_factor() * m_cache.partitions()) +
-                    1));
-            }
-        }
-
-        JLOG(m_journal.debug()) << m_name << " target size set to " << s;
-    }
-
-    clock_type::duration
-    getTargetAge() const
-    {
-        std::lock_guard lock(m_mutex);
-        return m_target_age;
-    }
-
-    void
-    setTargetAge(clock_type::duration s)
-    {
-        std::lock_guard lock(m_mutex);
-        m_target_age = s;
-        JLOG(m_journal.debug())
-            << m_name << " target age set to " << m_target_age.count();
     }
 
     int
@@ -196,73 +186,162 @@ public:
         return true;
     }
 
-    using SweptPointersVector = std::pair<
-        std::vector<std::shared_ptr<mapped_type>>,
-        std::vector<std::weak_ptr<mapped_type>>>;
+    struct SweptPointers
+    {
+        std::vector<std::shared_ptr<mapped_type>> strong;
+        std::vector<std::weak_ptr<mapped_type>> weak;
+    };
 
     void
     sweep()
     {
-        // Keep references to all the stuff we sweep
-        // For performance, each worker thread should exit before the swept data
-        // is destroyed but still within the main cache lock.
-        std::vector<SweptPointersVector> allStuffToSweep(m_cache.partitions());
-
-        clock_type::time_point const now(m_clock.now());
-        clock_type::time_point when_expire;
-
         auto const start = std::chrono::steady_clock::now();
+
+        // Total number of sweepers: this (the calling) thread plus up to three
+        // spawned helpers. The calling thread participates as the last sweeper
+        // rather than blocking while helpers work, so a single-partition cache
+        // (wc == 1) spawns no threads and runs entirely inline.
+        auto const wc = [this]() -> std::size_t {
+            // If we don't have a lot of entries, the overhead of sharding the
+            // work out over multiple threads drowns out the benefits.
+            if (m_cache.size() < 10000)
+                return 1;
+
+            return std::min<std::size_t>(4, m_cache.partitions());
+        }();
+
+        // Track our helpers: we have one fewer than the number of sweepers,
+        // because this thread will also do work, instead of simply waiting
+        // for others.
+        //
+        // When a helper is done sweeping, it updates its removals variable
+        // to report the number of entries it swept, which may be 0, so the
+        // main thread knows that the sweeping process is complete.
+        //
+        // A thread reports that sweeping is complete before destroying the
+        // actual swept values.
+        struct Worker
         {
-            std::lock_guard lock(m_mutex);
+            std::thread t;
+            std::atomic<int> removals{-1};
+        };
 
-            if (m_target_size == 0 ||
-                (static_cast<int>(m_cache.size()) <= m_target_size))
+        std::vector<Worker> workers(wc - 1);
+
+        // Hands partitions out to sweepers; each takes the next index until the
+        // supply is exhausted. Balances work across sweepers regardless of how
+        // uneven the per-partition cost turns out to be.
+        std::atomic<std::size_t> next = 0;
+
+        // The lock is held across all sweeping, since every sweeper touches
+        // m_cache; it is released after every sweeper has finished sweeping
+        // and any needed bookkeeping is done. Destruction of swept pointers
+        // by this thread happens after the lock is released.
+        std::unique_lock<mutex_type> lock(m_mutex);
+
+        auto const now(m_clock.now());
+        auto const expiration = compute_expiration(now, m_cache.size());
+
+        // The sweeper function. It pulls the next unswept partition, if one
+        // is available, sweeps it, accumulating swept pointers, and reports
+        // the number of entries swept. The destruction of the swept entries
+        // is left to the caller.
+        auto melville = [this, &next, now, expiration](SweptPointers& swept) {
+            int count = 0;
+
+            try
             {
-                when_expire = now - m_target_age;
+                for (;;)
+                {
+                    auto const p = next.fetch_add(1, std::memory_order_relaxed);
+
+                    if (p >= m_cache.partitions())
+                        break;
+
+                    count += sweep_partition(
+                        expiration, now, m_cache.partition(p), swept);
+                }
             }
-            else
+            catch (...)
             {
-                when_expire =
-                    now - m_target_age * m_target_size / m_cache.size();
-
-                clock_type::duration const minimumAge(std::chrono::seconds(1));
-                if (when_expire > (now - minimumAge))
-                    when_expire = now - minimumAge;
-
-                JLOG(m_journal.trace())
-                    << m_name << " is growing fast " << m_cache.size() << " of "
-                    << m_target_size << " aging at "
-                    << (now - when_expire).count() << " of "
-                    << m_target_age.count();
+                // Swallow the exception
             }
 
-            std::vector<std::thread> workers;
-            workers.reserve(m_cache.partitions());
-            std::atomic<int> allRemovals = 0;
+            return count;
+        };
 
-            for (std::size_t p = 0; p < m_cache.partitions(); ++p)
-            {
-                workers.push_back(sweepHelper(
-                    when_expire,
-                    now,
-                    m_cache.map()[p],
-                    allStuffToSweep[p],
-                    allRemovals,
-                    lock));
-            }
-            for (std::thread& worker : workers)
-                worker.join();
+        // Spawn helpers threads
+        for (auto& w : workers)
+        {
+            w.t = std::thread([this, &removals = w.removals, &melville] {
+                beast::setCurrentThreadName("sweep:" + m_name);
+                SweptPointers swept;
 
-            m_cache_count -= allRemovals;
+                // Once complete, this will report that we are done sweeping.
+                removals.store(melville(swept), std::memory_order_release);
+                removals.notify_one();
+
+                // And now, the pointers we swept will fall our of scope and
+                // get destroyed. This happens even if other threads are not
+                // yet done sweeping.
+            });
         }
-        // At this point allStuffToSweep will go out of scope outside the lock
-        // and decrement the reference count on each strong pointer.
+
+        // This thread is the last sweeper and doe its share inline.
+        SweptPointers swept;
+        int removals = melville(swept);
+
+        // Wait for the helpers to finish sweeping (but not, necessarily,
+        // destroying the swept items). Note that in the case of a cache
+        // with a single partition, there are no workers.
+        for (auto const& w : workers)
+            w.removals.wait(-1, std::memory_order_acquire);
+
+        // All threads have finished the sweeping part (but they may still be
+        // destroying their swept pointers concurrently). We update the cache
+        // state under the lock.
+        if constexpr (!IsKeyCache)
+        {
+            m_cache_count -= std::accumulate(
+                workers.begin(),
+                workers.end(),
+                removals,
+                [](int acc, auto const& w) {
+                    return acc + w.removals.load(std::memory_order_relaxed);
+                });
+        }
+
+        lock.unlock();
+
+        auto const sweep_end = std::chrono::steady_clock::now();
+
+        // Now, destroy our own swept pointers, if any.
+        swept.strong.clear();
+        swept.weak.clear();
+
+        auto const clear_end = std::chrono::steady_clock::now();
+
+        // We wait for the helpers to finish destroying before returning, so
+        // no destruction outlives this call, to keep the sweep work bounded
+        // by the JobQueue job that invoked it. Doing it this way avoids the
+        // challenge of synchronizing this during a shutdown.
+        for (auto& w : workers)
+            w.t.join();
+
         JLOG(m_journal.debug())
-            << m_name << " TaggedCache sweep lock duration "
+            << m_name << " sweep (workers: " << wc << ", lock duration "
             << std::chrono::duration_cast<std::chrono::milliseconds>(
-                   std::chrono::steady_clock::now() - start)
+                   sweep_end - start)
                    .count()
-            << "ms";
+            << "ms, destruction: "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(
+                   clear_end - sweep_end)
+                   .count()
+            << " + "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::steady_clock::now() - clear_end)
+                   .count()
+            << "ms)";
     }
 
     bool
@@ -434,7 +513,6 @@ public:
     //             the output parameter 'data'. This could be expensive.
     //             Perhaps it should work like standard containers, which
     //             simply return an iterator.
-    //
     bool
     retrieve(const key_type& key, T& data)
     {
@@ -448,8 +526,19 @@ public:
         return true;
     }
 
+    /** Allows direct access to the cache mutex.
+
+        An ugly wart: callers use this to lock externally so that they can
+        perform operations on the cache and other data atomically. Because
+        cache operations will, internally, acquire the lock as needed, the
+        mutex needs to support re-entrancy.
+
+        This is a really poor model. The correct "fix" probably depends on
+        the specifics, to be decided on a case-by-case basis.
+     */
     mutex_type&
     peekMutex()
+        requires std::same_as<Mutex, std::recursive_mutex>
     {
         return m_mutex;
     }
@@ -538,24 +627,6 @@ private:
         return {};
     }
 
-    void
-    collect_metrics()
-    {
-        m_stats.size.set(getCacheSize());
-
-        {
-            beast::insight::Gauge::value_type hit_rate(0);
-            {
-                std::lock_guard lock(m_mutex);
-                auto const total(m_hits + m_misses);
-                if (total != 0)
-                    hit_rate = (m_hits * 100) / total;
-            }
-            m_stats.hit_rate.set(hit_rate);
-        }
-    }
-
-private:
     struct Stats
     {
         template <class Handler>
@@ -650,126 +721,140 @@ private:
     using cache_type =
         hardened_partitioned_hash_map<key_type, Entry, Hash, KeyEqual>;
 
-    [[nodiscard]] std::thread
-    sweepHelper(
+    /** Computes the expiration cutoff for a sweep.
+
+        Entries last accessed at or before the returned time point are
+        eligible for eviction.
+
+        The caller must hold m_mutex.
+     */
+    clock_type::time_point
+    compute_expiration(clock_type::time_point const& now, std::size_t cacheSize)
+    {
+        if (m_target_size == 0 || m_target_size >= cacheSize)
+            return now - m_target_age;
+
+        auto when_expire = now - m_target_age * m_target_size / cacheSize;
+
+        clock_type::duration const minimumAge(std::chrono::seconds(1));
+        if (when_expire > (now - minimumAge))
+            when_expire = now - minimumAge;
+
+        JLOG(m_journal.trace())
+            << m_name << " is growing fast " << cacheSize << " of "
+            << m_target_size << " aging at " << (now - when_expire).count()
+            << " of " << m_target_age.count();
+
+        return when_expire;
+    }
+
+    [[nodiscard]] int
+    sweep_partition(
         clock_type::time_point const& when_expire,
         [[maybe_unused]] clock_type::time_point const& now,
         typename KeyValueCacheType::map_type& partition,
-        SweptPointersVector& stuffToSweep,
-        std::atomic<int>& allRemovals,
-        std::lock_guard<std::recursive_mutex> const&)
+        SweptPointers& swept)
     {
-        return std::thread([&, this]() {
-            int cacheRemovals = 0;
-            int mapRemovals = 0;
+        int cacheRemovals = 0;
+        int mapRemovals = 0;
 
-            // Keep references to all the stuff we sweep
-            // so that we can destroy them outside the lock.
-            stuffToSweep.first.reserve(partition.size());
-            stuffToSweep.second.reserve(partition.size());
+        // Keep references to all the stuff we sweep
+        // so that we can destroy them outside the lock.
+        swept.strong.reserve(partition.size());
+        swept.weak.reserve(partition.size());
+
+        auto cit = partition.begin();
+        while (cit != partition.end())
+        {
+            if (cit->second.isWeak())
             {
-                auto cit = partition.begin();
-                while (cit != partition.end())
+                // weak
+                if (cit->second.isExpired())
                 {
-                    if (cit->second.isWeak())
-                    {
-                        // weak
-                        if (cit->second.isExpired())
-                        {
-                            stuffToSweep.second.push_back(
-                                std::move(cit->second.weak_ptr));
-                            ++mapRemovals;
-                            cit = partition.erase(cit);
-                        }
-                        else
-                        {
-                            ++cit;
-                        }
-                    }
-                    else if (cit->second.last_access <= when_expire)
-                    {
-                        // strong, expired
-                        ++cacheRemovals;
-                        if (cit->second.ptr.use_count() == 1)
-                        {
-                            stuffToSweep.first.push_back(
-                                std::move(cit->second.ptr));
-                            ++mapRemovals;
-                            cit = partition.erase(cit);
-                        }
-                        else
-                        {
-                            // remains weakly cached
-                            cit->second.ptr.reset();
-                            ++cit;
-                        }
-                    }
-                    else
-                    {
-                        // strong, not expired
-                        ++cit;
-                    }
+                    swept.weak.push_back(std::move(cit->second.weak_ptr));
+                    ++mapRemovals;
+                    cit = partition.erase(cit);
+                }
+                else
+                {
+                    ++cit;
                 }
             }
-
-            if (mapRemovals || cacheRemovals)
+            else if (cit->second.last_access <= when_expire)
             {
-                JLOG(m_journal.debug())
-                    << "TaggedCache partition sweep " << m_name
-                    << ": cache = " << partition.size() << "-" << cacheRemovals
-                    << ", map-=" << mapRemovals;
+                // strong, expired
+                ++cacheRemovals;
+                if (cit->second.ptr.use_count() == 1)
+                {
+                    swept.strong.push_back(std::move(cit->second.ptr));
+                    ++mapRemovals;
+                    cit = partition.erase(cit);
+                }
+                else
+                {
+                    // remains weakly cached
+                    cit->second.ptr.reset();
+                    ++cit;
+                }
             }
+            else
+            {
+                // strong, not expired
+                ++cit;
+            }
+        }
 
-            allRemovals += cacheRemovals;
-        });
+        if (mapRemovals || cacheRemovals)
+        {
+            JLOG(m_journal.trace())
+                << "TaggedCache partition sweep " << m_name
+                << ": cache = " << partition.size() << "-" << cacheRemovals
+                << ", map-=" << mapRemovals;
+        }
+
+        return cacheRemovals;
     }
 
-    [[nodiscard]] std::thread
-    sweepHelper(
+    [[nodiscard]] int
+    sweep_partition(
         clock_type::time_point const& when_expire,
         clock_type::time_point const& now,
         typename KeyOnlyCacheType::map_type& partition,
-        SweptPointersVector&,
-        std::atomic<int>& allRemovals,
-        std::lock_guard<std::recursive_mutex> const&)
+        [[maybe_unused]] SweptPointers& swept)
     {
-        return std::thread([&, this]() {
-            int cacheRemovals = 0;
-            int mapRemovals = 0;
+        int cacheRemovals = 0;
+        int mapRemovals = 0;
 
-            // Keep references to all the stuff we sweep
-            // so that we can destroy them outside the lock.
+        auto cit = partition.begin();
+        while (cit != partition.end())
+        {
+            if (cit->second.last_access > now)
             {
-                auto cit = partition.begin();
-                while (cit != partition.end())
-                {
-                    if (cit->second.last_access > now)
-                    {
-                        cit->second.last_access = now;
-                        ++cit;
-                    }
-                    else if (cit->second.last_access <= when_expire)
-                    {
-                        cit = partition.erase(cit);
-                    }
-                    else
-                    {
-                        ++cit;
-                    }
-                }
+                cit->second.last_access = now;
+                ++cit;
             }
-
-            if (mapRemovals || cacheRemovals)
+            else if (cit->second.last_access <= when_expire)
             {
-                JLOG(m_journal.debug())
-                    << "TaggedCache partition sweep " << m_name
-                    << ": cache = " << partition.size() << "-" << cacheRemovals
-                    << ", map-=" << mapRemovals;
+                ++cacheRemovals;
+                ++mapRemovals;
+                cit = partition.erase(cit);
             }
+            else
+            {
+                ++cit;
+            }
+        }
 
-            allRemovals += cacheRemovals;
-        });
-    };
+        if (mapRemovals || cacheRemovals)
+        {
+            JLOG(m_journal.debug())
+                << "TaggedCache partition sweep " << m_name
+                << ": cache = " << partition.size() << "-" << cacheRemovals
+                << ", map-=" << mapRemovals;
+        }
+
+        return cacheRemovals;
+    }
 
     beast::Journal m_journal;
     clock_type& m_clock;
@@ -781,7 +866,7 @@ private:
     std::string m_name;
 
     // Desired number of cache entries (0 = ignore)
-    int m_target_size;
+    std::size_t m_target_size;
 
     // Desired maximum cache age
     clock_type::duration m_target_age;

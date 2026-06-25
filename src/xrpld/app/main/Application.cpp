@@ -400,8 +400,9 @@ public:
                   make_PeerSetBuilder(*this)))
 
         , m_acceptedLedgerCache(
+              1,
               "AcceptedLedger",
-              4,
+              128,
               std::chrono::minutes{1},
               stopwatch(),
               logs_->journal("TaggedCache"))

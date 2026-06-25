@@ -108,7 +108,7 @@ sizedItems
     //        config option that can be used to override the default.
 
     //                                   tiny    small   medium    large     huge
-    {SizedItem::sweepInterval,      {{     10,      30,      60,      90,     120 }}},
+    {SizedItem::sweepInterval,      {{     45,      45,      90,     120,     120 }}},
     {SizedItem::treeCacheSize,      {{ 262144,  524288, 2097152, 4194304, 8388608 }}},
     {SizedItem::treeCacheAge,       {{     30,      60,      90,     120,     900 }}},
     {SizedItem::ledgerSize,         {{     32,      32,      64,     256,     384 }}},

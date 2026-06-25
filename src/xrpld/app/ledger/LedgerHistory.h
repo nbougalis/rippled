@@ -124,7 +124,16 @@ private:
     beast::insight::Collector::ptr collector_;
     beast::insight::Counter mismatch_counter_;
 
-    using LedgersByHash = TaggedCache<LedgerHash, Ledger const>;
+    // We need to use std::recursive_mutex here because we use the
+    // mutex of the m_ledger_by_hash to make some operations which
+    // touch multiple containers in this class atomic.
+    using LedgersByHash = TaggedCache<
+        LedgerHash,
+        Ledger const,
+        false,
+        hardened_hash<>,
+        std::equal_to<LedgerHash>,
+        std::recursive_mutex>;
 
     LedgersByHash m_ledgers_by_hash;
 
@@ -143,7 +152,13 @@ private:
         // Consensus metadata of built ledger
         std::optional<Json::Value> consensus;
     };
-    using ConsensusValidated = TaggedCache<LedgerIndex, cv_entry>;
+    using ConsensusValidated = TaggedCache<
+        LedgerIndex,
+        cv_entry,
+        false,
+        hardened_hash<>,
+        std::equal_to<LedgerIndex>,
+        std::recursive_mutex>;
     ConsensusValidated m_consensus_validated;
 
     // Maps ledger indexes to the corresponding hash.
