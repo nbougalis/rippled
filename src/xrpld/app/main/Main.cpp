@@ -369,7 +369,10 @@ run(int argc, char** argv)
     po::options_description gen("General Options");
     gen.add_options()(
         "conf", po::value<std::string>(), "Specify the configuration file.")(
-        "debug", "Enable normally suppressed debug logging")(
+        "debug",
+        po::value<std::string>()->implicit_value("info"),
+        "Enable normally suppressed debug logging (optional level, one of "
+        "'trace', 'debug', or 'info' (default), e.g. --debug=info)")(
         "help,h", "Display this message.")(
         "newnodeid", "Generate a new node identity for this server.")(
         "nodeid",
@@ -824,7 +827,30 @@ run(int argc, char** argv)
             return -1;
 
         if (vm.count("debug"))
-            setDebugLogSink(logs->makeSink("Debug", beast::severities::kTrace));
+        {
+            auto const level = [req = boost::algorithm::to_lower_copy(
+                                    vm["debug"].as<std::string>())]() {
+                if (req == "trace")
+                    return kTrace;
+
+                if (req == "debug")
+                    return kDebug;
+
+                if (req == "info")
+                    return kInfo;
+
+                return kNone;
+            }();
+
+            if (level == kNone)
+            {
+                std::cerr << "Invalid value specified for --debug: '"
+                          << vm["debug"].as<std::string>() << "'\n";
+                return -1;
+            }
+
+            setDebugLogSink(logs->makeSink("Debug", level));
+        }
 
         auto app = make_Application(
             std::move(config), std::move(logs), std::make_unique<TimeKeeper>());
