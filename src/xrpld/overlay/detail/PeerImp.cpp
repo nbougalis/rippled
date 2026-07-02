@@ -286,11 +286,10 @@ PeerImp::send(std::shared_ptr<Message> const& m)
             send_queue_.front()->getBuffer(compressionEnabled_)),
         bind_executor(
             strand_,
-            std::bind(
-                &PeerImp::onWriteMessage,
-                shared_from_this(),
-                std::placeholders::_1,
-                std::placeholders::_2)));
+            [self = shared_from_this()](
+                error_code ec, std::size_t bytes_transferred) {
+                self->onWriteMessage(ec, bytes_transferred);
+            }));
 }
 
 void
@@ -640,8 +639,7 @@ PeerImp::gracefulClose()
     setTimer();
     stream_.async_shutdown(bind_executor(
         strand_,
-        std::bind(
-            &PeerImp::onShutdown, shared_from_this(), std::placeholders::_1)));
+        [self = shared_from_this()](error_code ec) { self->onShutdown(ec); }));
 }
 
 void
@@ -657,8 +655,7 @@ PeerImp::setTimer()
     }
     timer_.async_wait(bind_executor(
         strand_,
-        std::bind(
-            &PeerImp::onTimer, shared_from_this(), std::placeholders::_1)));
+        [self = shared_from_this()](error_code ec) { self->onTimer(ec); }));
 }
 
 // convenience for ignoring the error code
@@ -936,11 +933,10 @@ PeerImp::onReadMessage(error_code ec, std::size_t bytes_transferred)
         read_buffer_.prepare(std::max(Tuning::readBufferBytes, hint)),
         bind_executor(
             strand_,
-            std::bind(
-                &PeerImp::onReadMessage,
-                shared_from_this(),
-                std::placeholders::_1,
-                std::placeholders::_2)));
+            [self = shared_from_this()](
+                error_code ec, std::size_t bytes_transferred) {
+                self->onReadMessage(ec, bytes_transferred);
+            }));
 }
 
 void
@@ -966,31 +962,26 @@ PeerImp::onWriteMessage(error_code ec, std::size_t bytes_transferred)
         !send_queue_.empty(),
         "ripple::PeerImp::onWriteMessage : non-empty send buffer");
     send_queue_.pop();
+
+    // Timeout on writes only
     if (!send_queue_.empty())
-    {
-        // Timeout on writes only
         return boost::asio::async_write(
             stream_,
             boost::asio::buffer(
                 send_queue_.front()->getBuffer(compressionEnabled_)),
             bind_executor(
                 strand_,
-                std::bind(
-                    &PeerImp::onWriteMessage,
-                    shared_from_this(),
-                    std::placeholders::_1,
-                    std::placeholders::_2)));
-    }
+                [self = shared_from_this()](
+                    error_code ec, std::size_t bytes_transferred) {
+                    self->onWriteMessage(ec, bytes_transferred);
+                }));
 
     if (gracefulClose_)
-    {
-        return stream_.async_shutdown(bind_executor(
-            strand_,
-            std::bind(
-                &PeerImp::onShutdown,
-                shared_from_this(),
-                std::placeholders::_1)));
-    }
+
+        return stream_.async_shutdown(
+            bind_executor(strand_, [self = shared_from_this()](error_code ec) {
+                self->onShutdown(ec);
+            }));
 }
 
 //------------------------------------------------------------------------------
@@ -1239,18 +1230,12 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMEndpoints> const& m)
 void
 PeerImp::onMessage(std::shared_ptr<protocol::TMTransaction> const& m)
 {
-    handleTransaction(m, true, false);
+    handleTransaction(*m, TxSource::Broadcast);
 }
 
 void
-PeerImp::handleTransaction(
-    std::shared_ptr<protocol::TMTransaction> const& m,
-    bool eraseTxQueue,
-    bool batch)
+PeerImp::handleTransaction(protocol::TMTransaction const& m, TxSource source)
 {
-    XRPL_ASSERT(
-        eraseTxQueue != batch,
-        ("ripple::PeerImp::handleTransaction : valid inputs"));
     if (tracking_.load() == Tracking::diverged)
         return;
 
@@ -1263,11 +1248,11 @@ PeerImp::handleTransaction(
         return;
     }
 
-    SerialIter sit(makeSlice(m->rawtransaction()));
-
     try
     {
-        auto stx = std::make_shared<STTx const>(sit);
+        auto stx = std::make_shared<STTx const>(
+            SerialIter{makeSlice(m.rawtransaction())});
+
         uint256 txID = stx->getTransactionID();
 
         // Charge strongly for attempting to relay a txn with sfEmitDetails
@@ -1293,7 +1278,7 @@ PeerImp::handleTransaction(
 
             // Erase only if the server has seen this tx. If the server has not
             // seen this tx then the tx could not has been queued for this peer.
-            if (eraseTxQueue && txReduceRelayEnabled())
+            if (source == TxSource::Broadcast && txReduceRelayEnabled())
             {
                 removeTxQueue(txID);
                 return;
@@ -1305,7 +1290,7 @@ PeerImp::handleTransaction(
         bool checkSignature = true;
         if (cluster())
         {
-            if (!m->has_deferred() || !m->deferred())
+            if (!m.has_deferred() || !m.deferred())
             {
                 // Skip local checks if a server we trust
                 // put the transaction in its open ledger
@@ -1340,7 +1325,7 @@ PeerImp::handleTransaction(
         app_.getJobQueue().addJob(
             jtTRANSACTION,
             "Check Transaction " + to_string(txID),
-            [weak = weak_from_this(), flags, checkSignature, batch, stx]() {
+            [weak = weak_from_this(), flags, checkSignature, source, stx]() {
                 auto peer = weak.lock();
 
                 if (!peer)
@@ -1390,7 +1375,8 @@ PeerImp::handleTransaction(
                         {
                             JLOG(peer->p_journal_.debug())
                                 << "Processing "
-                                << (batch ? "batch" : "unsolicited")
+                                << (source == TxSource::Batch ? "batch"
+                                                              : "broadcast")
                                 << " pseudo-transaction tx " << tx->getID();
 
                             peer->app_.getMasterTransaction().canonicalize(&tx);
@@ -1405,7 +1391,7 @@ PeerImp::handleTransaction(
                                 peer->app_.overlay().relay(
                                     tx->getID(), {}, *toSkip);
                             }
-                            if (!batch)
+                            if (source == TxSource::Broadcast)
                             {
                                 JLOG(peer->p_journal_.debug())
                                     << "Charging for pseudo-transaction tx "
@@ -1485,7 +1471,7 @@ PeerImp::handleTransaction(
     catch (std::exception const& ex)
     {
         JLOG(p_journal_.warn())
-            << "Transaction invalid: " << strHex(m->rawtransaction())
+            << "Transaction invalid: " << strHex(m.rawtransaction())
             << ". Exception: " << ex.what();
     }
 }
@@ -1572,11 +1558,11 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMGetLedger> const& m)
     }
 
     // Queue a job to process the request
-    std::weak_ptr<PeerImp> weak = shared_from_this();
-    app_.getJobQueue().addJob(jtLEDGER_REQ, "recvGetLedger", [weak, m]() {
-        if (auto peer = weak.lock())
-            peer->processLedgerRequest(m);
-    });
+    app_.getJobQueue().addJob(
+        jtLEDGER_REQ, "recvGetLedger", [weak = weak_from_this(), m]() {
+            if (auto peer = weak.lock())
+                peer->processLedgerRequest(m);
+        });
 }
 
 void
@@ -1592,9 +1578,8 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMProofPathRequest> const& m)
 
     fee_.update(
         Resource::feeModerateBurdenPeer, "received a proof path request");
-    std::weak_ptr<PeerImp> weak = shared_from_this();
     app_.getJobQueue().addJob(
-        jtREPLAY_REQ, "recvProofPathRequest", [weak, m]() {
+        jtREPLAY_REQ, "recvProofPathRequest", [weak = weak_from_this(), m]() {
             if (auto peer = weak.lock())
             {
                 auto reply =
@@ -1647,9 +1632,8 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMReplayDeltaRequest> const& m)
     }
 
     fee_.fee = Resource::feeModerateBurdenPeer;
-    std::weak_ptr<PeerImp> weak = shared_from_this();
     app_.getJobQueue().addJob(
-        jtREPLAY_REQ, "recvReplayDeltaRequest", [weak, m]() {
+        jtREPLAY_REQ, "recvReplayDeltaRequest", [weak = weak_from_this(), m]() {
             if (auto peer = weak.lock())
             {
                 auto reply =
@@ -2541,11 +2525,10 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMValidation> const& m)
                 return ret;
             }();
 
-            std::weak_ptr<PeerImp> weak = shared_from_this();
             app_.getJobQueue().addJob(
                 isTrusted ? jtVALIDATION_t : jtVALIDATION_ut,
                 name,
-                [weak, val, m, key]() {
+                [weak = weak_from_this(), val, m, key]() {
                     auto peer = weak.lock();
 
                     if (!peer)
@@ -2646,9 +2629,10 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMGetObjectByHash> const& m)
                 return;
             }
 
-            std::weak_ptr<PeerImp> weak = shared_from_this();
             app_.getJobQueue().addJob(
-                jtREQUESTED_TXN, "doTransactions", [weak, m]() {
+                jtREQUESTED_TXN,
+                "doTransactions",
+                [weak = weak_from_this(), m]() {
                     if (auto peer = weak.lock())
                         peer->doTransactions(m);
                 });
@@ -2857,12 +2841,8 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMTransactions> const& m)
 
     overlay_.addTxMetrics(m->transactions_size());
 
-    for (std::uint32_t i = 0; i < m->transactions_size(); ++i)
-        handleTransaction(
-            std::shared_ptr<protocol::TMTransaction>(
-                m->mutable_transactions(i), [](protocol::TMTransaction*) {}),
-            false,
-            true);
+    for (auto const& t : m->transactions())
+        handleTransaction(t, TxSource::Batch);
 }
 
 void
@@ -2958,11 +2938,12 @@ PeerImp::doFetchPack(const std::shared_ptr<protocol::TMGetObjectByHash>& packet)
 
     uint256 const hash{packet->ledgerhash()};
 
-    std::weak_ptr<PeerImp> weak = shared_from_this();
     auto elapsed = UptimeClock::now();
-    auto const pap = &app_;
+
     app_.getJobQueue().addJob(
-        jtPACK, "MakeFetchPack", [pap, weak, packet, hash, elapsed]() {
+        jtPACK,
+        "MakeFetchPack",
+        [pap = &app_, weak = weak_from_this(), packet, hash, elapsed]() {
             pap->getLedgerMaster().makeFetchPack(weak, packet, hash, elapsed);
         });
 }

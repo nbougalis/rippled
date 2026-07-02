@@ -185,7 +185,42 @@ public:
         , m_job_queue(job_queue)
         , m_standalone(standalone)
         , minPeerCount_(start_valid ? 0 : minPeerCount)
-        , m_stats(std::bind(&NetworkOPsImp::collect_metrics, this), collector)
+        , m_stats(
+              [this]() {
+                  auto const snap = mode_.snapshot();
+
+                  auto dur = [&](OperatingMode m) {
+                      auto d = snap.counters[static_cast<std::size_t>(m)].dur;
+                      if (m == snap.mode)
+                          d += snap.current;
+                      return d.count();
+                  };
+
+                  auto trans = [&](OperatingMode m) {
+                      return snap.counters[static_cast<std::size_t>(m)]
+                          .transitions;
+                  };
+
+                  std::lock_guard lock(m_statsMutex);
+
+                  m_stats.disconnected_duration.set(
+                      dur(OperatingMode::DISCONNECTED));
+                  m_stats.connected_duration.set(dur(OperatingMode::CONNECTED));
+                  m_stats.syncing_duration.set(dur(OperatingMode::SYNCING));
+                  m_stats.tracking_duration.set(dur(OperatingMode::TRACKING));
+                  m_stats.full_duration.set(dur(OperatingMode::FULL));
+
+                  m_stats.disconnected_transitions.set(
+                      trans(OperatingMode::DISCONNECTED));
+                  m_stats.connected_transitions.set(
+                      trans(OperatingMode::CONNECTED));
+                  m_stats.syncing_transitions.set(
+                      trans(OperatingMode::SYNCING));
+                  m_stats.tracking_transitions.set(
+                      trans(OperatingMode::TRACKING));
+                  m_stats.full_transitions.set(trans(OperatingMode::FULL));
+              },
+              collector)
     {
     }
 
@@ -842,10 +877,6 @@ private:
 
     std::mutex m_statsMutex;  // Mutex to lock m_stats
     Stats m_stats;
-
-private:
-    void
-    collect_metrics();
 };
 
 //------------------------------------------------------------------------------
@@ -4654,37 +4685,6 @@ NetworkOPsImp::getBookPage(
 }
 
 #endif
-
-inline void
-NetworkOPsImp::collect_metrics()
-{
-    auto const snap = mode_.snapshot();
-
-    auto dur = [&](OperatingMode m) {
-        auto d = snap.counters[static_cast<std::size_t>(m)].dur;
-        if (m == snap.mode)
-            d += snap.current;
-        return d.count();
-    };
-
-    auto trans = [&](OperatingMode m) {
-        return snap.counters[static_cast<std::size_t>(m)].transitions;
-    };
-
-    std::lock_guard lock(m_statsMutex);
-
-    m_stats.disconnected_duration.set(dur(OperatingMode::DISCONNECTED));
-    m_stats.connected_duration.set(dur(OperatingMode::CONNECTED));
-    m_stats.syncing_duration.set(dur(OperatingMode::SYNCING));
-    m_stats.tracking_duration.set(dur(OperatingMode::TRACKING));
-    m_stats.full_duration.set(dur(OperatingMode::FULL));
-
-    m_stats.disconnected_transitions.set(trans(OperatingMode::DISCONNECTED));
-    m_stats.connected_transitions.set(trans(OperatingMode::CONNECTED));
-    m_stats.syncing_transitions.set(trans(OperatingMode::SYNCING));
-    m_stats.tracking_transitions.set(trans(OperatingMode::TRACKING));
-    m_stats.full_transitions.set(trans(OperatingMode::FULL));
-}
 
 //------------------------------------------------------------------------------
 

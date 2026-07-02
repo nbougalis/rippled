@@ -57,6 +57,9 @@ public:
     enum class Tracking { diverged, unknown, converged };
 
 private:
+    /** Determines the source of a given transaction during processing. */
+    enum class TxSource { Broadcast, Batch };
+
     using clock_type = std::chrono::steady_clock;
     using error_code = boost::system::error_code;
     using socket_type = boost::asio::ip::tcp::socket;
@@ -494,23 +497,22 @@ private:
     void
     onWriteMessage(error_code ec, std::size_t bytes_transferred);
 
-    /** Called from onMessage(TMTransaction(s)).
-       @param m Transaction protocol message
-       @param eraseTxQueue is true when called from onMessage(TMTransaction)
-       and is false when called from onMessage(TMTransactions). If true then
-       the transaction hash is erased from txQueue_. Don't need to erase from
-       the queue when called from onMessage(TMTransactions) because this
-       message is a response to the missing transactions request and the queue
-       would not have any of these transactions.
-       @param batch is false when called from onMessage(TMTransaction)
-       and is true when called from onMessage(TMTransactions). If true, then the
-       transaction is part of a batch, and should not be charged an extra fee.
+    /** Handle a transaction received from a peer.
+
+        Called from onMessage(TMTransaction) and onMessage(TMTransactions).
+
+        @param m Transaction protocol message
+        @param source Distinguishes how the transaction arrived:
+            - Broadcast: an unsolicited transaction relayed via TMTransaction.
+              Its hash is erased from txQueue_ (the peer will not have queued it
+              against a request), and it is charged a relay fee.
+            - Batch: an element of a TMTransactions reply to our own missing-
+              transactions request. Not erased from txQueue_ (the queue holds no
+              entry for a transaction we requested) and not charged an extra
+       fee, since we asked for it.
      */
     void
-    handleTransaction(
-        std::shared_ptr<protocol::TMTransaction> const& m,
-        bool eraseTxQueue,
-        bool batch);
+    handleTransaction(protocol::TMTransaction const& m, TxSource source);
 
     // Check if reduce-relay feature is enabled and
     // reduce_relay::WAIT_ON_BOOTUP time passed since the start
