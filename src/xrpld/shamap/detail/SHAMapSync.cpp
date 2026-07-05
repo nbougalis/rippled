@@ -398,8 +398,9 @@ SHAMap::getMissingNodes(int max, SHAMapSyncFilter* filter)
                 // Recheck nodes we could not finish before
                 for (auto const& [innerNode, nodeId] : mn.resumes_)
                     if (!innerNode->isFullBelow(mn.generation_))
-                        mn.stack_.push(std::make_tuple(
-                            innerNode, nodeId, rand_int(255), 0, true));
+                        mn.stack_.push(
+                            std::make_tuple(
+                                innerNode, nodeId, rand_int(255), 0, true));
 
                 mn.resumes_.clear();
             }
@@ -837,32 +838,32 @@ SHAMap::verifyProofPath(
     if (path.empty() || path.size() > 65)
         return false;
 
-    SHAMapHash hash{rootHash};
     try
     {
-        for (auto rit = path.rbegin(); rit != path.rend(); ++rit)
+        SHAMapHash hash{rootHash};
+
+        for (unsigned int depth = 0; depth < path.size(); ++depth)
         {
-            auto const& blob = *rit;
-            auto node = SHAMapTreeNode::makeFromWire(makeSlice(blob));
-            if (!node)
-                return false;
-            node->updateHash();
-            if (node->getHash() != hash)
+            auto node = SHAMapTreeNode::makeFromWire(
+                makeSlice(path[path.size() - 1 - depth]));
+
+            if (!node || node->getHash() != hash)
                 return false;
 
-            auto depth = std::distance(path.rbegin(), rit);
-            if (node->isInner())
-            {
-                auto nodeId = SHAMapNodeID::createID(depth, key);
-                hash = static_cast<SHAMapInnerNode*>(node.get())
-                           ->getChildHash(selectBranch(nodeId, key));
-            }
-            else
-            {
-                // should exhaust all the blobs now
+            // A leaf must be the last blob consumed.
+            if (!node->isInner())
                 return depth + 1 == path.size();
-            }
+
+            // An inner node cannot sit at leaf depth; reject crafted input
+            // that would otherwise index past the key buffer in selectBranch.
+            if (depth >= leafDepth)
+                return false;
+
+            hash = static_cast<SHAMapInnerNode*>(node.get())
+                       ->getChildHash(selectBranch(depth, key));
         }
+
+        return false;
     }
     catch (std::exception const&)
     {
@@ -870,7 +871,6 @@ SHAMap::verifyProofPath(
         // exception could be thrown when parsing the data
         return false;
     }
-    return false;
 }
 
 }  // namespace ripple

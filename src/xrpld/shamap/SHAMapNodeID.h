@@ -33,7 +33,6 @@ namespace ripple {
 /** Identifies a node inside a SHAMap */
 class SHAMapNodeID : public CountedObject<SHAMapNodeID>
 {
-private:
     uint256 id_;
     unsigned int depth_ = 0;
 
@@ -70,53 +69,17 @@ public:
     SHAMapNodeID
     getChildNodeID(unsigned int m) const;
 
-    /**
-     * Create a SHAMapNodeID of a node with the depth of the node and
-     * the key of a leaf
-     *
-     * @param depth  the depth of the node
-     * @param key  the key of a leaf
-     * @return SHAMapNodeID of the node
-     */
-    static SHAMapNodeID
-    createID(int depth, uint256 const& key);
-
-    // FIXME-C++20: use spaceship and operator synthesis
     /** Comparison operators */
-    bool
-    operator<(SHAMapNodeID const& n) const
+    friend auto
+    operator<=>(SHAMapNodeID const& lhs, SHAMapNodeID const& rhs)
     {
-        return std::tie(depth_, id_) < std::tie(n.depth_, n.id_);
+        return std::tie(lhs.depth_, lhs.id_) <=> std::tie(rhs.depth_, rhs.id_);
     }
 
-    bool
-    operator>(SHAMapNodeID const& n) const
+    friend bool
+    operator==(SHAMapNodeID const& lhs, SHAMapNodeID const& rhs)
     {
-        return n < *this;
-    }
-
-    bool
-    operator<=(SHAMapNodeID const& n) const
-    {
-        return !(n < *this);
-    }
-
-    bool
-    operator>=(SHAMapNodeID const& n) const
-    {
-        return !(*this < n);
-    }
-
-    bool
-    operator==(SHAMapNodeID const& n) const
-    {
-        return (depth_ == n.depth_) && (id_ == n.id_);
-    }
-
-    bool
-    operator!=(SHAMapNodeID const& n) const
-    {
-        return !(*this == n);
+        return lhs.depth_ == rhs.depth_ && lhs.id_ == rhs.id_;
     }
 };
 
@@ -156,8 +119,29 @@ deserializeSHAMapNodeID(std::string const& s)
 /** @} */
 
 /** Returns the branch that would contain the given hash */
-[[nodiscard]] unsigned int
-selectBranch(SHAMapNodeID const& id, uint256 const& hash);
+/** @{ */
+[[nodiscard]] inline unsigned int
+selectBranch(unsigned int depth, uint256 const& hash) noexcept
+{
+    XRPL_ASSERT(
+        depth < 2 * uint256::bytes, "ripple::selectBranch : maximum depth");
+
+    auto branch = static_cast<unsigned int>(*(hash.begin() + (depth / 2)));
+
+    if (depth & 1)
+        branch &= 0xf;
+    else
+        branch >>= 4;
+
+    return branch;
+}
+
+[[nodiscard]] inline unsigned int
+selectBranch(SHAMapNodeID const& id, uint256 const& hash) noexcept
+{
+    return selectBranch(id.getDepth(), hash);
+}
+/** @} */
 
 }  // namespace ripple
 

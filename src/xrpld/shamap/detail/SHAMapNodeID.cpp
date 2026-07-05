@@ -26,32 +26,28 @@
 
 namespace ripple {
 
-static uint256 const&
-depthMask(unsigned int depth)
-{
-    constexpr auto mask_size = SHAMap::leafDepth + 1;
+namespace {
+constexpr auto depthMasks = []() {
+    std::array<uint256, SHAMap::leafDepth + 1> masks{};
 
-    struct masks_t
+    std::array<std::uint8_t, uint256::bytes> bytes{};  // all zero
+
+    for (std::size_t d = 0; d < masks.size(); ++d)
     {
-        uint256 entry[SHAMap::leafDepth + 1];
+        masks[d] = uint256{bytes};
 
-        masks_t()
+        if (d + 1 < masks.size())
         {
-            uint256 selector;
-            for (int i = 0; i < mask_size - 1; i += 2)
-            {
-                entry[i] = selector;
-                *(selector.begin() + (i / 2)) = 0xF0;
-                entry[i + 1] = selector;
-                *(selector.begin() + (i / 2)) = 0xFF;
-            }
-            entry[mask_size - 1] = selector;
+            if (d & 1)
+                bytes[d / 2] |= 0x0F;
+            else
+                bytes[d / 2] |= 0xF0;
         }
-    };
+    }
 
-    static masks_t const masks;
-    return masks.entry[depth];
-}
+    return masks;
+}();
+}  // namespace
 
 // canonicalize the hash to a node ID for this depth
 SHAMapNodeID::SHAMapNodeID(unsigned int depth, uint256 const& hash)
@@ -61,7 +57,7 @@ SHAMapNodeID::SHAMapNodeID(unsigned int depth, uint256 const& hash)
         depth <= SHAMap::leafDepth,
         "ripple::SHAMapNodeID::SHAMapNodeID : maximum depth input");
     XRPL_ASSERT(
-        id_ == (id_ & depthMask(depth)),
+        id_ == (id_ & depthMasks[depth]),
         "ripple::SHAMapNodeID::SHAMapNodeID : hash and depth inputs do match");
 }
 
@@ -97,7 +93,7 @@ SHAMapNodeID::getChildNodeID(unsigned int m) const
         Throw<std::logic_error>(
             "Request for child node ID of " + to_string(*this));
 
-    if (id_ != (id_ & depthMask(depth_)))
+    if (id_ != (id_ & depthMasks[depth_]))
         Throw<std::logic_error>("Incorrect mask for " + to_string(*this));
 
     SHAMapNodeID node{depth_ + 1, id_};
@@ -119,37 +115,12 @@ deserializeSHAMapNodeID(std::span<std::byte const> data)
                 std::span<std::uint8_t const, 32>(
                     reinterpret_cast<std::uint8_t const*>(data.data()), 32));
 
-            if (id == (id & depthMask(depth)))
+            if (id == (id & depthMasks[depth]))
                 ret.emplace(depth, id);
         }
     }
 
     return ret;
-}
-
-[[nodiscard]] unsigned int
-selectBranch(SHAMapNodeID const& id, uint256 const& hash)
-{
-    auto const depth = id.getDepth();
-    auto branch = static_cast<unsigned int>(*(hash.begin() + (depth / 2)));
-
-    if (depth & 1)
-        branch &= 0xf;
-    else
-        branch >>= 4;
-
-    XRPL_ASSERT(
-        branch < SHAMap::branchFactor, "ripple::selectBranch : maximum result");
-    return branch;
-}
-
-SHAMapNodeID
-SHAMapNodeID::createID(int depth, uint256 const& key)
-{
-    XRPL_ASSERT(
-        (depth >= 0) && (depth < 65),
-        "ripple::SHAMapNodeID::createID : valid branch input");
-    return SHAMapNodeID(depth, key & depthMask(depth));
 }
 
 }  // namespace ripple
