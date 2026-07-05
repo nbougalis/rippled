@@ -159,37 +159,73 @@ SHAMapInnerNode::makeFullInner(
 std::shared_ptr<SHAMapTreeNode>
 SHAMapInnerNode::makeCompressedInner(Slice data)
 {
-    // A compressed inner node is serialized as a series of 33 byte chunks,
-    // representing a one byte "position" and a 256-bit hash:
-    constexpr std::size_t chunkSize = uint256::bytes + 1;
+    // A serialized compressed inner node is a series of 33 byte chunks, each
+    // of which is a 256-bit hash followed by a one byte branch position. The
+    // serializer emits branches in branch order, so branch position ought to
+    // be strictly monotonically increasing. Previous versions did not verify
+    // and enforce this invariant, but this version does.
+    auto const branches = [data]() {
+        auto const s = data.size();
 
-    if (auto const s = data.size();
-        (s % chunkSize != 0) || (s > chunkSize * branchFactor))
-        Throw<std::runtime_error>("Invalid CI node");
+        constexpr std::size_t chunkSize = uint256::bytes + 1;
 
-    SerialIter si(data);
+        if (s == 0 || (s % chunkSize != 0) || (s > chunkSize * branchFactor))
+            Throw<std::runtime_error>("Invalid CI node");
 
-    auto ret = std::make_shared<SHAMapInnerNode>(0, branchFactor);
+        auto const entries = s / chunkSize;
+
+        if (entries > branchFactor)
+            Throw<std::runtime_error>("Invalid CI node");
+
+        return checked_cast<std::uint8_t>(entries);
+    }();
+
+    SerialIter si{data};
+
+    auto ret = std::make_shared<SHAMapInnerNode>(0, branches);
 
     auto hashes = ret->hashesAndChildren_.getHashes();
 
-    while (!si.empty())
-    {
+    auto process_one = [&]() {
         auto const hash = si.getBitString<256>();
-        auto const pos = si.get8();
 
-        if (pos >= branchFactor)
-            Throw<std::runtime_error>("invalid CI node");
+        if (hash.isZero()) [[unlikely]]
+            Throw<std::runtime_error>("invalid CI node (zero hash)");
 
-        hashes[pos].as_uint256() = hash;
+        if (auto const pos = si.get8(); pos < branchFactor)
+        {
+            ret->isBranch_ |=
+                checked_cast<std::uint16_t>(std::uint16_t{1} << pos);
+            hashes[*ret->getChildIndex(pos)].as_uint256() = hash;
+            return pos;
+        }
 
-        if (hashes[pos].isNonZero())
-            ret->isBranch_ |= (1 << pos);
+        Throw<std::runtime_error>("invalid CI node (out-of-bounds index)");
+    };
+
+    // At this point, we are guaranteed that there is at least one branch,
+    // which we process. We loop for any remaining branches:
+    auto prev_pos = process_one();
+
+    for (std::uint8_t i = 1; i < branches; ++i)
+    {
+        auto const pos = process_one();
+
+        if (pos <= prev_pos)
+            Throw<std::runtime_error>("invalid CI node (out-of-order index)");
+
+        prev_pos = pos;
     }
 
-    ret->resizeChildArrays(ret->getBranchCount());
-    ret->updateHash();
-    return ret;
+    // This is not necessary, given the earlier calculation of the number
+    // of branches, but the check is cheap. Belt and suspenders.
+    if (si.empty()) [[likely]]
+    {
+        ret->updateHash();
+        return ret;
+    }
+
+    Throw<std::runtime_error>("invalid CI node (trailing data)");
 }
 
 void
