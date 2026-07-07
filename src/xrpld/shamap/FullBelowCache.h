@@ -37,7 +37,7 @@ namespace detail {
 */
 class BasicFullBelowCache
 {
-    using CacheType = KeyCache;
+    using CacheType = TaggedKeyCache<256>;
 
 public:
     using key_type = uint256;
