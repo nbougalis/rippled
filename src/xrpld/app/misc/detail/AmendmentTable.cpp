@@ -306,16 +306,19 @@ struct AmendmentState
     explicit AmendmentState() = default;
 };
 
-// Just making sure that these values are sane.
+// Just making sure that these values are sane. We want the numerator
+// to be non-zero (std::ratio guarantees that the denominator is also
+// non-zero) and that the ratio is strictly less then 1 (that is, the
+// numerator must be less than the denominator).
 static_assert(
-    postFixAmendmentMajorityCalcThreshold.num != 0 &&
-    std::in_range<std::uint32_t>(postFixAmendmentMajorityCalcThreshold.num) &&
-    std::in_range<std::uint32_t>(postFixAmendmentMajorityCalcThreshold.den));
+    postFixAmendmentMajorityCalcThreshold.num > 0 &&
+    postFixAmendmentMajorityCalcThreshold.num <
+        postFixAmendmentMajorityCalcThreshold.den);
 
 static_assert(
-    preFixAmendmentMajorityCalcThreshold.num != 0 &&
-    std::in_range<std::uint32_t>(preFixAmendmentMajorityCalcThreshold.num) &&
-    std::in_range<std::uint32_t>(preFixAmendmentMajorityCalcThreshold.den));
+    preFixAmendmentMajorityCalcThreshold.num > 0 &&
+    preFixAmendmentMajorityCalcThreshold.num <
+        preFixAmendmentMajorityCalcThreshold.den);
 
 /** The status of all amendments requested in a given window. */
 class AmendmentSet
@@ -341,14 +344,23 @@ public:
         std::tie(trustedValidations_, votes_) =
             trustedVotes.getVotes(rules, lock);
 
-        auto crunch = [](std::uint32_t value,
-                         std::intmax_t numerator,
-                         std::intmax_t denominator) {
-            return std::max<std::uint32_t>(
-                1,
-                (value * checked_cast<std::uint32_t>(numerator)) /
-                    checked_cast<std::uint32_t>(denominator));
-        };
+        // Computes the activation threshold as a fraction of the specified
+        // value.
+        auto crunch =
+            [](std::uint32_t value, std::intmax_t num, std::intmax_t den) {
+                std::intmax_t const result =
+                    (safe_cast<std::intmax_t>(value) * num) / den;
+
+                // The input is a 32-bit value, and we know that the ratio
+                // of num/den is less than 1, so arithmetic guarantees the
+                // result will be no greater than the input.
+                XRPL_ASSERT(
+                    std::in_range<std::uint32_t>(result),
+                    "ripple::AmendmentSet::AmendmentSet : threshold overflow");
+
+                return std::max<std::uint32_t>(
+                    1, unsafe_cast<std::uint32_t>(result));
+            };
 
         threshold_ = rules_.enabled(fixAmendmentMajorityCalc)
             ? crunch(
