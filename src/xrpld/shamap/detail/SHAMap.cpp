@@ -193,7 +193,7 @@ SHAMap::finishFetch(
         auto node =
             SHAMapTreeNode::makeFromPrefix(makeSlice(object->data()), hash);
         if (node)
-            canonicalize(hash, node);
+            node = canonicalize(hash, node);
         return node;
     }
     catch (std::exception const& e)
@@ -203,7 +203,7 @@ SHAMap::finishFetch(
     catch (...)
     {
         JLOG(journal_.warn())
-            << "finishFetch exception: unknonw exception: " << hash;
+            << "finishFetch exception: unknown exception: " << hash;
     }
 
     return {};
@@ -228,7 +228,7 @@ SHAMap::checkFilter(SHAMapHash const& hash, SHAMapSyncFilter* filter) const
                     std::move(*nodeData),
                     node->getType());
                 if (backed_)
-                    canonicalize(hash, node);
+                    node = canonicalize(hash, node);
             }
             return node;
         }
@@ -243,71 +243,26 @@ SHAMap::checkFilter(SHAMapHash const& hash, SHAMapSyncFilter* filter) const
 
 // Get a node without throwing
 // Used on maps where missing nodes are expected
-/*
 std::shared_ptr<SHAMapTreeNode>
 SHAMap::fetchNodeNT(SHAMapHash const& hash, SHAMapSyncFilter* filter) const
 {
     auto node = cacheLookup(hash);
-    if (node)
-        return node;
 
-    if (backed_)
+    if (!node)
     {
-        node = fetchNodeFromDB(hash);
-        if (node)
-        {
-            canonicalize(hash, node);
-            return node;
-        }
-    }
-
-    if (filter)
-        node = checkFilter(hash, filter);
-
-    return node;
-}
-*/
-
-std::shared_ptr<SHAMapTreeNode>
-SHAMap::fetchNodeNT(SHAMapHash const& hash, SHAMapSyncFilter* filter) const
-{
-    using namespace std::chrono;
-    auto start = high_resolution_clock::now();
-    auto timeout = nanoseconds(50);
-
-    while (true)
-    {
-        // Try to fetch from cache first
-        auto node = cacheLookup(hash);
-        if (node)
-            return node;
-
         if (backed_)
         {
             node = fetchNodeFromDB(hash);
+
             if (node)
-            {
-                canonicalize(hash, node);
-                return node;
-            }
+                return canonicalize(hash, node);
         }
 
         if (filter)
             node = checkFilter(hash, filter);
-
-        if (node)
-            return node;
-
-        // Check if we've exceeded timeout
-        auto elapsed = high_resolution_clock::now() - start;
-        if (elapsed >= timeout)
-            break;
-
-        // Short yield to avoid overwhelming CPU
-        std::this_thread::yield();
     }
 
-    return nullptr;
+    return node;
 }
 
 std::shared_ptr<SHAMapTreeNode>
@@ -561,11 +516,12 @@ SHAMap::firstBelow(
     int branch) const
 {
     auto init = 0;
-    auto cmp = [](int i) { return i <= branchFactor; };
+    auto cmp = [](int i) { return i < branchFactor; };
     auto incr = [](int& i) { ++i; };
 
     return belowHelper(node, stack, branch, {init, cmp, incr});
 }
+
 static const boost::intrusive_ptr<SHAMapItem const> no_item;
 
 boost::intrusive_ptr<SHAMapItem const> const&
@@ -1037,7 +993,7 @@ SHAMap::writeNode(NodeObjectType t, std::shared_ptr<SHAMapTreeNode> node) const
         node->cowid() == 0, "ripple::SHAMap::writeNode : valid input node");
     XRPL_ASSERT(backed_, "ripple::SHAMap::writeNode : is backed");
 
-    canonicalize(node->getHash(), node);
+    node = canonicalize(node->getHash(), node);
 
     Serializer s;
     node->serializeWithPrefix(s);
@@ -1267,12 +1223,13 @@ SHAMap::cacheLookup(SHAMapHash const& hash) const
     return ret;
 }
 
-void
+[[nodiscard]] std::shared_ptr<SHAMapTreeNode>
 SHAMap::canonicalize(
     SHAMapHash const& hash,
-    std::shared_ptr<SHAMapTreeNode>& node) const
+    std::shared_ptr<SHAMapTreeNode> node) const
 {
     XRPL_ASSERT(backed_, "ripple::SHAMap::canonicalize : is backed");
+    XRPL_ASSERT(node, "ripple::SHAMap::canonicalize : non-null node input");
     XRPL_ASSERT(
         node->cowid() == 0, "ripple::SHAMap::canonicalize : valid node input");
     XRPL_ASSERT(
@@ -1280,6 +1237,8 @@ SHAMap::canonicalize(
         "ripple::SHAMap::canonicalize : node hash do match");
 
     f_.getTreeNodeCache()->canonicalize_replace_client(hash.as_uint256(), node);
+
+    return node;
 }
 
 void

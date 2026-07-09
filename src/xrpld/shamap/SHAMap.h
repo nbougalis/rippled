@@ -377,8 +377,9 @@ private:
     // tree node cache operations
     std::shared_ptr<SHAMapTreeNode>
     cacheLookup(SHAMapHash const& hash) const;
-    void
-    canonicalize(SHAMapHash const& hash, std::shared_ptr<SHAMapTreeNode>&)
+
+    [[nodiscard]] std::shared_ptr<SHAMapTreeNode>
+    canonicalize(SHAMapHash const& hash, std::shared_ptr<SHAMapTreeNode> node)
         const;
 
     // database operations

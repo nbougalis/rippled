@@ -551,7 +551,7 @@ SHAMap::addRootNode(
         return SHAMapAddNode::invalid();
 
     if (backed_)
-        canonicalize(hash, node);
+        node = canonicalize(hash, node);
 
     root_ = node;
 
@@ -646,7 +646,7 @@ SHAMap::addKnownNode(
             }
 
             if (backed_)
-                canonicalize(childHash, newNode);
+                newNode = canonicalize(childHash, newNode);
 
             newNode = prevNode->canonicalizeChild(branch, std::move(newNode));
 
