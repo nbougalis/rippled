@@ -38,11 +38,8 @@ convertBlobsToTxResult(
     Blob const& rawMeta,
     Application& app)
 {
-    SerialIter it(makeSlice(rawTxn));
-    auto txn = std::make_shared<STTx const>(it);
-    std::string reason;
-
-    auto tr = std::make_shared<Transaction>(txn, reason, app);
+    auto tr = std::make_shared<Transaction>(
+        std::make_shared<STTx const>(SerialIter{makeSlice(rawTxn)}));
 
     auto metaset = std::make_shared<TxMeta>(tr->getID(), ledger_index, rawMeta);
 
@@ -57,7 +54,7 @@ convertBlobsToTxResult(
         tr->setStatus(Transaction::sqlTransactionStatus(status), ledger_index);
 
     to.emplace_back(std::move(tr), metaset);
-};
+}
 
 void
 saveLedgerAsync(Application& app, std::uint32_t seq)

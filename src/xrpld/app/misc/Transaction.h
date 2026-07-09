@@ -21,7 +21,7 @@
 #define RIPPLE_APP_MISC_TRANSACTION_H_INCLUDED
 
 #include <xrpl/basics/RangeSet.h>
-#include <xrpl/beast/utility/Journal.h>
+#include <xrpl/basics/enum_bitops.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Protocol.h>
 #include <xrpl/protocol/STBase.h>
@@ -43,37 +43,56 @@ class Application;
 class Database;
 class Rules;
 
-enum TransStatus {
-    NEW = 0,         // just received / generated
-    INVALID = 1,     // no valid signature, insufficient funds
-    INCLUDED = 2,    // added to the current ledger
-    CONFLICTED = 3,  // losing to a conflicting transaction
-    COMMITTED = 4,   // known to be in a ledger
-    HELD = 5,        // not valid now, maybe later
-    REMOVED = 6,     // taken out of a ledger
-    OBSOLETE = 7,    // a compatible transaction has taken precedence
-    INCOMPLETE = 8   // needs more signatures
+enum TransStatus : std::int8_t {
+    // clang-format off
+    NEW         = 0,  // just received / generated
+    INVALID     = 1,  // no valid signature, insufficient funds
+    INCLUDED    = 2,  // added to the current ledger
+    CONFLICTED  = 3,  // losing to a conflicting transaction
+    COMMITTED   = 4,  // known to be in a ledger
+    HELD        = 5,  // not valid now, maybe later
+    REMOVED     = 6,  // taken out of a ledger
+    OBSOLETE    = 7,  // a compatible transaction has taken precedence
+    INCOMPLETE  = 8   // needs more signatures
+    // clang-format on
 };
 
 enum class TxSearched { all, some, unknown };
 
+enum class SubmitResult : std::uint8_t {
+    // clang-format off
+    none        = 0x00,
+    queued      = 0x01,
+    kept        = 0x02,
+    broadcast   = 0x04,
+    applied     = 0x08
+    // clang-format on
+};
+
+/** Enables bitwise operators (&, |, ^, ~) for @ref sfmeta. */
+template <>
+struct enum_bitops::optin<SubmitResult> : std::true_type
+{
+};
+
 // This class is for constructing and examining transactions.
 // Transactions are static so manipulation functions are unnecessary.
-class Transaction : public std::enable_shared_from_this<Transaction>,
-                    public CountedObject<Transaction>
+class Transaction : public CountedObject<Transaction>
 {
 public:
-    using pointer = std::shared_ptr<Transaction>;
-    using ref = const pointer&;
+    explicit Transaction(std::shared_ptr<STTx const> const&) noexcept;
 
-    Transaction(
-        std::shared_ptr<STTx const> const&,
-        std::string&,
-        Application&) noexcept;
+    Transaction(Transaction const&) = delete;
+    Transaction&
+    operator=(Transaction const&) = delete;
+
+    Transaction(Transaction&&) = delete;
+    Transaction&
+    operator=(Transaction&&) = delete;
 
     // The two boost::optional parameters are because SOCI requires
     // boost::optional (not std::optional) parameters.
-    static Transaction::pointer
+    static std::shared_ptr<Transaction>
     transactionFromSQL(
         boost::optional<std::uint64_t> const& ledgerSeq,
         boost::optional<std::string> const& status,
@@ -86,43 +105,43 @@ public:
     sqlTransactionStatus(boost::optional<std::string> const& status);
 
     std::shared_ptr<STTx const> const&
-    getSTransaction()
+    getSTransaction() const noexcept
     {
         return mTransaction;
     }
 
     uint256 const&
-    getID() const
+    getID() const noexcept
     {
-        return mTransactionID;
+        return mTransaction->getTransactionID();
     }
 
     LedgerIndex
-    getLedger() const
+    getLedger() const noexcept
     {
         return mLedgerIndex;
     }
 
     bool
-    isValidated() const
+    isValidated() const noexcept
     {
         return mLedgerIndex != 0;
     }
 
     TransStatus
-    getStatus() const
+    getStatus() const noexcept
     {
         return mStatus;
     }
 
     TER
-    getResult()
+    getResult() const noexcept
     {
         return mResult;
     }
 
     void
-    setResult(TER terResult)
+    setResult(TER terResult) noexcept
     {
         mResult = terResult;
     }
@@ -135,13 +154,13 @@ public:
         std::optional<uint16_t> networkID = std::nullopt);
 
     void
-    setStatus(TransStatus status)
+    setStatus(TransStatus status) noexcept
     {
         mStatus = status;
     }
 
     void
-    setLedger(LedgerIndex ledger)
+    setLedger(LedgerIndex ledger) noexcept
     {
         mLedgerIndex = ledger;
     }
@@ -150,7 +169,7 @@ public:
      * Set this flag once added to a batch.
      */
     void
-    setApplying()
+    setApplying() noexcept
     {
         mApplying = true;
     }
@@ -161,7 +180,7 @@ public:
      * @return Whether transaction is being applied within a batch.
      */
     bool
-    getApplying()
+    getApplying() noexcept
     {
         return mApplying;
     }
@@ -170,47 +189,17 @@ public:
      * Indicate that transaction application has been attempted.
      */
     void
-    clearApplying()
+    clearApplying() noexcept
     {
         mApplying = false;
     }
-
-    struct SubmitResult
-    {
-        /**
-         * @brief clear Clear all states
-         */
-        void
-        clear()
-        {
-            applied = false;
-            broadcast = false;
-            queued = false;
-            kept = false;
-        }
-
-        /**
-         * @brief any Get true of any state is true
-         * @return True if any state if true
-         */
-        bool
-        any() const
-        {
-            return applied || broadcast || queued || kept;
-        }
-
-        bool applied = false;
-        bool broadcast = false;
-        bool queued = false;
-        bool kept = false;
-    };
 
     /**
      * @brief getSubmitResult Return submit result
      * @return SubmitResult struct
      */
     SubmitResult
-    getSubmitResult() const
+    getSubmitResult() const noexcept
     {
         return submitResult_;
     }
@@ -219,67 +208,67 @@ public:
      * @brief clearSubmitResult Clear all flags in SubmitResult
      */
     void
-    clearSubmitResult()
+    clearSubmitResult() noexcept
     {
-        submitResult_.clear();
+        submitResult_ = SubmitResult::none;
     }
 
     /**
      * @brief setApplied Set this flag once was applied to open ledger
      */
     void
-    setApplied()
+    setApplied() noexcept
     {
-        submitResult_.applied = true;
+        submitResult_ |= SubmitResult::applied;
     }
 
     /**
      * @brief setQueued Set this flag once was put into heldtxns queue
      */
     void
-    setQueued()
+    setQueued() noexcept
     {
-        submitResult_.queued = true;
+        submitResult_ |= SubmitResult::queued;
     }
 
     /**
      * @brief setBroadcast Set this flag once was broadcasted via network
      */
     void
-    setBroadcast()
+    setBroadcast() noexcept
     {
-        submitResult_.broadcast = true;
+        submitResult_ |= SubmitResult::broadcast;
     }
 
     /**
      * @brief setKept Set this flag once was put to localtxns queue
      */
     void
-    setKept()
+    setKept() noexcept
     {
-        submitResult_.kept = true;
+        submitResult_ |= SubmitResult::kept;
     }
 
     struct CurrentLedgerState
     {
-        CurrentLedgerState() = delete;
+        CurrentLedgerState() noexcept = default;
 
         CurrentLedgerState(
             LedgerIndex li,
             XRPAmount fee,
             std::uint32_t accSeqNext,
-            std::uint32_t accSeqAvail)
-            : validatedLedger{li}
-            , minFeeRequired{fee}
+            std::uint32_t accSeqAvail) noexcept
+            : minFeeRequired{fee}
+            , validatedLedger{li}
             , accountSeqNext{accSeqNext}
             , accountSeqAvail{accSeqAvail}
         {
         }
 
-        LedgerIndex validatedLedger;
-        XRPAmount minFeeRequired;
-        std::uint32_t accountSeqNext;
-        std::uint32_t accountSeqAvail;
+        XRPAmount minFeeRequired{};
+        LedgerIndex validatedLedger = 0;
+        std::uint32_t accountSeqNext = 0;
+        std::uint32_t accountSeqAvail = 0;
     };
 
     /**
@@ -287,8 +276,11 @@ public:
      * @return Current ledger state
      */
     std::optional<CurrentLedgerState>
-    getCurrentLedgerState() const
+    getCurrentLedgerState() const noexcept
     {
+        if (currentLedgerState_.validatedLedger == 0)
+            return std::nullopt;
+
         return currentLedgerState_;
     }
 
@@ -306,12 +298,14 @@ public:
         std::uint32_t accountSeq,
         std::uint32_t availableSeq)
     {
-        currentLedgerState_.emplace(
-            validatedLedger, fee, accountSeq, availableSeq);
+        currentLedgerState_.validatedLedger = validatedLedger;
+        currentLedgerState_.minFeeRequired = fee;
+        currentLedgerState_.accountSeqNext = accountSeq;
+        currentLedgerState_.accountSeqAvail = availableSeq;
     }
 
     Json::Value
-    getJson(JsonOptions options, bool binary = false) const;
+    getJson(JsonOptions options, Application& app, bool binary = false) const;
 
     // Information used to locate a transaction.
     // Contains a nodestore hash and ledger sequence pair if the transaction was
@@ -389,24 +383,19 @@ private:
         std::optional<ClosedInterval<uint32_t>> const& range,
         error_code_i& ec);
 
-    uint256 mTransactionID;
+    std::shared_ptr<STTx const> mTransaction;
 
     LedgerIndex mLedgerIndex = 0;
     std::optional<uint32_t> mTxnSeq;
     std::optional<uint16_t> mNetworkID;
+    CurrentLedgerState currentLedgerState_{};
+    TER mResult = temUNCERTAIN;
 
     TransStatus mStatus = INVALID;
-    TER mResult = temUNCERTAIN;
     bool mApplying = false;
 
     /** different ways for transaction to be accepted */
     SubmitResult submitResult_;
-
-    std::optional<CurrentLedgerState> currentLedgerState_;
-
-    std::shared_ptr<STTx const> mTransaction;
-    Application& mApp;
-    beast::Journal j_;
 };
 
 }  // namespace ripple

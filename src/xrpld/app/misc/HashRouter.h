@@ -64,9 +64,7 @@ private:
     class Entry : public CountedObject<Entry>
     {
     public:
-        Entry()
-        {
-        }
+        Entry() noexcept = default;
 
         void
         addPeer(PeerShortID peer)
@@ -76,7 +74,7 @@ private:
         }
 
         int
-        getFlags(void) const
+        getFlags() const noexcept
         {
             return flags_;
         }

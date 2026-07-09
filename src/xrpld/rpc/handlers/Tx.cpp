@@ -54,7 +54,7 @@ isValidated(LedgerMaster& ledgerMaster, std::uint32_t seq, uint256 const& hash)
 
 struct TxResult
 {
-    Transaction::pointer txn;
+    std::shared_ptr<Transaction> txn;
     std::variant<std::shared_ptr<TxMeta>, Blob> meta;
     bool validated = false;
     std::optional<std::string> ctid;
@@ -222,10 +222,12 @@ populateJsonResponse(
             constexpr auto optionsJson =
                 JsonOptions::include_date | JsonOptions::disable_API_prior_V2;
             if (args.binary)
-                response[jss::tx_blob] = result.txn->getJson(optionsJson, true);
+                response[jss::tx_blob] =
+                    result.txn->getJson(optionsJson, context.app, true);
             else
             {
-                response[jss::tx_json] = result.txn->getJson(optionsJson);
+                response[jss::tx_json] =
+                    result.txn->getJson(optionsJson, context.app);
                 RPC::insertDeliverMax(
                     response[jss::tx_json],
                     sttx->getTxnType(),
@@ -248,8 +250,8 @@ populateJsonResponse(
         }
         else
         {
-            response =
-                result.txn->getJson(JsonOptions::include_date, args.binary);
+            response = result.txn->getJson(
+                JsonOptions::include_date, context.app, args.binary);
             if (!args.binary)
                 RPC::insertDeliverMax(
                     response, sttx->getTxnType(), context.apiVersion);

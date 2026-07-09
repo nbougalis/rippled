@@ -43,19 +43,16 @@ class InboundTransactionSet
 {
     // A transaction set we generated, acquired, or are acquiring
 public:
-    std::uint32_t mSeq;
     TransactionAcquire::pointer mAcquire;
     std::shared_ptr<SHAMap> mSet;
+    std::uint32_t mSeq = 0;
 
     InboundTransactionSet(std::uint32_t seq, std::shared_ptr<SHAMap> const& set)
-        : mSeq(seq), mSet(set)
+        : mSet(set), mSeq(seq)
     {
-        ;
     }
-    InboundTransactionSet() : mSeq(0)
-    {
-        ;
-    }
+
+    InboundTransactionSet() = default;
 };
 
 class InboundTransactionsImp : public InboundTransactions

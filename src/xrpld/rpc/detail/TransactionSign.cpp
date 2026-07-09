@@ -591,86 +591,49 @@ transactionPreProcessImpl(
     return transactionPreProcessResult{std::move(stTx)};
 }
 
-static std::pair<Json::Value, Transaction::pointer>
+static std::pair<Json::Value, std::shared_ptr<Transaction>>
 transactionConstructImpl(
-    std::shared_ptr<STTx const> const& stTx,
+    std::shared_ptr<STTx const> const& tx,
     Rules const& rules,
     Application& app)
 {
-    std::pair<Json::Value, Transaction::pointer> ret;
-
-    // Turn the passed in STTx into a Transaction.
-    Transaction::pointer tpTrans;
-    {
-        std::string reason;
-        tpTrans = std::make_shared<Transaction>(stTx, reason, app);
-        if (tpTrans->getStatus() != NEW)
-        {
-            ret.first = RPC::make_error(
-                rpcINTERNAL, "Unable to construct transaction: " + reason);
-            return ret;
-        }
-    }
     try
     {
-        // Make sure the Transaction we just built is legit by serializing it
-        // and then de-serializing it.  If the result isn't equivalent
-        // to the initial transaction then there's something wrong with the
-        // passed-in STTx.
-        {
-            Serializer s;
-            tpTrans->getSTransaction()->add(s);
-            Blob transBlob = s.getData();
-            SerialIter sit{makeSlice(transBlob)};
+        auto sterile = sterilize(*tx);
 
-            // Check the signature if that's called for.
-            auto sttxNew = std::make_shared<STTx const>(sit);
-            if (!app.checkSigs())
-                forceValidity(
-                    app.getHashRouter(),
-                    sttxNew->getTransactionID(),
-                    Validity::SigGoodOnly);
-            if (checkValidity(
-                    app.getHashRouter(), *sttxNew, rules, app.config())
-                    .first != Validity::Valid)
-            {
-                ret.first = RPC::make_error(rpcINTERNAL, "Invalid signature.");
-                return ret;
-            }
+        if (!app.checkSigs())
+            forceValidity(
+                app.getHashRouter(),
+                sterile->getTransactionID(),
+                Validity::SigGoodOnly);
 
-            std::string reason;
-            auto tpTransNew =
-                std::make_shared<Transaction>(sttxNew, reason, app);
+        if (checkValidity(app.getHashRouter(), *sterile, rules, app.config())
+                .first != Validity::Valid)
+            return {RPC::make_error(rpcINTERNAL, "Invalid signature."), {}};
 
-            if (tpTransNew)
-            {
-                if (!tpTransNew->getSTransaction()->isEquivalent(
-                        *tpTrans->getSTransaction()))
-                {
-                    tpTransNew.reset();
-                }
-                tpTrans = std::move(tpTransNew);
-            }
-        }
+        // Make sure the transaction is legit by checking that the sterilized
+        // transaction is equivalent to the transaction were received.
+        if (!tx->isEquivalent(*sterile))
+            return {
+                RPC::make_error(
+                    rpcINTERNAL, "Unable to sterilize transaction."),
+                {}};
     }
-    catch (std::exception&)
+    catch (std::exception const&)
     {
-        // Assume that any exceptions are related to transaction sterilization.
-        tpTrans.reset();
+        return {
+            RPC::make_error(rpcINTERNAL, "Unable to sterilize transaction."),
+            {}};
     }
 
-    if (!tpTrans)
-    {
-        ret.first =
-            RPC::make_error(rpcINTERNAL, "Unable to sterilize transaction.");
-        return ret;
-    }
-    ret.second = std::move(tpTrans);
-    return ret;
+    return {Json::Value{}, std::make_shared<Transaction>(tx)};
 }
 
 static Json::Value
-transactionFormatResultImpl(Transaction::pointer tpTrans, unsigned apiVersion)
+transactionFormatResultImpl(
+    std::shared_ptr<Transaction> const& tpTrans,
+    Application& app,
+    unsigned apiVersion)
 {
     Json::Value jvResult;
     try
@@ -678,11 +641,11 @@ transactionFormatResultImpl(Transaction::pointer tpTrans, unsigned apiVersion)
         if (apiVersion > 1)
         {
             jvResult[jss::tx_json] =
-                tpTrans->getJson(JsonOptions::disable_API_prior_V2);
+                tpTrans->getJson(JsonOptions::disable_API_prior_V2, app);
             jvResult[jss::hash] = to_string(tpTrans->getID());
         }
         else
-            jvResult[jss::tx_json] = tpTrans->getJson(JsonOptions::none);
+            jvResult[jss::tx_json] = tpTrans->getJson(JsonOptions::none, app);
 
         RPC::insertDeliverMax(
             jvResult[jss::tx_json],
@@ -917,13 +880,13 @@ transactionSign(
 
     std::shared_ptr<const ReadView> ledger = app.openLedger().current();
     // Make sure the STTx makes a legitimate Transaction.
-    std::pair<Json::Value, Transaction::pointer> txn =
+    auto txn =
         transactionConstructImpl(preprocResult.second, ledger->rules(), app);
 
     if (!txn.second)
         return txn.first;
 
-    return transactionFormatResultImpl(txn.second, apiVersion);
+    return transactionFormatResultImpl(txn.second, app, apiVersion);
 }
 
 /** Returns a Json::objectValue. */
@@ -952,7 +915,7 @@ transactionSubmit(
         return preprocResult.first;
 
     // Make sure the STTx makes a legitimate Transaction.
-    std::pair<Json::Value, Transaction::pointer> txn =
+    auto txn =
         transactionConstructImpl(preprocResult.second, ledger->rules(), app);
 
     if (!txn.second)
@@ -970,7 +933,7 @@ transactionSubmit(
             rpcINTERNAL, "Exception occurred during transaction submission.");
     }
 
-    return transactionFormatResultImpl(txn.second, apiVersion);
+    return transactionFormatResultImpl(txn.second, app, apiVersion);
 }
 
 namespace detail {
@@ -1157,13 +1120,12 @@ transactionSignFor(
     }
 
     // Make sure the STTx makes a legitimate Transaction.
-    std::pair<Json::Value, Transaction::pointer> txn =
-        transactionConstructImpl(sttx, ledger->rules(), app);
+    auto txn = transactionConstructImpl(sttx, ledger->rules(), app);
 
     if (!txn.second)
         return txn.first;
 
-    return transactionFormatResultImpl(txn.second, apiVersion);
+    return transactionFormatResultImpl(txn.second, app, apiVersion);
 }
 
 /** Returns a Json::objectValue. */
@@ -1338,8 +1300,7 @@ transactionSubmitMultiSigned(
         return err;
 
     // Make sure the SerializedTransaction makes a legitimate Transaction.
-    std::pair<Json::Value, Transaction::pointer> txn =
-        transactionConstructImpl(stTx, ledger->rules(), app);
+    auto txn = transactionConstructImpl(stTx, ledger->rules(), app);
 
     if (!txn.second)
         return txn.first;
@@ -1356,7 +1317,7 @@ transactionSubmitMultiSigned(
             rpcINTERNAL, "Exception occurred during transaction submission.");
     }
 
-    return transactionFormatResultImpl(txn.second, apiVersion);
+    return transactionFormatResultImpl(txn.second, app, apiVersion);
 }
 
 }  // namespace RPC

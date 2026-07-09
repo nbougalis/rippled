@@ -1363,45 +1363,35 @@ PeerImp::handleTransaction(protocol::TMTransaction const& m, TxSource source)
                     {
                         // Don't do anything with pseudo transactions except put
                         // them in the TransactionMaster cache
-                        std::string reason;
-                        auto tx = std::make_shared<Transaction>(
-                            stx, reason, peer->app_);
-                        XRPL_ASSERT(
-                            tx->getStatus() == NEW,
-                            "ripple::PeerImp::checkTransaction Transaction "
-                            "created "
-                            "correctly");
-                        if (tx->getStatus() == NEW)
+                        auto tx =
+                            peer->app_.getMasterTransaction().canonicalize(
+                                std::make_shared<Transaction>(stx));
+
+                        JLOG(peer->p_journal_.debug())
+                            << "Processing "
+                            << (source == TxSource::Batch ? "batch"
+                                                          : "broadcast")
+                            << " pseudo-transaction tx " << tx->getID();
+
+                        // Tell the overlay about it, but don't relay it.
+                        if (auto const skip = hr.shouldRelay(tx->getID()))
                         {
                             JLOG(peer->p_journal_.debug())
-                                << "Processing "
-                                << (source == TxSource::Batch ? "batch"
-                                                              : "broadcast")
-                                << " pseudo-transaction tx " << tx->getID();
-
-                            peer->app_.getMasterTransaction().canonicalize(&tx);
-                            // Tell the overlay about it, but don't relay it.
-                            auto const toSkip = hr.shouldRelay(tx->getID());
-                            if (toSkip)
-                            {
-                                JLOG(peer->p_journal_.debug())
-                                    << "Passing skipped pseudo "
-                                       "pseudo-transaction tx "
-                                    << tx->getID();
-                                peer->app_.overlay().relay(
-                                    tx->getID(), {}, *toSkip);
-                            }
-                            if (source == TxSource::Broadcast)
-                            {
-                                JLOG(peer->p_journal_.debug())
-                                    << "Charging for pseudo-transaction tx "
-                                    << tx->getID();
-                                peer->charge(
-                                    Resource::feeUselessData, "pseudo tx");
-                            }
-
-                            return;
+                                << "Passing skipped pseudo "
+                                   "pseudo-transaction tx "
+                                << tx->getID();
+                            peer->app_.overlay().relay(tx->getID(), {}, *skip);
                         }
+
+                        if (source == TxSource::Broadcast)
+                        {
+                            JLOG(peer->p_journal_.debug())
+                                << "Charging for pseudo-transaction tx "
+                                << tx->getID();
+                            peer->charge(Resource::feeUselessData, "pseudo tx");
+                        }
+
+                        return;
                     }
 
                     if (checkSignature)
@@ -1437,22 +1427,7 @@ PeerImp::handleTransaction(protocol::TMTransaction const& m, TxSource source)
                             hr, stx->getTransactionID(), Validity::Valid);
                     }
 
-                    std::string reason;
-                    auto tx =
-                        std::make_shared<Transaction>(stx, reason, peer->app_);
-
-                    if (tx->getStatus() == INVALID)
-                    {
-                        if (!reason.empty())
-                        {
-                            JLOG(peer->p_journal_.trace())
-                                << "Exception checking transaction: " << reason;
-                        }
-                        hr.setFlags(stx->getTransactionID(), SF_BAD);
-                        peer->charge(
-                            Resource::feeInvalidSignature, "tx (impossible)");
-                        return;
-                    }
+                    auto tx = std::make_shared<Transaction>(stx);
 
                     bool const trusted(flags & SF_TRUSTED);
                     peer->app_.getOPs().processTransaction(
@@ -2996,7 +2971,8 @@ PeerImp::doTransactions(
                                          : protocol::tsNEW);
         tx->set_receivetimestamp(
             app_.timeKeeper().now().time_since_epoch().count());
-        tx->set_deferred(txn->getSubmitResult().queued);
+        tx->set_deferred(
+            static_cast<bool>(txn->getSubmitResult() & SubmitResult::queued));
     }
 
     if (reply.transactions_size() > 0)
@@ -3015,8 +2991,7 @@ getPeerWithTree(OverlayImpl& ov, uint256 const& rootHash, PeerImp const* skip)
     ov.for_each([&](std::shared_ptr<PeerImp>&& p) {
         if (p->hasTxSet(rootHash) && p.get() != skip)
         {
-            auto score = p->getScore(true);
-            if (!ret || (score > retScore))
+            if (auto score = p->getScore(true); !ret || (score > retScore))
             {
                 ret = std::move(p);
                 retScore = score;

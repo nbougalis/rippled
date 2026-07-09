@@ -195,10 +195,14 @@ measureDurationAndLog(
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         end_time - start_time);
+
     if (duration > maxDelay)
     {
-        JLOG(journal.warn())
-            << actionDescription << " took " << duration.count() << " ms";
+        auto const limit =
+            std::chrono::duration_cast<std::chrono::milliseconds>(maxDelay);
+
+        JLOG(journal.warn()) << actionDescription << " took " << duration.count() << "ms ("
+            << ((duration - limit) * 100 / limit) << "% over)";
     }
 
     return result;

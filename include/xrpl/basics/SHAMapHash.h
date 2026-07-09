@@ -35,8 +35,9 @@ class SHAMapHash
     uint256 hash_;
 
 public:
-    SHAMapHash() = default;
-    explicit SHAMapHash(uint256 const& hash) : hash_(hash)
+    constexpr SHAMapHash() = default;
+
+    constexpr explicit SHAMapHash(uint256 const& hash) : hash_(hash)
     {
     }
 
@@ -72,13 +73,13 @@ public:
     }
 
     friend bool
-    operator==(SHAMapHash const& x, SHAMapHash const& y)
+    operator==(SHAMapHash const& x, SHAMapHash const& y) noexcept
     {
         return x.hash_ == y.hash_;
     }
 
     friend bool
-    operator<(SHAMapHash const& x, SHAMapHash const& y)
+    operator<(SHAMapHash const& x, SHAMapHash const& y) noexcept
     {
         return x.hash_ < y.hash_;
     }
@@ -102,12 +103,6 @@ public:
         hash_append(h, x.hash_);
     }
 };
-
-inline bool
-operator!=(SHAMapHash const& x, SHAMapHash const& y)
-{
-    return !(x == y);
-}
 
 template <>
 inline std::size_t

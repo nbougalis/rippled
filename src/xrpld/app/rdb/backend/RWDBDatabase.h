@@ -281,10 +281,9 @@ public:
                 auto const& txn = acceptedLedgerTx->getTxn();
                 auto const& meta = acceptedLedgerTx->getMeta();
                 auto const& id = txn->getTransactionID();
-                std::string reason;
 
                 auto accTx = std::make_pair(
-                    std::make_shared<ripple::Transaction>(txn, reason, app_),
+                    std::make_shared<ripple::Transaction>(txn),
                     std::make_shared<ripple::TxMeta>(meta));
 
                 ledgerData.transactions.emplace(id, accTx);

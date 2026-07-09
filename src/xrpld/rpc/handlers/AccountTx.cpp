@@ -324,6 +324,7 @@ populateJsonResponse(
                         jvObj[json_tx] = txn->getJson(
                             JsonOptions::include_date |
                                 JsonOptions::disable_API_prior_V2,
+                            context.app,
                             false);
                         jvObj[jss::hash] = to_string(txn->getID());
                         jvObj[jss::ledger_index] = txn->getLedger();
@@ -338,8 +339,8 @@ populateJsonResponse(
                                 to_string_iso(*closeTime);
                     }
                     else
-                        jvObj[json_tx] =
-                            txn->getJson(JsonOptions::include_date);
+                        jvObj[json_tx] = txn->getJson(
+                            JsonOptions::include_date, context.app);
 
                     auto const& sttx = txn->getSTransaction();
                     RPC::insertDeliverMax(

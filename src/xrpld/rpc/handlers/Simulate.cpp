@@ -49,8 +49,10 @@ getAutofillSequence(Json::Value const& tx_json, RPC::JsonContext& context)
     auto const srcAddressID = parseBase58<AccountID>(accountStr.asString());
     if (!srcAddressID.has_value())
     {
-        return Unexpected(RPC::make_error(
-            rpcSRC_ACT_MALFORMED, RPC::invalid_field_message("tx.Account")));
+        return Unexpected(
+            RPC::make_error(
+                rpcSRC_ACT_MALFORMED,
+                RPC::invalid_field_message("tx.Account")));
     }
     std::shared_ptr<SLE const> const sle =
         context.app.openLedger().current()->read(
@@ -282,7 +284,8 @@ simulateTxn(RPC::JsonContext& context, std::shared_ptr<Transaction> transaction)
     }
     else
     {
-        jvResult[jss::tx_json] = transaction->getJson(JsonOptions::none);
+        jvResult[jss::tx_json] =
+            transaction->getJson(JsonOptions::none, context.app);
     }
 
     return jvResult;
@@ -341,12 +344,10 @@ doSimulate(RPC::JsonContext& context)
         return jvResult;
     }
 
-    std::string reason;
-    auto transaction = std::make_shared<Transaction>(stTx, reason, context.app);
     // Actually run the transaction through the transaction processor
     try
     {
-        return simulateTxn(context, transaction);
+        return simulateTxn(context, std::make_shared<Transaction>(stTx));
     }
     // LCOV_EXCL_START this is just in case, so rippled doesn't crash
     catch (std::exception const& e)

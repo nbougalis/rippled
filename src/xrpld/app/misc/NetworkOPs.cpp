@@ -72,7 +72,6 @@
 #include <xrpl/resource/ResourceManager.h>
 #include <boost/asio/ip/host_name.hpp>
 #include <boost/asio/steady_timer.hpp>
-#include <boost/stacktrace.hpp>
 
 #include <algorithm>
 #include <exception>
@@ -104,7 +103,7 @@ class NetworkOPsImp final : public NetworkOPs
         TER result;
 
         TransactionStatus(
-            std::shared_ptr<Transaction> t,
+            std::shared_ptr<Transaction> const& t,
             bool a,
             bool l,
             FailHard f)
@@ -293,7 +292,7 @@ public:
      */
     void
     doTransactionSync(
-        std::shared_ptr<Transaction> transaction,
+        std::shared_ptr<Transaction> const& transaction,
         bool bUnlimited,
         FailHard failType);
 
@@ -308,7 +307,7 @@ public:
      */
     void
     doTransactionAsync(
-        std::shared_ptr<Transaction> transaction,
+        std::shared_ptr<Transaction> const& transaction,
         bool bUnlimited,
         FailHard failtype);
 
@@ -325,6 +324,23 @@ public:
      */
     void
     apply(std::unique_lock<std::mutex>& batchLock);
+
+    /** Relay a processed transaction to peers, if appropriate.
+
+        Broadcasts @p e over the overlay when it is worth propagating: it
+        applied, was queued, or was submitted locally while we are not in
+        sync. Emitted and hash-router suppressed transactions are skipped.
+
+        This marks the transaction as having been broadcast on success.
+
+        Does not apply the fail-hard exclusion; callers must not invoke it
+        for fail-hard submissions.
+
+        @param e The processed transaction
+        @param scratch Serializer used as scratch storage; erased before use.
+    */
+    void
+    attemptRelay(TransactionStatus const& e, Serializer& scratch);
 
     //
     // Owner functions.
@@ -748,7 +764,13 @@ private:
 
     RCLConsensus mConsensus;
 
-    ConsensusPhase mLastConsensusPhase;
+    /** The last consensus phase reported to subscribers.
+
+        This is used to detect phase transitions; only changes are published
+        to the `consensus` stream. Initialized to `open` because that is the
+        initial phase of a freshly constructed consensus engine.
+    */
+    ConsensusPhase mLastConsensusPhase = ConsensusPhase::open;
 
     LedgerMaster& m_ledgerMaster;
 
@@ -1162,11 +1184,10 @@ NetworkOPsImp::submitTransaction(std::shared_ptr<STTx const> const& iTrans)
 
     // this is an asynchronous interface
     auto const trans = sterilize(*iTrans);
-
     auto const txid = trans->getTransactionID();
-    auto const flags = app_.getHashRouter().getFlags(txid);
 
-    if ((flags & SF_BAD) != 0)
+    if (auto const flags = app_.getHashRouter().getFlags(txid);
+        (flags & SF_BAD) != 0)
     {
         // RH NOTE: Warning removed here due to ConsesusSet using this function
         // which continually triggers this bar. Doesn't seem dangerous, just
@@ -1199,14 +1220,14 @@ NetworkOPsImp::submitTransaction(std::shared_ptr<STTx const> const& iTrans)
         return;
     }
 
-    std::string reason;
-
-    auto tx = std::make_shared<Transaction>(trans, reason, app_);
-
-    m_job_queue.addJob(jtTRANSACTION, "submitTxn", [this, tx]() {
-        auto t = tx;
-        processTransaction(t, false, false, FailHard::no);
-    });
+    // We need the lambda to be mutable so the captured tx is not const
+    // since processTransaction takes the tx by ref and can reseat it.
+    m_job_queue.addJob(
+        jtTRANSACTION,
+        "submitTxn",
+        [this, tx = std::make_shared<Transaction>(trans)]() mutable {
+            processTransaction(tx, false, false, FailHard::no);
+        });
 }
 
 void
@@ -1268,8 +1289,8 @@ NetworkOPsImp::processTransaction(
         return;
     }
 
-    // canonicalize can change our pointer
-    app_.getMasterTransaction().canonicalize(&transaction);
+    // canonicalize returns the pointer we should be using
+    transaction = app_.getMasterTransaction().canonicalize(transaction);
 
     if (bLocal)
         doTransactionSync(transaction, bUnlimited, failType);
@@ -1279,7 +1300,7 @@ NetworkOPsImp::processTransaction(
 
 void
 NetworkOPsImp::doTransactionAsync(
-    std::shared_ptr<Transaction> transaction,
+    std::shared_ptr<Transaction> const& transaction,
     bool bUnlimited,
     FailHard failType)
 {
@@ -1302,8 +1323,7 @@ NetworkOPsImp::doTransactionAsync(
     if (transaction->getApplying())
         return;
 
-    mTransactions.push_back(
-        TransactionStatus(transaction, bUnlimited, false, failType));
+    mTransactions.emplace_back(transaction, bUnlimited, false, failType);
     transaction->setApplying();
 
     if (mDispatchState == DispatchState::none)
@@ -1319,7 +1339,7 @@ NetworkOPsImp::doTransactionAsync(
 
 void
 NetworkOPsImp::doTransactionSync(
-    std::shared_ptr<Transaction> transaction,
+    std::shared_ptr<Transaction> const& transaction,
     bool bUnlimited,
     FailHard failType)
 {
@@ -1341,8 +1361,7 @@ NetworkOPsImp::doTransactionSync(
 
     if (!transaction->getApplying())
     {
-        mTransactions.push_back(
-            TransactionStatus(transaction, bUnlimited, true, failType));
+        mTransactions.emplace_back(transaction, bUnlimited, true, failType);
         transaction->setApplying();
     }
 
@@ -1375,21 +1394,47 @@ NetworkOPsImp::doTransactionSync(
 void
 NetworkOPsImp::transactionBatch()
 {
-    try
-    {
-        std::unique_lock<std::mutex> lock(mMutex);
+    std::unique_lock lock(mMutex);
 
-        if (mDispatchState != DispatchState::running)
-        {
-            while (!mTransactions.empty())
-                apply(lock);
-        }
-    }
-    catch (std::exception const& ex)
+    if (mDispatchState != DispatchState::running)
     {
-        JLOG(m_journal.error())
-            << "NetworkOPsImp::transactionBatch exception: " << ex.what();
-        JLOG(m_journal.error()) << boost::stacktrace::stacktrace();
+        while (!mTransactions.empty())
+            apply(lock);
+    }
+}
+
+void
+NetworkOPsImp::attemptRelay(TransactionStatus const& e, Serializer& scratch)
+{
+    // Only relay if the transaction is worth propagating: either it
+    // applied, it was queued for a later ledger, or it is a locally
+    // submitted tx that we cannot authoritatively evaluate while we
+    // are unsynced.
+    if (!e.applied && e.result != terQUEUED &&
+        (mode_.get() == OperatingMode::FULL || !e.local))
+        return;
+
+    // Emitted (hook-generated) txns propagate via the emit mechanism,
+    // not peer relay.
+    if (hook::isEmittedTxn(*(e.transaction->getSTransaction())))
+        return;
+
+    if (auto const skip =
+            app_.getHashRouter().shouldRelay(e.transaction->getID()))
+    {
+        protocol::TMTransaction tx;
+
+        scratch.erase();
+
+        e.transaction->getSTransaction()->add(scratch);
+        tx.set_rawtransaction(scratch.data(), scratch.size());
+        tx.set_status(protocol::tsCURRENT);
+        tx.set_receivetimestamp(
+            app_.timeKeeper().now().time_since_epoch().count());
+        tx.set_deferred(e.result == terQUEUED);
+        // FIXME: This should be when we received it
+        app_.overlay().relay(e.transaction->getID(), tx, skip.value());
+        e.transaction->setBroadcast();
     }
 }
 
@@ -1410,6 +1455,10 @@ NetworkOPsImp::apply(std::unique_lock<std::mutex>& batchLock)
 
     batchLock.unlock();
 
+    // We catch any exceptions thrown during transaction application, so that
+    // we can ensure the state is consistent (applying flags, dispatch status
+    // and waiter notifications) and avoid wedging the dispatcher.
+    try
     {
         std::unique_lock masterLock{app_.getMasterMutex(), std::defer_lock};
         bool changed = false;
@@ -1438,14 +1487,21 @@ NetworkOPsImp::apply(std::unique_lock<std::mutex>& batchLock)
                 return changed;
             });
         }
+
         if (changed)
             reportFeeChange();
 
         std::optional<LedgerIndex> validatedLedgerIndex;
+
         if (auto const l = m_ledgerMaster.getValidatedLedger())
             validatedLedgerIndex = l->info().seq;
 
+        // Determines whether to propagate the given transaction
+
         auto newOL = app_.openLedger().current();
+
+        Serializer scratch;
+
         for (TransactionStatus& e : transactions)
         {
             e.transaction->clearSubmitResult();
@@ -1462,17 +1518,6 @@ NetworkOPsImp::apply(std::unique_lock<std::mutex>& batchLock)
             if (isTemMalformed(e.result))
                 app_.getHashRouter().setFlags(e.transaction->getID(), SF_BAD);
 
-#ifdef DEBUG
-            if (!isTesSuccess(e.result))
-            {
-                if (std::string token = transToken(e.result); token != "-")
-                {
-                    JLOG(m_journal.debug()) << "Tx " << e.transaction->getID()
-                                            << ", result: " << token;
-                }
-            }
-#endif
-
             bool addLocal = e.local;
 
             if (isTesSuccess(e.result))
@@ -1485,17 +1530,17 @@ NetworkOPsImp::apply(std::unique_lock<std::mutex>& batchLock)
                 auto const txNext = m_ledgerMaster.popAcctTransaction(txCur);
                 if (txNext)
                 {
-                    std::string reason;
-                    auto const trans = sterilize(*txNext);
-                    auto t = std::make_shared<Transaction>(trans, reason, app_);
-                    submit_held.emplace_back(t, false, false, FailHard::no);
+                    auto t = std::make_shared<Transaction>(sterilize(*txNext));
                     t->setApplying();
+                    submit_held.emplace_back(t, false, false, FailHard::no);
                 }
             }
             else if (e.result == tefPAST_SEQ)
             {
                 // duplicate or conflict
-                JLOG(m_journal.info()) << "Transaction is obsolete";
+                JLOG(m_journal.debug())
+                    << "Transaction " << e.transaction->getID()
+                    << " is obsolete" << (e.applied ? " (applied)" : "");
                 e.transaction->setStatus(OBSOLETE);
             }
             else if (e.result == terQUEUED)
@@ -1531,44 +1576,19 @@ NetworkOPsImp::apply(std::unique_lock<std::mutex>& batchLock)
                 e.transaction->setStatus(INVALID);
             }
 
-            auto const enforceFailHard =
-                e.failType == FailHard::yes && !isTesSuccess(e.result);
-
-            if (addLocal && !enforceFailHard)
+            if (e.failType != FailHard::yes || isTesSuccess(e.result))
             {
-                m_localTX->push_back(
-                    m_ledgerMaster.getCurrentLedgerIndex(),
-                    e.transaction->getSTransaction());
-                e.transaction->setKept();
-            }
-
-            if ((e.applied ||
-                 ((mode_.get() != OperatingMode::FULL) &&
-                  (e.failType != FailHard::yes) && e.local) ||
-                 (e.result == terQUEUED)) &&
-                !enforceFailHard)
-            {
-                auto const toSkip =
-                    app_.getHashRouter().shouldRelay(e.transaction->getID());
-
-                bool const isEmitted =
-                    hook::isEmittedTxn(*(e.transaction->getSTransaction()));
-
-                if (toSkip && !isEmitted)
+                if (addLocal)
                 {
-                    protocol::TMTransaction tx;
-                    Serializer s;
-
-                    e.transaction->getSTransaction()->add(s);
-                    tx.set_rawtransaction(s.data(), s.size());
-                    tx.set_status(protocol::tsCURRENT);
-                    tx.set_receivetimestamp(
-                        app_.timeKeeper().now().time_since_epoch().count());
-                    tx.set_deferred(e.result == terQUEUED);
-                    // FIXME: This should be when we received it
-                    app_.overlay().relay(e.transaction->getID(), tx, *toSkip);
-                    e.transaction->setBroadcast();
+                    m_localTX->push_back(
+                        m_ledgerMaster.getCurrentLedgerIndex(),
+                        e.transaction->getSTransaction());
+                    e.transaction->setKept();
                 }
+
+                // Fail-hard submissions need a definitive local result and do
+                // not get speculatively relayed.
+                attemptRelay(e, scratch);
             }
 
             if (validatedLedgerIndex)
@@ -1581,11 +1601,24 @@ NetworkOPsImp::apply(std::unique_lock<std::mutex>& batchLock)
             }
         }
     }
+    catch (std::exception const& ex)
+    {
+        JLOG(m_journal.error()) << "Exception applying " << transactions.size()
+                                << " transaction batch: " << ex.what();
+    }
+    catch (...)
+    {
+        JLOG(m_journal.error()) << "Unknown exception applying "
+                                << transactions.size() << " transaction batch";
+    }
 
     batchLock.lock();
 
     for (TransactionStatus& e : transactions)
         e.transaction->clearApplying();
+
+    mCond.notify_all();
+    mDispatchState = DispatchState::none;
 
     if (!submit_held.empty())
     {
@@ -1595,10 +1628,6 @@ NetworkOPsImp::apply(std::unique_lock<std::mutex>& batchLock)
             for (auto& e : submit_held)
                 mTransactions.push_back(std::move(e));
     }
-
-    mCond.notify_all();
-
-    mDispatchState = DispatchState::none;
 }
 
 //

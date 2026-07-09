@@ -218,11 +218,8 @@ public:
         }
         {
             // TOO_MANY_EMITTED_TXN
-            std::string reason;
             auto tx = std::make_shared<ripple::Transaction>(
-                std::make_shared<ripple::STTx const>(invokeTx),
-                reason,
-                env.app());
+                std::make_shared<ripple::STTx const>(invokeTx));
             std::queue<std::shared_ptr<ripple::Transaction>> emittedTxn;
             emittedTxn.push(tx);
             auto hookCtx = makeStubHookContext(

@@ -80,8 +80,8 @@ public:
         std::optional<uint32_t> tseq,
         std::optional<uint16_t> netID);
 
-    void
-    canonicalize(std::shared_ptr<Transaction>* pTransaction);
+    [[nodiscard]] std::shared_ptr<Transaction>
+    canonicalize(std::shared_ptr<Transaction> const& tx);
 
     void
     sweep(void);

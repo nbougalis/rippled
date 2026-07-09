@@ -34,23 +34,11 @@
 
 namespace ripple {
 
-Transaction::Transaction(
-    std::shared_ptr<STTx const> const& stx,
-    std::string& reason,
-    Application& app) noexcept
-    : mTransaction(stx), mApp(app), j_(app.journal("Ledger"))
+Transaction::Transaction(std::shared_ptr<STTx const> const& stx) noexcept
+    : mTransaction(stx), mStatus(NEW)
 {
-    try
-    {
-        mTransactionID = mTransaction->getTransactionID();
-    }
-    catch (std::exception& e)
-    {
-        reason = e.what();
-        return;
-    }
-
-    mStatus = NEW;
+    if (!mTransaction) [[unlikely]]
+        LogicError("Transaction: Unexpected nullptr to STTx");
 }
 
 //
@@ -98,7 +86,7 @@ Transaction::sqlTransactionStatus(boost::optional<std::string> const& status)
     return INVALID;
 }
 
-Transaction::pointer
+std::shared_ptr<Transaction>
 Transaction::transactionFromSQL(
     boost::optional<std::uint64_t> const& ledgerSeq,
     boost::optional<std::string> const& status,
@@ -110,8 +98,7 @@ Transaction::transactionFromSQL(
 
     SerialIter it(makeSlice(rawTxn));
     auto txn = std::make_shared<STTx const>(it);
-    std::string reason;
-    auto tr = std::make_shared<Transaction>(txn, reason, app);
+    auto tr = std::make_shared<Transaction>(txn);
 
     tr->setStatus(sqlTransactionStatus(status));
     tr->setLedger(inLedger);
@@ -161,7 +148,7 @@ Transaction::load(
 
 // options 1 to include the date of the transaction
 Json::Value
-Transaction::getJson(JsonOptions options, bool binary) const
+Transaction::getJson(JsonOptions options, Application& app, bool binary) const
 {
     // Note, we explicitly suppress `include_date` option here
     Json::Value ret(
@@ -182,7 +169,7 @@ Transaction::getJson(JsonOptions options, bool binary) const
 
         if (options & JsonOptions::include_date)
         {
-            auto ct = mApp.getLedgerMaster().getCloseTimeBySeq(mLedgerIndex);
+            auto ct = app.getLedgerMaster().getCloseTimeBySeq(mLedgerIndex);
             if (ct)
                 ret[jss::date] = ct->time_since_epoch().count();
         }

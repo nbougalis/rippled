@@ -775,15 +775,7 @@ HookAPI::emit(Slice const& txBlob) const
         return Unexpected(EMISSION_FAILURE);
     }
 
-    std::string reason;
-    auto tpTrans =
-        std::make_shared<Transaction>(stpTrans, reason, applyCtx.app);
-    if (tpTrans->getStatus() != NEW)
-    {
-        JLOG(j.trace()) << "HookEmit[" << HC_ACC()
-                        << "]: tpTrans->getStatus() != NEW";
-        return Unexpected(EMISSION_FAILURE);
-    }
+    auto tpTrans = std::make_shared<Transaction>(stpTrans);
 
     // preflight the transaction
     auto preflightResult = ripple::preflight(

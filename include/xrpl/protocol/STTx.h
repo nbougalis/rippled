@@ -107,8 +107,11 @@ public:
     boost::container::flat_set<AccountID>
     getMentionedAccounts() const;
 
-    uint256
-    getTransactionID() const;
+    uint256 const&
+    getTransactionID() const noexcept
+    {
+        return tid_;
+    }
 
     Json::Value
     getJson(JsonOptions options) const override;
@@ -188,11 +191,6 @@ STTx::getSigningPubKey() const
     return getFieldVL(sfSigningPubKey);
 }
 
-inline uint256
-STTx::getTransactionID() const
-{
-    return tid_;
-}
 
 }  // namespace ripple
 

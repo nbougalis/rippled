@@ -1154,8 +1154,6 @@ InboundLedger::processData(
             return -1;
         }
 
-        ScopedLockType sl(mtx_);
-
         // Verify node IDs and data are complete
         for (auto const& node : packet.nodes())
         {
@@ -1167,6 +1165,8 @@ InboundLedger::processData(
                 return -1;
             }
         }
+
+        ScopedLockType sl(mtx_);
 
         SHAMapAddNode san;
         receiveNode(packet, san);

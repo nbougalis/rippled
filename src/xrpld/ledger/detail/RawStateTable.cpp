@@ -314,17 +314,16 @@ RawStateTable::replace(std::shared_ptr<SLE> const& sle)
 std::shared_ptr<SLE const>
 RawStateTable::read(ReadView const& base, Keylet const& k) const
 {
-    auto const iter = items_.find(k.key);
-    if (iter == items_.end())
-        return base.read(k);
-    auto const& item = iter->second;
-    if (item.action == Action::erase)
+    if (auto const iter = items_.find(k.key); iter != items_.end())
+    {
+        if (auto const& item = iter->second;
+            item.action != Action::erase && k.check(*item.sle))
+            return item.sle;
+
         return nullptr;
-    // Convert to SLE const
-    std::shared_ptr<SLE const> sle = item.sle;
-    if (!k.check(*sle))
-        return nullptr;
-    return sle;
+    }
+
+    return base.read(k);
 }
 
 void

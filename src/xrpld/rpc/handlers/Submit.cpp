@@ -160,15 +160,7 @@ doSubmit(RPC::JsonContext& context)
         }
     }
 
-    std::string reason;
-    auto transaction = std::make_shared<Transaction>(stTx, reason, context.app);
-    if (transaction->getStatus() != NEW)
-    {
-        jvResult[jss::error] = "invalidTransaction";
-        jvResult[jss::error_exception] = "fails local checks: " + reason;
-
-        return jvResult;
-    }
+    auto transaction = std::make_shared<Transaction>(stTx);
 
     try
     {
@@ -187,7 +179,8 @@ doSubmit(RPC::JsonContext& context)
 
     try
     {
-        jvResult[jss::tx_json] = transaction->getJson(JsonOptions::none);
+        jvResult[jss::tx_json] =
+            transaction->getJson(JsonOptions::none, context.app);
         jvResult[jss::tx_blob] =
             strHex(transaction->getSTransaction()->getSerializer().peekData());
 
@@ -204,11 +197,16 @@ doSubmit(RPC::JsonContext& context)
 
             auto const submitResult = transaction->getSubmitResult();
 
-            jvResult[jss::accepted] = submitResult.any();
-            jvResult[jss::applied] = submitResult.applied;
-            jvResult[jss::broadcast] = submitResult.broadcast;
-            jvResult[jss::queued] = submitResult.queued;
-            jvResult[jss::kept] = submitResult.kept;
+            jvResult[jss::accepted] =
+                static_cast<bool>(submitResult != SubmitResult::none);
+            jvResult[jss::applied] =
+                static_cast<bool>(submitResult & SubmitResult::applied);
+            jvResult[jss::broadcast] =
+                static_cast<bool>(submitResult & SubmitResult::broadcast);
+            jvResult[jss::queued] =
+                static_cast<bool>(submitResult & SubmitResult::queued);
+            jvResult[jss::kept] =
+                static_cast<bool>(submitResult & SubmitResult::kept);
 
             if (auto currentLedgerState = transaction->getCurrentLedgerState())
             {

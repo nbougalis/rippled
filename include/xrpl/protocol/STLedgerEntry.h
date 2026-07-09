@@ -64,14 +64,14 @@ public:
         the SHAMap associative container.
     */
     uint256 const&
-    key() const;
+    key() const noexcept;
 
     LedgerEntryType
-    getType() const;
+    getType() const noexcept;
 
     // is this a ledger entry that can be threaded
     bool
-    isThreadedType(Rules const& rules) const;
+    isThreadedType(Rules const& rules) const noexcept;
 
     bool
     thread(
@@ -114,13 +114,13 @@ inline STLedgerEntry::STLedgerEntry(SerialIter&& sit, uint256 const& index)
     the SHAMap associative container.
 */
 inline uint256 const&
-STLedgerEntry::key() const
+STLedgerEntry::key() const noexcept
 {
     return key_;
 }
 
 inline LedgerEntryType
-STLedgerEntry::getType() const
+STLedgerEntry::getType() const noexcept
 {
     return type_;
 }

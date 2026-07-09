@@ -126,7 +126,7 @@ STLedgerEntry::getJson(JsonOptions options) const
 }
 
 bool
-STLedgerEntry::isThreadedType(Rules const& rules) const
+STLedgerEntry::isThreadedType(Rules const& rules) const noexcept
 {
     static constexpr std::array<LedgerEntryType, 7> newPreviousTxnIDTypes = {
         ltDIR_NODE,

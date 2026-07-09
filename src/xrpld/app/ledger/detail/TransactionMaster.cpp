@@ -139,17 +139,19 @@ TransactionMaster::fetch(
     return txn;
 }
 
-void
-TransactionMaster::canonicalize(std::shared_ptr<Transaction>* pTransaction)
+std::shared_ptr<Transaction>
+TransactionMaster::canonicalize(std::shared_ptr<Transaction> const& tx)
 {
-    uint256 const tid = (*pTransaction)->getID();
-    if (tid != beast::zero)
+    auto canonical = tx;
+
+    if (uint256 const tid = tx->getID(); tid != beast::zero) [[likely]]
     {
-        auto txn = *pTransaction;
-        // VFALCO NOTE canonicalize can change the value of txn!
-        mCache.canonicalize_replace_client(tid, txn);
-        *pTransaction = txn;
+        // canonicalize_replace_client may replace canonical with the cached
+        // instance
+        mCache.canonicalize_replace_client(tid, canonical);
     }
+
+    return canonical;
 }
 
 void
