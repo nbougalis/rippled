@@ -20,7 +20,7 @@
 #ifndef RIPPLE_CORE_LOADMONITOR_H_INCLUDED
 #define RIPPLE_CORE_LOADMONITOR_H_INCLUDED
 
-#include <xrpl/basics/UptimeClock.h>
+#include <xrpl/beast/clock/basic_seconds_clock.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <chrono>
 #include <functional>
@@ -93,7 +93,7 @@ private:
     std::chrono::milliseconds peakLatency_{};
     std::optional<std::chrono::milliseconds> targetAverageLatency_{};
     std::optional<std::chrono::milliseconds> targetPeakLatency_{};
-    UptimeClock::time_point lastUpdate_;
+    beast::basic_seconds_clock::time_point lastUpdate_;
     beast::Journal const j_;
     LoadSampler eventCallback_;
 };

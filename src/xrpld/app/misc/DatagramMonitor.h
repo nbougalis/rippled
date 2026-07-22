@@ -13,7 +13,7 @@
 #include <xrpld/ledger/CachedSLEs.h>
 #include <xrpld/nodestore/Database.h>
 #include <xrpld/overlay/Overlay.h>
-#include <xrpl/basics/UptimeClock.h>
+#include <xrpl/beast/clock/basic_seconds_clock.h>
 #include <xrpl/basics/mulDiv.h>
 #include <xrpl/protocol/BuildInfo.h>
 #include <xrpl/protocol/ErrorCodes.h>
@@ -732,7 +732,8 @@ private:
             std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::system_clock::now().time_since_epoch())
                 .count();
-        header->uptime = UptimeClock::now().time_since_epoch().count();
+        header->uptime =
+            beast::basic_seconds_clock::now().time_since_epoch().count();
         header->io_latency_us = app_.getIOLatency().count();
         header->validation_quorum = app_.validators().quorum();
         header->peer_count = app_.overlay().size();

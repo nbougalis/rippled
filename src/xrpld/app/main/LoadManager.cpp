@@ -21,7 +21,7 @@
 #include <xrpld/app/main/LoadManager.h>
 #include <xrpld/app/misc/LoadFeeTrack.h>
 #include <xrpld/app/misc/NetworkOPs.h>
-#include <xrpl/basics/UptimeClock.h>
+#include <xrpl/beast/clock/basic_seconds_clock.h>
 #include <xrpl/beast/core/CurrentThreadName.h>
 #include <memory>
 #include <mutex>

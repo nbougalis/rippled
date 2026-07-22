@@ -26,7 +26,7 @@
 #include <xrpld/ledger/CachedSLEs.h>
 #include <xrpld/nodestore/Database.h>
 #include <xrpld/rpc/Context.h>
-#include <xrpl/basics/UptimeClock.h>
+#include <xrpl/beast/clock/basic_seconds_clock.h>
 #include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/RPCErr.h>
@@ -37,7 +37,7 @@ namespace ripple {
 static void
 textTime(
     std::string& text,
-    UptimeClock::time_point& seconds,
+    beast::basic_seconds_clock::time_point& seconds,
     const char* unitName,
     std::chrono::seconds unitVal)
 {
@@ -122,7 +122,7 @@ getCountsJson(Application& app, int minObjectCount)
         app.getNodeFamily().getTreeNodeCache()->getTrackSize();
 
     std::string uptime;
-    auto s = UptimeClock::now();
+    auto s = beast::basic_seconds_clock::now();
     using namespace std::chrono_literals;
     textTime(uptime, s, "year", 365 * 24h);
     textTime(uptime, s, "day", 24h);

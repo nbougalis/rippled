@@ -32,7 +32,7 @@
 #include <xrpld/overlay/detail/PeerImp.h>
 #include <xrpld/overlay/detail/Tuning.h>
 #include <xrpld/perflog/PerfLog.h>
-#include <xrpl/basics/UptimeClock.h>
+#include <xrpl/beast/clock/basic_seconds_clock.h>
 #include <xrpl/basics/base64.h>
 #include <xrpl/basics/random.h>
 #include <xrpl/basics/safe_cast.h>
@@ -2913,7 +2913,7 @@ PeerImp::doFetchPack(const std::shared_ptr<protocol::TMGetObjectByHash>& packet)
 
     uint256 const hash{packet->ledgerhash()};
 
-    auto elapsed = UptimeClock::now();
+    auto elapsed = beast::basic_seconds_clock::now();
 
     app_.getJobQueue().addJob(
         jtPACK,
@@ -3429,8 +3429,8 @@ bool
 PeerImp::reduceRelayReady()
 {
     if (!reduceRelayReady_)
-        reduceRelayReady_ =
-            reduce_relay::epoch<std::chrono::minutes>(UptimeClock::now()) >
+        reduceRelayReady_ = reduce_relay::epoch<std::chrono::minutes>(
+                                beast::basic_seconds_clock::now()) >
             reduce_relay::WAIT_ON_BOOTUP;
     return vpReduceRelayEnabled_ && reduceRelayReady_;
 }

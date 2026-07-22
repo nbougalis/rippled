@@ -44,7 +44,7 @@
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/MathUtilities.h>
 #include <xrpl/basics/TaggedCache.h>
-#include <xrpl/basics/UptimeClock.h>
+#include <xrpl/beast/clock/basic_seconds_clock.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/basics/safe_cast.h>
 #include <xrpl/basics/scope.h>
@@ -2330,10 +2330,10 @@ LedgerMaster::makeFetchPack(
     std::weak_ptr<Peer> const& wPeer,
     std::shared_ptr<protocol::TMGetObjectByHash> const& request,
     uint256 haveLedgerHash,
-    UptimeClock::time_point uptime)
+    beast::basic_seconds_clock::time_point uptime)
 {
     using namespace std::chrono_literals;
-    if (UptimeClock::now() > uptime + 1s)
+    if (beast::basic_seconds_clock::now() > uptime + 1s)
     {
         JLOG(m_journal.info()) << "Fetch pack request got stale";
         return;
@@ -2440,7 +2440,7 @@ LedgerMaster::makeFetchPack(
 
             have = std::move(want);
             want = getLedgerByHash(have->info().parentHash);
-        } while (want && UptimeClock::now() <= uptime + 1s);
+        } while (want && beast::basic_seconds_clock::now() <= uptime + 1s);
 
         auto msg = std::make_shared<Message>(reply, protocol::mtGET_OBJECTS);
 

@@ -19,7 +19,7 @@
 
 #include <xrpld/core/LoadMonitor.h>
 #include <xrpl/basics/Log.h>
-#include <xrpl/basics/UptimeClock.h>
+#include <xrpl/beast/clock/basic_seconds_clock.h>
 
 namespace ripple {
 
@@ -39,7 +39,7 @@ LoadMonitor::LoadMonitor(
             targetPeakLatency.reset();
         return targetPeakLatency;
     }())
-    , lastUpdate_(UptimeClock::now())
+    , lastUpdate_(beast::basic_seconds_clock::now())
     , j_(j)
     , eventCallback_([this](
                          char const* name,
@@ -78,7 +78,7 @@ LoadMonitor::update()
 {
     using namespace std::chrono_literals;
 
-    if (auto const now = UptimeClock::now(); now != lastUpdate_)
+    if (auto const now = beast::basic_seconds_clock::now(); now != lastUpdate_)
     {
         // VFALCO TODO Why 8?
         if ((now < lastUpdate_) || (now > (lastUpdate_ + 8s)))

@@ -30,7 +30,7 @@
 #include <xrpld/app/misc/CanonicalTXSet.h>
 #include <xrpl/basics/RangeSet.h>
 #include <xrpl/basics/StringUtilities.h>
-#include <xrpl/basics/UptimeClock.h>
+#include <xrpl/beast/clock/basic_seconds_clock.h>
 #include <xrpl/basics/chrono.h>
 #include <xrpl/beast/insight/Collector.h>
 #include <xrpl/protocol/Protocol.h>
@@ -275,7 +275,7 @@ public:
         std::weak_ptr<Peer> const& wPeer,
         std::shared_ptr<protocol::TMGetObjectByHash> const& request,
         uint256 haveLedgerHash,
-        UptimeClock::time_point uptime);
+        beast::basic_seconds_clock::time_point uptime);
 
     std::size_t
     getFetchPackCacheSize() const;

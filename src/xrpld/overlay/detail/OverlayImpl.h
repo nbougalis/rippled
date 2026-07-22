@@ -119,7 +119,7 @@ private:
     std::atomic<uint64_t> peerDisconnects_{0};
     std::atomic<uint64_t> peerDisconnectsCharges_{0};
 
-    reduce_relay::Slots<UptimeClock> slots_;
+    reduce_relay::Slots<beast::basic_seconds_clock> slots_;
 
     // Transaction reduce-relay metrics
     metrics::TxMetrics txMetrics_;

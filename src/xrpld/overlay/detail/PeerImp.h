@@ -118,7 +118,7 @@ private:
     clock_type::time_point lastPingTime_;
     clock_type::time_point const creationTime_;
 
-    reduce_relay::Squelch<UptimeClock> squelch_;
+    reduce_relay::Squelch<beast::basic_seconds_clock> squelch_;
     inline static std::atomic_bool reduceRelayReady_{false};
 
     // Notes on thread locking:

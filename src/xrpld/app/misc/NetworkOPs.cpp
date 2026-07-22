@@ -54,10 +54,10 @@
 #include <xrpld/rpc/MPTokenIssuanceID.h>
 #include <xrpld/rpc/ServerHandler.h>
 #include <xrpld/rpc/detail/UDPInfoSub.h>
-#include <xrpl/basics/UptimeClock.h>
 #include <xrpl/basics/mulDiv.h>
 #include <xrpl/basics/safe_cast.h>
 #include <xrpl/basics/scope.h>
+#include <xrpl/beast/clock/basic_seconds_clock.h>
 #include <xrpl/beast/rfc2616.h>
 #include <xrpl/beast/utility/rngfill.h>
 #include <xrpl/crypto/RFC1751.h>
@@ -2902,7 +2902,7 @@ NetworkOPsImp::getServerInfo(bool human, bool admin, bool counters)
             info[jss::published_ledger] = lpPublished->info().seq;
     }
 
-    info[jss::uptime] = UptimeClock::now().time_since_epoch().count();
+    info[jss::uptime] = static_cast<std::uint32_t>(app_.uptime().count());
     info[jss::jq_trans_overflow] =
         std::to_string(app_.overlay().getJqTransOverflow());
     info[jss::peer_disconnects] =

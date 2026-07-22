@@ -165,6 +165,8 @@ private:
     };
 
 public:
+    beast::basic_seconds_clock::time_point start_time;
+
     std::unique_ptr<Config> config_;
     std::unique_ptr<Logs> logs_;
     std::unique_ptr<TimeKeeper> timeKeeper_;
@@ -272,6 +274,7 @@ public:
         std::unique_ptr<Logs> logs,
         std::unique_ptr<TimeKeeper> timeKeeper)
         : BasicApp(numberOfThreads(*config))
+        , start_time(beast::basic_seconds_clock::now())
         , config_(std::move(config))
         , logs_(std::move(logs))
         , timeKeeper_(std::move(timeKeeper))
@@ -1149,10 +1152,17 @@ public:
         return maxDisallowedLedger_;
     }
 
-    virtual const std::optional<uint256>&
-    trapTxID() const override
+    std::optional<uint256> const&
+    trapTxID() const noexcept override
     {
         return trapTxID_;
+    }
+
+    std::chrono::seconds
+    uptime() const noexcept override
+    {
+        return std::chrono::floor<std::chrono::seconds>(
+            beast::basic_seconds_clock::now() - start_time);
     }
 
 private:

@@ -19,6 +19,7 @@
 
 #ifndef RIPPLE_APP_MAIN_APPLICATION_H_INCLUDED
 #define RIPPLE_APP_MAIN_APPLICATION_H_INCLUDED
+
 #include <xrpld/core/Config.h>
 #include <xrpld/overlay/PeerReservationTable.h>
 #include <xrpld/shamap/FullBelowCache.h>
@@ -26,8 +27,11 @@
 #include <xrpl/basics/TaggedCache.h>
 #include <xrpl/beast/utility/PropertyStream.h>
 #include <xrpl/protocol/Protocol.h>
+
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
+
+#include <chrono>
 #include <memory>
 #include <mutex>
 
@@ -269,8 +273,12 @@ public:
     virtual LedgerIndex
     getMaxDisallowedLedger() = 0;
 
-    virtual const std::optional<uint256>&
-    trapTxID() const = 0;
+    virtual std::optional<uint256> const&
+    trapTxID() const noexcept = 0;
+
+    /** The number of seconds since the application was instantiated. */
+    [[nodiscard]] virtual std::chrono::seconds
+    uptime() const noexcept = 0;
 };
 
 std::unique_ptr<Application>
