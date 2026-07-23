@@ -32,32 +32,9 @@
 #include <xrpl/protocol/RPCErr.h>
 #include <xrpl/protocol/jss.h>
 
+#include <format>
+
 namespace ripple {
-
-static void
-textTime(
-    std::string& text,
-    beast::basic_seconds_clock::time_point& seconds,
-    const char* unitName,
-    std::chrono::seconds unitVal)
-{
-    auto i = seconds.time_since_epoch() / unitVal;
-
-    if (i == 0)
-        return;
-
-    seconds -= unitVal * i;
-
-    if (!text.empty())
-        text += ", ";
-
-    text += std::to_string(i);
-    text += " ";
-    text += unitName;
-
-    if (i > 1)
-        text += "s";
-}
 
 Json::Value
 getCountsJson(Application& app, int minObjectCount)
@@ -121,15 +98,25 @@ getCountsJson(Application& app, int minObjectCount)
     ret[jss::treenode_track_size] =
         app.getNodeFamily().getTreeNodeCache()->getTrackSize();
 
-    std::string uptime;
-    auto s = beast::basic_seconds_clock::now();
-    using namespace std::chrono_literals;
-    textTime(uptime, s, "year", 365 * 24h);
-    textTime(uptime, s, "day", 24h);
-    textTime(uptime, s, "hour", 1h);
-    textTime(uptime, s, "minute", 1min);
-    textTime(uptime, s, "second", 1s);
-    ret[jss::uptime] = uptime;
+    ret[jss::uptime] = [](std::chrono::seconds uptime) {
+        std::string ret;
+
+        using namespace std::chrono_literals;
+
+        if (auto d = uptime / 24h; d != 0)
+        {
+            ret = std::to_string(d) + " day";
+
+            if (d != 1)
+                ret += "s";
+
+            ret += ", ";
+
+            uptime -= d * 24h;
+        }
+
+        return ret + std::format("{:%T}", uptime);
+    }(app.uptime());
 
     app.getNodeStore().getCountsJson(ret);
 

@@ -79,6 +79,12 @@ public:
 namespace detail {
 
 template <class Facade, class Clock>
+    requires(
+        std::convertible_to<
+            typename Clock::time_point,
+            typename Facade::time_point> &&
+        std::
+            convertible_to<typename Clock::duration, typename Facade::duration>)
 struct abstract_clock_wrapper : public abstract_clock<Facade>
 {
     explicit abstract_clock_wrapper() = default;

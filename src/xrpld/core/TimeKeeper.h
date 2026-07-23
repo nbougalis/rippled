@@ -37,6 +37,10 @@ private:
     static constexpr time_point
     adjust(std::chrono::system_clock::time_point when)
     {
+        XRPL_ASSERT(
+            when.time_since_epoch() >= epoch_offset,
+            "ripple::TimeKeeper::adjust : system clock time predates epoch");
+
         return time_point(std::chrono::duration_cast<duration>(
             when.time_since_epoch() - epoch_offset));
     }
