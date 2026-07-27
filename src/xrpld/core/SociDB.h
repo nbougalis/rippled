@@ -114,9 +114,10 @@ convert(std::string const& from, soci::blob& to);
 class Checkpointer : public std::enable_shared_from_this<Checkpointer>
 {
 public:
-    virtual std::uintptr_t
-    id() const = 0;
     virtual ~Checkpointer() = default;
+
+    virtual std::uintptr_t
+    id() const noexcept = 0;
 
     virtual void
     schedule() = 0;

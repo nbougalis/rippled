@@ -29,6 +29,7 @@
 #include <xrpl/basics/ByteUtilities.h>
 #include <xrpl/basics/contract.h>
 #include <boost/filesystem.hpp>
+#include <atomic>
 #include <memory>
 #include <soci/sqlite3/soci-sqlite3.h>
 
@@ -198,6 +199,46 @@ namespace {
 
 class WALCheckpointer : public Checkpointer
 {
+    std::atomic<bool> running_ = false;
+
+    std::uintptr_t const id_;
+
+    // session is owned by the DatabaseCon parent that holds the checkpointer.
+    // It is possible (tho rare) for the DatabaseCon class to be destoryed
+    // before the checkpointer.
+    std::weak_ptr<soci::session> session_;
+
+    JobQueue& jobQueue_;
+
+    beast::Journal const j_;
+
+    class ConnInfo
+    {
+        /** Used to keep the session alive while `conn` is accessible. */
+        std::shared_ptr<soci::session> ref;
+
+        sqlite_api::sqlite3* conn = nullptr;
+
+    public:
+        explicit ConnInfo(std::weak_ptr<soci::session> r) : ref(r.lock())
+        {
+            if (ref)
+                conn = getConnection(*ref);
+        }
+
+        explicit
+        operator bool() const noexcept
+        {
+            return conn;
+        }
+
+        sqlite_api::sqlite3*
+        handle() const noexcept
+        {
+            return conn;
+        }
+    };
+
 public:
     WALCheckpointer(
         std::uintptr_t id,
@@ -209,121 +250,89 @@ public:
         , jobQueue_(q)
         , j_(logs.journal("WALCheckpointer"))
     {
-        if (auto [conn, keepAlive] = getConnection(); conn)
+        if (ConnInfo ci{session_})
         {
-            (void)keepAlive;
             sqlite_api::sqlite3_wal_hook(
-                conn, &sqliteWALHook, reinterpret_cast<void*>(id_));
-        }
-    }
+                ci.handle(),
+                [](void* cp,
+                   sqlite_api::sqlite3* conn,
+                   char const* name,
+                   int pages) {
+                    if (pages >= checkpointPageCount)
+                    {
+                        if (auto checkpointer = checkpointerFromId(
+                                reinterpret_cast<std::uintptr_t>(cp)))
+                        {
+                            checkpointer->schedule();
+                        }
+                        else
+                        {
+                            sqlite_api::sqlite3_wal_hook(
+                                conn, nullptr, nullptr);
+                        }
+                    }
 
-    std::pair<sqlite_api::sqlite3*, std::shared_ptr<soci::session>>
-    getConnection() const
-    {
-        if (auto p = session_.lock())
-        {
-            return {ripple::getConnection(*p), p};
+                    return SQLITE_OK;
+                },
+                reinterpret_cast<void*>(id_));
         }
-        return {nullptr, std::shared_ptr<soci::session>{}};
     }
 
     std::uintptr_t
-    id() const override
+    id() const noexcept override
     {
         return id_;
     }
 
-    ~WALCheckpointer() override = default;
-
     void
     schedule() override
     {
+        // If another job is not already running, try to queue a job; we take
+        // a weak pointer, so that if the owning DatabaseCon can be destroyed
+        // we can avoid an unnecessary checkpoint.
+        if (!running_.exchange(true, std::memory_order_acq_rel) &&
+            !jobQueue_.addJob(jtWAL, "WAL", [wp = weak_from_this()]() {
+                // There is a separate check in `checkpoint` to check for
+                // connection validity. Here we only care that the object
+                // still exists.
+                if (auto self = wp.lock())
+                    self->checkpoint();
+            }))
         {
-            std::lock_guard lock(mutex_);
-            if (running_)
-                return;
-            running_ = true;
-        }
-
-        // If the Job is not added to the JobQueue then we're not running_.
-        if (!jobQueue_.addJob(
-                jtWAL,
-                "WAL",
-                // If the owning DatabaseCon is destroyed, no need to checkpoint
-                // or keep the checkpointer alive so use a weak_ptr to this.
-                // There is a separate check in `checkpoint` for a valid
-                // connection in the rare case when the DatabaseCon is destroyed
-                // after locking this weak_ptr
-                [wp = std::weak_ptr<Checkpointer>{shared_from_this()}]() {
-                    if (auto self = wp.lock())
-                        self->checkpoint();
-                }))
-        {
-            std::lock_guard lock(mutex_);
-            running_ = false;
+            // If the Job was not added to the JobQueue then we're not running.
+            running_.store(false, std::memory_order_release);
         }
     }
 
     void
     checkpoint() override
     {
-        auto [conn, keepAlive] = getConnection();
-        (void)keepAlive;
-        if (!conn)
-            return;
-
-        int log = 0, ckpt = 0;
-        int ret = sqlite3_wal_checkpoint_v2(
-            conn, nullptr, SQLITE_CHECKPOINT_PASSIVE, &log, &ckpt);
-
-        auto fname = sqlite3_db_filename(conn, "main");
-        if (ret != SQLITE_OK)
+        if (ConnInfo ci{session_})
         {
-            auto jm = (ret == SQLITE_LOCKED) ? j_.trace() : j_.warn();
-            JLOG(jm) << "WAL(" << fname << "): error " << ret;
-        }
-        else
-        {
-            JLOG(j_.trace()) << "WAL(" << fname << "): frames=" << log
-                             << ", written=" << ckpt;
-        }
+            int log = 0;
+            int ckpt = 0;
 
-        std::lock_guard lock(mutex_);
-        running_ = false;
-    }
+            int ret = sqlite3_wal_checkpoint_v2(
+                ci.handle(), nullptr, SQLITE_CHECKPOINT_PASSIVE, &log, &ckpt);
 
-protected:
-    std::uintptr_t const id_;
-    // session is owned by the DatabaseCon parent that holds the checkpointer.
-    // It is possible (tho rare) for the DatabaseCon class to be destoryed
-    // before the checkpointer.
-    std::weak_ptr<soci::session> session_;
-    std::mutex mutex_;
-    JobQueue& jobQueue_;
+            auto fname = sqlite3_db_filename(ci.handle(), "main");
 
-    bool running_ = false;
-    beast::Journal const j_;
+            if (fname == nullptr)
+                fname = "unknown";
 
-    static int
-    sqliteWALHook(
-        void* cpId,
-        sqlite_api::sqlite3* conn,
-        const char* dbName,
-        int walSize)
-    {
-        if (walSize >= checkpointPageCount)
-        {
-            if (auto checkpointer =
-                    checkpointerFromId(reinterpret_cast<std::uintptr_t>(cpId)))
+            if (ret != SQLITE_OK)
             {
-                checkpointer->schedule();
+                auto jm = (ret == SQLITE_LOCKED) ? j_.trace() : j_.warn();
+                JLOG(jm) << "WAL(" << fname << "): error " << ret;
             }
             else
             {
-                sqlite_api::sqlite3_wal_hook(conn, nullptr, nullptr);
+                JLOG(j_.trace()) << "WAL(" << fname << "): frames=" << log
+                                 << ", written=" << ckpt;
             }
         }
-        return SQLITE_OK;
+
+        running_.store(false, std::memory_order_release);
     }
 };
 

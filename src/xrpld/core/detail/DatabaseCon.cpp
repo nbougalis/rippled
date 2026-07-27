@@ -25,6 +25,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 
+#include <atomic>
 #include <memory>
 #include <unordered_map>
 
@@ -32,23 +33,27 @@ namespace ripple {
 
 class CheckpointersCollection
 {
-    std::uintptr_t nextId_{0};
+    /** The (intentionally non-zero) identifier for the next checkpointer. */
+    std::atomic<std::uintptr_t> nextId_{1};
+
     // Mutex protects the CheckpointersCollection
     std::mutex mutex_;
+
     // Each checkpointer is given a unique id. All the checkpointers that are
     // part of a DatabaseCon are part of this collection. When the DatabaseCon
     // is destroyed, its checkpointer is removed from the collection
     std::unordered_map<std::uintptr_t, std::shared_ptr<Checkpointer>>
-        checkpointers_;
+            checkpointers_;
 
 public:
     std::shared_ptr<Checkpointer>
-    fromId(std::uintptr_t id)
+    find(std::uintptr_t id)
     {
         std::lock_guard l{mutex_};
-        auto it = checkpointers_.find(id);
-        if (it != checkpointers_.end())
+
+        if (auto it = checkpointers_.find(id); it != checkpointers_.end())
             return it->second;
+
         return {};
     }
 
@@ -65,20 +70,24 @@ public:
         JobQueue& jobQueue,
         Logs& logs)
     {
+        auto r = makeCheckpointer(
+            nextId_.fetch_add(1, std::memory_order::relaxed),
+            session,
+            jobQueue,
+            logs);
+
         std::lock_guard lock{mutex_};
-        auto const id = nextId_++;
-        auto const r = makeCheckpointer(id, session, jobQueue, logs);
-        checkpointers_[id] = r;
+        checkpointers_.emplace(r->id(), r);
         return r;
     }
 };
 
-CheckpointersCollection checkpointers;
+inline CheckpointersCollection checkpointers;
 
 std::shared_ptr<Checkpointer>
 checkpointerFromId(std::uintptr_t id)
 {
-    return checkpointers.fromId(id);
+    return checkpointers.find(id);
 }
 
 DatabaseCon::~DatabaseCon()
@@ -164,8 +173,10 @@ setup_DatabaseCon(Config const& c, std::optional<beast::Journal> j)
                     boost::iequals(journal_mode, "persist") ||
                     boost::iequals(journal_mode, "wal"))
                 {
-                    result->emplace_back(boost::str(
-                        boost::format(CommonDBPragmaJournal) % journal_mode));
+                    result->emplace_back(
+                        boost::str(
+                            boost::format(CommonDBPragmaJournal) %
+                            journal_mode));
                 }
                 else
                 {
@@ -189,8 +200,9 @@ setup_DatabaseCon(Config const& c, std::optional<beast::Journal> j)
                     boost::iequals(synchronous, "full") ||
                     boost::iequals(synchronous, "extra"))
                 {
-                    result->emplace_back(boost::str(
-                        boost::format(CommonDBPragmaSync) % synchronous));
+                    result->emplace_back(
+                        boost::str(
+                            boost::format(CommonDBPragmaSync) % synchronous));
                 }
                 else
                 {
@@ -213,8 +225,9 @@ setup_DatabaseCon(Config const& c, std::optional<beast::Journal> j)
                 if (higherRisk || boost::iequals(temp_store, "default") ||
                     boost::iequals(temp_store, "file"))
                 {
-                    result->emplace_back(boost::str(
-                        boost::format(CommonDBPragmaTemp) % temp_store));
+                    result->emplace_back(
+                        boost::str(
+                            boost::format(CommonDBPragmaTemp) % temp_store));
                 }
                 else
                 {
@@ -280,6 +293,7 @@ DatabaseCon::setupCheckpointing(JobQueue* q, Logs& l)
 {
     if (!q)
         Throw<std::logic_error>("No JobQueue");
+
     checkpointer_ = checkpointers.create(session_, *q, l);
 }
 
