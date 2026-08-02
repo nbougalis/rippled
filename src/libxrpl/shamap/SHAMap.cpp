@@ -111,10 +111,15 @@ SHAMap::dirtyUp(NodePathStack& stack, uint256 const& target, SHAMapTreeNodePtr c
 
     while (!stack.empty())
     {
-        auto node = intr_ptr::dynamicPointerCast<SHAMapInnerNode>(stack.top().first);
-        SHAMapNodeID const nodeID = stack.top().second;
-        stack.pop();
-        XRPL_ASSERT(node, "xrpl::SHAMap::dirtyUp : non-null node");
+        auto [top, nodeID] = stack.release();
+        if (!top->isInner())
+        {
+            // LCOV_EXCL_START
+            UNREACHABLE("xrpl::SHAMap::dirtyUp : node is not inner");
+            Throw<SHAMapMissingNode>(type_, target);
+            // LCOV_EXCL_STOP
+        }
+        auto node = intr_ptr::staticPointerCast<SHAMapInnerNode>(std::move(top));
 
         auto const branch = selectBranch(nodeID, target);
 
@@ -553,7 +558,7 @@ SHAMap::peekNextItem(uint256 const& id, NodePathStack& stack) const
     stack.pop();
     while (!stack.empty())
     {
-        auto const [node, nodeID] = stack.top();
+        auto const& [node, nodeID] = stack.top();
         XRPL_ASSERT(!node->isLeaf(), "xrpl::SHAMap::peekNextItem : another node is not leaf");
         auto& inner = safeDowncast<SHAMapInnerNode&>(*node);
         for (auto i = selectBranch(nodeID, id) + 1; i < kBranchFactor; ++i)
@@ -611,7 +616,7 @@ SHAMap::boundHelper(uint256 const& id, BelowDirection direction) const
     walkTowardsKey(id, &stack);
     while (!stack.empty())
     {
-        auto const [node, nodeID] = stack.top();
+        auto const& [node, nodeID] = stack.top();
         if (node->isLeaf())
         {
             auto const& item = safeDowncast<SHAMapLeafNode const&>(*node).peekItem();
@@ -675,8 +680,7 @@ SHAMap::delItem(uint256 const& id)
     if (stack.empty())
         Throw<SHAMapMissingNode>(type_, id);
 
-    auto leaf = intr_ptr::dynamicPointerCast<SHAMapLeafNode>(stack.top().first);
-    stack.pop();
+    auto leaf = intr_ptr::dynamicPointerCast<SHAMapLeafNode>(stack.release().first);
 
     if (!leaf || (leaf->peekItem()->key() != id))
         return false;
@@ -688,9 +692,15 @@ SHAMap::delItem(uint256 const& id)
 
     while (!stack.empty())
     {
-        auto node = intr_ptr::staticPointerCast<SHAMapInnerNode>(stack.top().first);
-        SHAMapNodeID const nodeID = stack.top().second;
-        stack.pop();
+        auto [top, nodeID] = stack.release();
+        if (!top->isInner())
+        {
+            // LCOV_EXCL_START
+            UNREACHABLE("xrpl::SHAMap::delItem : node is not inner");
+            Throw<SHAMapMissingNode>(type_, id);
+            // LCOV_EXCL_STOP
+        }
+        auto node = intr_ptr::staticPointerCast<SHAMapInnerNode>(std::move(top));
 
         node = unshareNode(std::move(node), nodeID);
         node->setChild(
@@ -761,8 +771,7 @@ SHAMap::addGiveItem(SHAMapNodeType type, boost::intrusive_ptr<SHAMapItem const> 
     if (stack.empty())
         Throw<SHAMapMissingNode>(type_, tag);
 
-    auto [node, nodeID] = stack.top();
-    stack.pop();
+    auto [node, nodeID] = stack.release();
 
     if (node->isLeaf())
     {
@@ -849,11 +858,17 @@ SHAMap::updateGiveItem(SHAMapNodeType type, boost::intrusive_ptr<SHAMapItem cons
     if (stack.empty())
         Throw<SHAMapMissingNode>(type_, tag);
 
-    auto node = intr_ptr::dynamicPointerCast<SHAMapLeafNode>(stack.top().first);
-    auto nodeID = stack.top().second;
-    stack.pop();
+    auto [top, nodeID] = stack.release();
 
-    if (!node || (node->peekItem()->key() != tag))
+    // walkTowardsKey pushes an inner node's own entry before testing whether the branch it needs
+    // is empty, so a tag absent from the map leaves that inner node on top rather than a leaf.
+    // Not reachable through updateGiveItem's current callers, all of which check the item exists
+    // before calling this, but the static cast below is safe only once this is confirmed.
+    if (!top->isLeaf())
+        return false;
+    auto node = intr_ptr::staticPointerCast<SHAMapLeafNode>(std::move(top));
+
+    if (node->peekItem()->key() != tag)
     {
         // LCOV_EXCL_START
         UNREACHABLE("xrpl::SHAMap::updateGiveItem : invalid node");
