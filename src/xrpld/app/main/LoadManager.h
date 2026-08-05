@@ -22,31 +22,33 @@
 
 #include <xrpl/beast/utility/Journal.h>
 #include <atomic>
-#include <condition_variable>
 #include <memory>
-#include <mutex>
 #include <thread>
 
 namespace ripple {
 
 class Application;
 
-/** Manages load sources.
+/** Monitors server health and manages load-based local fee escalation.
 
-    This object creates an associated thread to maintain a clock.
+    LoadManager runs a dedicated background thread that wakes approximately
+    once per second to check whether the JobQueue is overloaded, and adjust
+    the server's local fee.
 
-    When the server is overloaded by a particular peer it issues a warning
-    first. This allows friendly peers to reduce their consumption of resources,
-    or disconnect from the server.
+    It also checks the application's watchdog, to track how long the server
+    has gone without making forward progress. A sustained stall gets logged
+    with escalating severity, and if the stall persists, we assume that the
+    server is deadlocked and deliberately terminate it via LogicError.
 
-    The warning system is used instead of merely dropping, because hostile
-    peers can just reconnect anyway.
+    The background thread is created when the @ref start method is invoked,
+    and is stopped when the @ref stop method is called (either directly or
+    automatically by the destructor).
 */
 class LoadManager
 {
+public:
     LoadManager(Application& app, beast::Journal journal);
 
-public:
     LoadManager() = delete;
     LoadManager(LoadManager const&) = delete;
     LoadManager&
@@ -58,60 +60,37 @@ public:
     */
     ~LoadManager();
 
-    /** Turn on deadlock detection.
-
-        The deadlock detector begins in a disabled state. After this function
-        is called, it will report deadlocks using a separate thread whenever
-        the reset function is not called at least once per 10 seconds.
-
-        @see resetDeadlockDetector
-    */
-    // VFALCO NOTE it seems that the deadlock detector has an "armed" state
-    //             to prevent it from going off during program startup if
-    //             there's a lengthy initialization operation taking place?
-    //
-    void
-    activateDeadlockDetector();
-
-    /** Reset the deadlock detection timer.
-
-        A dedicated thread monitors the deadlock timer, and if too much
-        time passes it will produce log warnings.
-    */
-    void
-    resetDeadlockDetector();
-
     //--------------------------------------------------------------------------
 
+    /** Instruct the load manager to start background operations.
+
+        Starting the load manager when it is already running has
+        no effect.
+     */
     void
     start();
 
+    /** Instruct the load manager to stop background operations.
+
+        Returns only after the background thread has exited; one final
+        tick of work may still execute after stop is invoked.
+
+        This may be called multiple times, but is not safe to call
+        concurrently with itself or with start().
+
+        This is called automatically by the destructor, but manually
+        stopping allows fine-grained control.
+     */
     void
     stop();
-
-private:
-    void
-    run();
 
 private:
     Application& app_;
     beast::Journal const journal_;
 
+    std::atomic<bool> run_ = false;
     std::thread thread_;
-    std::mutex mutex_;  // Guards deadLock_, armed_, cv_
-    std::condition_variable cv_;
-    bool stop_ = false;
-
-    std::chrono::steady_clock::time_point
-        deadLock_;  // Detect server deadlocks.
-    bool armed_;
-
-    friend std::unique_ptr<LoadManager>
-    make_LoadManager(Application& app, beast::Journal journal);
 };
-
-std::unique_ptr<LoadManager>
-make_LoadManager(Application& app, beast::Journal journal);
 
 }  // namespace ripple
 

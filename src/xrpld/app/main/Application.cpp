@@ -36,6 +36,7 @@
 #include <xrpld/app/main/NodeIdentity.h>
 #include <xrpld/app/main/NodeStoreScheduler.h>
 #include <xrpld/app/main/Tuning.h>
+#include <xrpld/app/main/Watchdog.h>
 #include <xrpld/app/misc/AmendmentTable.h>
 #include <xrpld/app/misc/DatagramMonitor.h>
 #include <xrpld/app/misc/HashRouter.h>
@@ -167,6 +168,8 @@ private:
 public:
     beast::basic_seconds_clock::time_point start_time;
 
+    Watchdog watchdog_;
+
     std::unique_ptr<Config> config_;
     std::unique_ptr<Logs> logs_;
     std::unique_ptr<TimeKeeper> timeKeeper_;
@@ -219,7 +222,7 @@ public:
     std::unique_ptr<LoadFeeTrack> mFeeTrack;
     std::unique_ptr<HashRouter> hashRouter_;
     RCLValidations mValidations;
-    std::unique_ptr<LoadManager> m_loadManager;
+    LoadManager m_loadManager;
     std::unique_ptr<TxQ> txQ_;
     ClosureCounter<void, boost::system::error_code const&> waitHandlerCounter_;
     boost::asio::steady_timer sweepTimer_;
@@ -468,7 +471,7 @@ public:
               *this,
               logs_->journal("Validations"))
 
-        , m_loadManager(make_LoadManager(*this, logs_->journal("LoadManager")))
+        , m_loadManager(*this, logs_->journal("LoadManager"))
 
         , txQ_(
               std::make_unique<TxQ>(setup_TxQ(*config_), logs_->journal("TxQ")))
@@ -694,10 +697,16 @@ public:
         return m_masterMutex;
     }
 
+    Watchdog&
+    watchdog() override
+    {
+        return watchdog_;
+    }
+
     LoadManager&
     getLoadManager() override
     {
-        return *m_loadManager;
+        return m_loadManager;
     }
 
     Resource::Manager&
@@ -1570,7 +1579,7 @@ ApplicationImp::start(bool withTimers)
 
     m_io_latency_sampler.start();
     m_resolver->start();
-    m_loadManager->start();
+    m_loadManager.start();
     m_shaMapStore->start();
     if (overlay_)
         overlay_->start();
@@ -1592,7 +1601,7 @@ ApplicationImp::run()
         //             manager then the deadlock detector can just always be
         //             "armed"
         //
-        getLoadManager().activateDeadlockDetector();
+        watchdog_.arm();
     }
 
     // Now wait for the stop signal:
@@ -1658,7 +1667,7 @@ ApplicationImp::run()
 
     // The order of these stop calls is delicate.
     // Re-ordering them risks undefined behavior.
-    m_loadManager->stop();
+    m_loadManager.stop();
     m_shaMapStore->stop();
     m_jobQueue->stop();
     if (overlay_)

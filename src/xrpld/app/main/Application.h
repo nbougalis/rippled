@@ -94,6 +94,7 @@ class STLedgerEntry;
 class TimeKeeper;
 class TransactionMaster;
 class TxQ;
+class Watchdog;
 
 class ValidatorList;
 class ValidatorSite;
@@ -183,6 +184,8 @@ public:
     getHashRouter() = 0;
     virtual LoadFeeTrack&
     getFeeTrack() = 0;
+    virtual Watchdog&
+    watchdog() = 0;
     virtual LoadManager&
     getLoadManager() = 0;
     virtual Overlay&

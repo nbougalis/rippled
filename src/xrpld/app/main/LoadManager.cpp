@@ -19,18 +19,18 @@
 
 #include <xrpld/app/main/Application.h>
 #include <xrpld/app/main/LoadManager.h>
+#include <xrpld/app/main/Watchdog.h>
 #include <xrpld/app/misc/LoadFeeTrack.h>
 #include <xrpld/app/misc/NetworkOPs.h>
 #include <xrpl/beast/clock/basic_seconds_clock.h>
 #include <xrpl/beast/core/CurrentThreadName.h>
 #include <memory>
-#include <mutex>
 #include <thread>
 
 namespace ripple {
 
 LoadManager::LoadManager(Application& app, beast::Journal journal)
-    : app_(app), journal_(journal), deadLock_(), armed_(false)
+    : app_(app), journal_(journal)
 {
 }
 
@@ -42,162 +42,116 @@ LoadManager::~LoadManager()
     }
     catch (std::exception const& ex)
     {
-        // Swallow the exception in a destructor.
+        // Swallow any exception in a destructor.
         JLOG(journal_.warn())
             << "std::exception in ~LoadManager.  " << ex.what();
     }
 }
 
-//------------------------------------------------------------------------------
-
-void
-LoadManager::activateDeadlockDetector()
-{
-    std::lock_guard sl(mutex_);
-    armed_ = true;
-    deadLock_ = std::chrono::steady_clock::now();
-}
-
-void
-LoadManager::resetDeadlockDetector()
-{
-    auto const detector_start = std::chrono::steady_clock::now();
-    std::lock_guard sl(mutex_);
-    deadLock_ = detector_start;
-}
-
-//------------------------------------------------------------------------------
-
 void
 LoadManager::start()
 {
-    JLOG(journal_.debug()) << "Starting";
-    XRPL_ASSERT(
-        !thread_.joinable(),
-        "ripple::LoadManager::start : thread not joinable");
+    if (!run_.exchange(true, std::memory_order_relaxed))
+    {
+        thread_ = std::thread([this]() {
+            beast::setCurrentThreadName("LoadManager");
 
-    thread_ = std::thread{&LoadManager::run, this};
+            using namespace std::chrono_literals;
+
+            // Limits how often we log (and dump the job queue) while
+            // overloaded.
+            static constexpr auto overloadLogInterval = 60s;
+
+            // Backdated by one interval so the first overload event always
+            // logs.
+            auto lastOverloadLog =
+                beast::basic_seconds_clock::now() - overloadLogInterval;
+
+            auto checkOverload = [this, &lastOverloadLog]() {
+                if (app_.getJobQueue().isOverloaded())
+                {
+                    if (auto const now = beast::basic_seconds_clock::now();
+                        now - lastOverloadLog >= overloadLogInterval)
+                    {
+                        JLOG(journal_.info())
+                            << "Raising local fee (JQ overload): "
+                            << app_.getJobQueue().getJson(0);
+                        lastOverloadLog = now;
+                    }
+
+                    return app_.getFeeTrack().raiseLocalFee();
+                }
+
+                return app_.getFeeTrack().lowerLocalFee();
+            };
+
+            auto t = beast::basic_seconds_clock::now();
+
+            while (run_.load(std::memory_order_relaxed))
+            {
+                // Escalation thresholds, denominated in observation ticks (the
+                // loop runs at 1 Hz, so nominally seconds).
+                constexpr std::uint64_t reportingInterval = 10;
+                constexpr std::uint64_t fatalLogLimit = 90;
+                constexpr std::uint64_t logicErrorLimit = 600;
+
+                // Check for stalls first: this must not sit behind anything
+                // that could itself block on a wedge (e.g. the fee check below,
+                // which takes JobQueue and LoadFeeTrack locks).
+                if (auto const stalled = app_.watchdog().observe();
+                    stalled >= reportingInterval)
+                {
+                    // stalled advances exactly once per observation, so this
+                    // modulo reliably fires every reportingInterval ticks.
+                    if ((stalled % reportingInterval) == 0)
+                    {
+                        if (stalled < fatalLogLimit)
+                        {
+                            JLOG(journal_.warn()) << "Server stalled for "
+                                                  << stalled << " seconds.";
+                            if (app_.getJobQueue().isOverloaded())
+                            {
+                                JLOG(journal_.warn())
+                                    << app_.getJobQueue().getJson(0);
+                            }
+                        }
+                        else
+                        {
+                            JLOG(journal_.fatal())
+                                << "Deadlock detected. Deadlocked time: "
+                                << stalled << "s";
+                            JLOG(journal_.fatal())
+                                << "JobQueue: "
+                                << app_.getJobQueue().getJson(0);
+                        }
+                    }
+
+                    // The stall has gone on long enough for us to conclude that
+                    // the server is wedged. Terminate unconditionally.
+                    if (stalled >= logicErrorLimit)
+                        LogicError("Deadlock detected");
+                }
+
+                // Instead of a direct call, we should have a way for NetworkOPs
+                // to subscribe to the load manager to intercept this event.
+                if (checkOverload())
+                    app_.getOPs().reportFeeChange();
+
+                t += 1s;
+
+                std::this_thread::sleep_until(t);
+            }
+        });
+    }
 }
 
 void
 LoadManager::stop()
 {
-    {
-        std::lock_guard lock(mutex_);
-        stop_ = true;
-        // There is at most one thread waiting on this condition.
-        cv_.notify_all();
-    }
+    run_.store(false, std::memory_order_relaxed);
+
     if (thread_.joinable())
-    {
-        JLOG(journal_.debug()) << "Stopping";
         thread_.join();
-    }
-}
-
-//------------------------------------------------------------------------------
-
-void
-LoadManager::run()
-{
-    beast::setCurrentThreadName("LoadManager");
-
-    using namespace std::chrono_literals;
-    using clock_type = std::chrono::steady_clock;
-
-    auto t = clock_type::now();
-
-    while (true)
-    {
-        t += 1s;
-
-        std::unique_lock sl(mutex_);
-        if (cv_.wait_until(sl, t, [this] { return stop_; }))
-            break;
-
-        // Copy out shared data under a lock.  Use copies outside lock.
-        auto const deadLock = deadLock_;
-        auto const armed = armed_;
-        sl.unlock();
-
-        // Measure the amount of time we have been deadlocked, in seconds.
-        using namespace std::chrono;
-        auto const timeSpentDeadlocked =
-            duration_cast<seconds>(steady_clock::now() - deadLock);
-
-        constexpr auto reportingIntervalSeconds = 10s;
-        constexpr auto deadlockFatalLogMessageTimeLimit = 90s;
-        constexpr auto deadlockLogicErrorTimeLimit = 600s;
-
-        if (armed && (timeSpentDeadlocked >= reportingIntervalSeconds))
-        {
-            // Report the deadlocked condition every
-            // reportingIntervalSeconds
-            if ((timeSpentDeadlocked % reportingIntervalSeconds) == 0s)
-            {
-                if (timeSpentDeadlocked < deadlockFatalLogMessageTimeLimit)
-                {
-                    JLOG(journal_.warn())
-                        << "Server stalled for " << timeSpentDeadlocked.count()
-                        << " seconds.";
-                    if (app_.getJobQueue().isOverloaded())
-                    {
-                        JLOG(journal_.warn()) << app_.getJobQueue().getJson(0);
-                    }
-                }
-                else
-                {
-                    JLOG(journal_.fatal())
-                        << "Deadlock detected. Deadlocked time: "
-                        << timeSpentDeadlocked.count() << "s";
-                    JLOG(journal_.fatal())
-                        << "JobQueue: " << app_.getJobQueue().getJson(0);
-                }
-            }
-
-            // If we go over the deadlockTimeLimit spent deadlocked, it
-            // means that the deadlock resolution code has failed, which
-            // qualifies as undefined behavior.
-            //
-            if (timeSpentDeadlocked >= deadlockLogicErrorTimeLimit)
-            {
-                JLOG(journal_.fatal())
-                    << "LogicError: Deadlock detected. Deadlocked time: "
-                    << timeSpentDeadlocked.count() << "s";
-                JLOG(journal_.fatal())
-                    << "JobQueue: " << app_.getJobQueue().getJson(0);
-                LogicError("Deadlock detected");
-            }
-        }
-    }
-
-    bool change;
-
-    if (app_.getJobQueue().isOverloaded())
-    {
-        JLOG(journal_.info()) << "Raising local fee (JQ overload): "
-                              << app_.getJobQueue().getJson(0);
-        change = app_.getFeeTrack().raiseLocalFee();
-    }
-    else
-    {
-        change = app_.getFeeTrack().lowerLocalFee();
-    }
-
-    if (change)
-    {
-        // VFALCO TODO replace this with a Listener / observer and
-        // subscribe in NetworkOPs or Application.
-        app_.getOPs().reportFeeChange();
-    }
-}
-
-//------------------------------------------------------------------------------
-
-std::unique_ptr<LoadManager>
-make_LoadManager(Application& app, beast::Journal journal)
-{
-    return std::unique_ptr<LoadManager>{new LoadManager{app, journal}};
 }
 
 }  // namespace ripple
