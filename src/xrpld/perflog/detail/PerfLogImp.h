@@ -199,7 +199,7 @@ public:
     }
 
     void
-    resizeJobs(int const resize) override;
+    resizeJobs(std::size_t resize) override;
     void
     rotate() override;
 

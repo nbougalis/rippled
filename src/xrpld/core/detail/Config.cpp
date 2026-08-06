@@ -725,12 +725,12 @@ Config::loadFromString(std::string const& fileContents)
 
     if (getSingleSection(secConfig, SECTION_PREFETCH_WORKERS, strTemp, j_))
     {
-        PREFETCH_WORKERS = beast::lexicalCastThrow<int>(strTemp);
+        PREFETCH_WORKERS = beast::lexicalCastThrow<unsigned int>(strTemp);
 
-        if (PREFETCH_WORKERS < 1 || PREFETCH_WORKERS > 1024)
+        if (PREFETCH_WORKERS < 1 || PREFETCH_WORKERS > 32)
             Throw<std::runtime_error>(
                 "Invalid " SECTION_PREFETCH_WORKERS
-                ": must be between 1 and 1024 inclusive.");
+                ": must be between 1 and 32 inclusive.");
     }
 
     if (getSingleSection(secConfig, SECTION_COMPRESSION, strTemp, j_))

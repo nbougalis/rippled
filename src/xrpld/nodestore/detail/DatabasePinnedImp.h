@@ -68,7 +68,7 @@ public:
     DatabasePinnedImp(
         Application& app,
         Scheduler& scheduler,
-        int readThreads,
+        unsigned int threads,
         std::shared_ptr<Backend> writableBackend,
         std::shared_ptr<Backend> archiveBackend,
         std::shared_ptr<Backend> persistent,

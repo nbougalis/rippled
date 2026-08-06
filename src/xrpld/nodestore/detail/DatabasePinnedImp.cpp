@@ -29,18 +29,18 @@ namespace NodeStore {
 DatabasePinnedImp::DatabasePinnedImp(
     Application& app,
     Scheduler& scheduler,
-    int readThreads,
+    unsigned int threads,
     std::shared_ptr<Backend> writableBackend,
     std::shared_ptr<Backend> archiveBackend,
     std::shared_ptr<Backend> persistent,
     Section const& config,
     beast::Journal j)
-    : DatabaseRotating(scheduler, readThreads, config, j)
+    : DatabaseRotating(scheduler, threads, config, j, "db-pinned")
     , app_(app)
     , rotating_(
           app,
           scheduler,
-          readThreads,
+          0,
           std::move(writableBackend),
           std::move(archiveBackend),
           config,

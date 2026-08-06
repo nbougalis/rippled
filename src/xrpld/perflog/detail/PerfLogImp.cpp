@@ -440,7 +440,7 @@ PerfLogImp::jobFinish(JobType const type, microseconds dur, int instance)
 }
 
 void
-PerfLogImp::resizeJobs(int const resize)
+PerfLogImp::resizeJobs(std::size_t resize)
 {
     std::lock_guard lock(counters_.jobsMutex_);
     if (resize > counters_.jobs_.size())

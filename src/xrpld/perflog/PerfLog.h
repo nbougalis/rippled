@@ -161,7 +161,7 @@ public:
      * @param resize Number of JobQueue worker threads
      */
     virtual void
-    resizeJobs(int const resize) = 0;
+    resizeJobs(std::size_t resize) = 0;
 
     /**
      * Rotate perf log file

@@ -26,8 +26,7 @@
 #include <xrpl/basics/TaggedCache.h>
 #include <xrpl/protocol/SystemParameters.h>
 
-#include <condition_variable>
-#include <thread>
+#include <memory>
 
 namespace ripple {
 
@@ -47,7 +46,7 @@ namespace NodeStore {
 
     @see NodeObject
 */
-class Database
+class alignas(64) Database
 {
 public:
     Database() = delete;
@@ -55,15 +54,17 @@ public:
     /** Construct the node store.
 
         @param scheduler The scheduler to use for performing asynchronous tasks.
-        @param readThreads The number of asynchronous read threads to create.
+        @param threads The number of asynchronous read threads to create.
         @param config The configuration settings
         @param journal Destination for logging output.
+        @param name A short name, used for naming our threads.
     */
     Database(
         Scheduler& scheduler,
-        int readThreads,
+        unsigned int threads,
         Section const& config,
-        beast::Journal j);
+        beast::Journal j,
+        std::string_view name = "db");
 
     /** Destroy the node store.
         All pending operations are completed, pending writes flushed,
@@ -146,14 +147,14 @@ public:
 
         @note This can be called concurrently.
         @param hash The key of the object to retrieve
-        @param ledgerSeq The sequence of the ledger where the
+        @param seq The sequence of the ledger where the
                 object is stored.
         @param callback Callback function when read completes
     */
     virtual void
     asyncFetch(
         uint256 const& hash,
-        std::uint32_t ledgerSeq,
+        std::uint32_t seq,
         std::function<void(boost::intrusive_ptr<NodeObject> const&)>&&
             callback);
 
@@ -228,23 +229,6 @@ public:
     }
 
 protected:
-    beast::Journal const j_;
-    Scheduler& scheduler_;
-    int fdRequired_ = 0;
-
-    // The default is XRP_LEDGER_EARLIEST_SEQ (32570) to match the XRP ledger
-    // network's earliest allowed ledger sequence. Can be set through the
-    // configuration file using the 'earliest_seq' field under the 'node_db'
-    // stanza. If specified, the value must be greater than zero.
-    // Only unit tests or alternate
-    // networks should change this value.
-    std::uint32_t const earliestLedgerSeq_;
-
-    // The maximum number of requests a thread extracts from the queue in an
-    // attempt to minimize the overhead of mutex acquisition. This is an
-    // advanced tunable, via the config file. The default value is 4.
-    int const requestBundle_;
-
     void
     storeStats(std::uint64_t count, std::uint64_t sz)
     {
@@ -275,30 +259,6 @@ protected:
     }
 
 private:
-    std::atomic<std::uint64_t> storeCount_ = 0;
-    std::atomic<std::uint64_t> storeSz_ = 0;
-    std::atomic<std::uint64_t> fetchTotalCount_ = 0;
-    std::atomic<std::uint64_t> fetchHitCount_ = 0;
-    std::atomic<std::uint64_t> fetchSz_ = 0;
-
-    std::atomic<std::chrono::microseconds::rep> fetchDurationUs_ = 0;
-    std::atomic<std::chrono::microseconds::rep> storeDurationUs_ = 0;
-
-    mutable std::mutex readLock_;
-    std::condition_variable readCondVar_;
-
-    // reads to do
-    std::map<
-        uint256,
-        std::vector<std::pair<
-            std::uint32_t,
-            std::function<void(boost::intrusive_ptr<NodeObject> const&)>>>>
-        read_;
-
-    std::atomic<bool> readStopping_ = false;
-    std::atomic<int> readThreads_ = 0;
-    std::atomic<int> runningThreads_ = 0;
-
     virtual boost::intrusive_ptr<NodeObject>
     fetchNodeObject(
         uint256 const& hash,
@@ -315,6 +275,89 @@ private:
     */
     virtual void
     for_each(std::function<void(boost::intrusive_ptr<NodeObject>)> f) = 0;
+
+protected:
+    beast::Journal const j_;
+    Scheduler& scheduler_;
+    int fdRequired_ = 0;
+
+    // The default is XRP_LEDGER_EARLIEST_SEQ (32570) to match the XRP ledger
+    // network's earliest allowed ledger sequence. Can be set through the
+    // configuration file using the 'earliest_seq' field under the 'node_db'
+    // stanza. If specified, the value must be greater than zero.
+    // Only unit tests or alternate  networks should change this value.
+    std::uint32_t const earliestLedgerSeq_;
+
+private:
+    /** Indicates we are stopping.
+
+        Placed among the cold members, so frequent (lock-free) reads on the
+        hot path, are never invalidated by counter traffic. Written to only
+        once, under the mutex.
+    */
+    std::atomic<bool> readStopping_ = false;
+
+    /** Number of objects written to the backend since startup. */
+    alignas(64) std::atomic<std::uint64_t> storeCount_ = 0;
+
+    /** Total bytes written to the backend since startup. */
+    std::atomic<std::uint64_t> storeSz_ = 0;
+
+    /** Number of fetch attempts since startup, hit or miss. */
+    alignas(64) std::atomic<std::uint64_t> fetchTotalCount_ = 0;
+
+    /** Number of fetch attempts that found the object. */
+    std::atomic<std::uint64_t> fetchHitCount_ = 0;
+
+    /** Total bytes of all objects returned by successful fetches. */
+    std::atomic<std::uint64_t> fetchSz_ = 0;
+
+    /** Cumulative wall time spent in fetchNodeObject. */
+    std::atomic<std::chrono::microseconds::rep> fetchDurationUs_ = 0;
+
+    /** Guards read_.
+
+        This is held only for queue insertion and extraction; it is never
+        held across a fetch, a callback, or a call into workers_.
+     */
+    alignas(64) mutable std::mutex readLock_;
+
+    /** Pending asynchronous reads, keyed by object hash.
+
+        Each key maps to the callbacks registered for it; the presence of a
+        key means a fetch is queued or in flight for that key, and a second
+        request for a hash adds another callback, instead of enqueueing new
+        work. One task is created per key insertion; each task extracts and
+        services exactly one key.
+    */
+    std::map<
+        uint256,
+        std::vector<std::pair<
+            std::uint32_t,
+            std::function<void(boost::intrusive_ptr<NodeObject> const&)>>>>
+        read_;
+
+    /** The read thread pool and its task handler.
+
+        Services asynchronous fetches queued in read_: each task extracts
+        one key and dispatches its callbacks (see asyncFetch for the task
+        accounting, and the class definition in Database.cpp for details).
+
+        Null when the database was constructed with zero read threads; in
+        that case asyncFetch degrades to servicing requests synchronously
+        on the caller's thread.
+
+        @note This MUST remain the last data member. Its destruction stops
+              the pool and joins its threads, which read every member that
+              is declared above (the queue, its lock, and the stop flag);
+              declaration order is what makes that join safe. Nothing may
+              be declared after it.
+     */
+    /** @{ */
+    class DatabaseWorkers;
+
+    std::unique_ptr<DatabaseWorkers> workers_;
+    /** @} */
 };
 
 }  // namespace NodeStore

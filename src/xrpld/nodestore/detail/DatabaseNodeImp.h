@@ -42,11 +42,11 @@ public:
 
     DatabaseNodeImp(
         Scheduler& scheduler,
-        int readThreads,
+        unsigned int threads,
         std::shared_ptr<Backend> backend,
         Section const& config,
         beast::Journal j)
-        : Database(scheduler, readThreads, config, j)
+        : Database(scheduler, threads, config, j, "db-node")
         , cache_(
               j,
               [&config]() -> std::size_t {

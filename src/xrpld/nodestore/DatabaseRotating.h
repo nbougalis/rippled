@@ -33,21 +33,14 @@ namespace NodeStore {
 class DatabaseRotating : public Database
 {
 public:
-    DatabaseRotating(
-        Scheduler& scheduler,
-        int readThreads,
-        Section const& config,
-        beast::Journal journal)
-        : Database(scheduler, readThreads, config, journal)
-    {
-    }
+    using Database::Database;
 
     /** Rotates the backends.
 
         @param newBackend New writable backend
         @param f A function executed after the rotation outside of lock. The
-       values passed to f will be the new backend database names _after_
-       rotation.
+                 values passed to f will be the new backend database names
+                 _after_ rotation.
     */
     virtual void
     rotate(

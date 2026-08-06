@@ -145,7 +145,7 @@ public:
     }
 
     std::unique_ptr<NodeStore::Database>
-    makeNodeStore(int readThreads) override;
+    makeNodeStore(unsigned int readThreads) override;
 
     LedgerIndex
     setCanDelete(LedgerIndex seq) override

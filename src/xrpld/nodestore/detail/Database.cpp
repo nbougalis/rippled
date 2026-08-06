@@ -18,8 +18,10 @@
 //==============================================================================
 
 #include <xrpld/app/ledger/Ledger.h>
+#include <xrpld/core/detail/Workers.h>
 #include <xrpld/nodestore/Database.h>
 #include <xrpl/basics/chrono.h>
+#include <xrpl/basics/safe_cast.h>
 #include <xrpl/beast/core/CurrentThreadName.h>
 #include <xrpl/json/json.h>
 #include <xrpl/protocol/HashPrefix.h>
@@ -29,97 +31,103 @@
 namespace ripple {
 namespace NodeStore {
 
+/** The thread pool and task handler for a database.
+
+    The ordering of the base classes matters: Workers::Callback must be
+    constructed before and must outlive Workers.
+ */
+class Database::DatabaseWorkers : public Workers::Callback, public Workers
+{
+    Database& db_;
+
+public:
+    explicit DatabaseWorkers(
+        Database& db,
+        unsigned int count,
+        std::string_view name)
+        : Workers(*this, name, count, WakePolicy::eager), db_(db)
+    {
+    }
+
+    void
+    processTask(unsigned int instance) override
+    {
+        auto node = [this]() -> decltype(db_.read_)::node_type {
+            std::lock_guard lock(db_.readLock_);
+            XRPL_ASSERT(
+                !db_.read_.empty(),
+                "ripple::Database::DatabaseWorkers::processTask : non-empty "
+                "read queue");
+
+            if (!db_.read_.empty()) [[likely]]
+                return db_.read_.extract(db_.read_.begin());
+
+            return {};
+        }();
+
+        if (!node)
+            return;
+
+        auto const& hash = node.key();
+        auto const& data = node.mapped();
+
+        auto const seqn = data[0].first;
+
+        auto obj = db_.fetchNodeObject(hash, seqn, FetchType::async);
+
+        for (auto const& req : data)
+            req.second(
+                (seqn == req.first) || db_.isSameDB(req.first, seqn)
+                    ? obj
+                    : db_.fetchNodeObject(hash, req.first, FetchType::async));
+    }
+
+    void
+    uncaughtException(unsigned int instance, std::exception_ptr eptr) override
+    {
+        try
+        {
+            if (eptr)
+                std::rethrow_exception(eptr);
+
+            LogicError(
+                beast::getCurrentThreadName() +
+                ": Uncaught exception handler invoked with no exception_ptr");
+        }
+        catch (std::exception const& e)
+        {
+            LogicError(
+                beast::getCurrentThreadName() +
+                ": Exception caught during task processing: " + e.what());
+        }
+        catch (...)
+        {
+            LogicError(
+                beast::getCurrentThreadName() +
+                ": Unknown exception caught during task processing");
+        }
+    }
+};
+
 Database::Database(
     Scheduler& scheduler,
-    int readThreads,
+    unsigned int threads,
     Section const& config,
-    beast::Journal journal)
+    beast::Journal journal,
+    std::string_view name)
     : j_(journal)
     , scheduler_(scheduler)
     , earliestLedgerSeq_(
           get<std::uint32_t>(config, "earliest_seq", XRP_LEDGER_EARLIEST_SEQ))
-    , requestBundle_(get<int>(config, "rq_bundle", 4))
-    , readThreads_(std::max(1, readThreads))
 {
-    if (earliestLedgerSeq_ < 1)
+    if (earliestLedgerSeq_ == 0)
         Throw<std::runtime_error>("Invalid earliest_seq");
 
-    if (requestBundle_ < 1 || requestBundle_ > 64)
-        Throw<std::runtime_error>("Invalid rq_bundle");
+    if (threads)
+        workers_ = std::make_unique<DatabaseWorkers>(*this, threads, name);
 
-    for (int i = readThreads_.load(); i != 0; --i)
-    {
-        std::thread t(
-            [this](int i) {
-                runningThreads_++;
-
-                beast::setCurrentThreadName(
-                    "db prefetch #" + std::to_string(i));
-
-                while (true)
-                {
-                    decltype(read_) read;
-
-                    {
-                        std::unique_lock<std::mutex> lock(readLock_);
-
-                        if (isStopping())
-                            break;
-
-                        if (read_.empty())
-                        {
-                            runningThreads_--;
-                            readCondVar_.wait(lock);
-                            runningThreads_++;
-                        }
-
-                        if (isStopping())
-                            break;
-
-                        // extract multiple object at a time to minimize the
-                        // overhead of acquiring the mutex.
-                        for (int cnt = 0;
-                             !read_.empty() && cnt != requestBundle_;
-                             ++cnt)
-                            read.insert(read_.extract(read_.begin()));
-                    }
-
-                    for (auto it = read.begin(); it != read.end(); ++it)
-                    {
-                        XRPL_ASSERT(
-                            !it->second.empty(),
-                            "ripple::NodeStore::Database::Database : non-empty "
-                            "data");
-
-                        auto const& hash = it->first;
-                        auto const& data = it->second;
-                        auto const seqn = data[0].first;
-
-                        auto obj =
-                            fetchNodeObject(hash, seqn, FetchType::async);
-
-                        // This could be further optimized: if there are
-                        // multiple requests for sequence numbers mapping to
-                        // multiple databases by sorting requests such that all
-                        // indices mapping to the same database are grouped
-                        // together and serviced by a single read.
-                        for (auto const& req : data)
-                        {
-                            req.second(
-                                (seqn == req.first) || isSameDB(req.first, seqn)
-                                    ? obj
-                                    : fetchNodeObject(
-                                          hash, req.first, FetchType::async));
-                        }
-                    }
-                }
-
-                --runningThreads_;
-                --readThreads_;
-            },
-            i);
-        t.detach();
-    }
+    JLOG(debugLog().fatal()) << this << ": database '" << name
+                             << "' created with " << threads << " read threads";
 }
 
 Database::~Database()
@@ -144,49 +152,48 @@ Database::stop()
 {
     {
         std::lock_guard lock(readLock_);
-
-        if (!readStopping_.exchange(true, std::memory_order_relaxed))
-        {
-            JLOG(j_.debug()) << "Clearing read queue because of stop request";
-            read_.clear();
-            readCondVar_.notify_all();
-        }
+        readStopping_.store(true, std::memory_order_relaxed);
     }
 
-    JLOG(j_.debug()) << "Waiting for stop request to complete...";
+    if (workers_)
+        workers_->stop();  // joins; dispatched tasks complete their callbacks
 
-    using namespace std::chrono;
-
-    auto const start = steady_clock::now();
-
-    while (readThreads_.load() != 0)
     {
-        XRPL_ASSERT(
-            steady_clock::now() - start < 30s,
-            "ripple::NodeStore::Database::stop : maximum stop duration");
-        std::this_thread::yield();
+        std::lock_guard lock(readLock_);
+        read_.clear();  // discard undispatched fetches, as today
     }
-
-    JLOG(j_.debug()) << "Stop request completed in "
-                     << duration_cast<std::chrono::milliseconds>(
-                            steady_clock::now() - start)
-                            .count()
-                     << " millseconds";
 }
 
 void
 Database::asyncFetch(
     uint256 const& hash,
-    std::uint32_t ledgerSeq,
-    std::function<void(boost::intrusive_ptr<NodeObject> const&)>&& cb)
+    std::uint32_t seq,
+    std::function<void(boost::intrusive_ptr<NodeObject> const&)>&& callback)
 {
-    std::lock_guard lock(readLock_);
-
-    if (!isStopping())
+    // With no read pool, service the request on the caller's thread. The
+    // callback contract is unchanged; only the asynchrony (and the dedup,
+    // which is an optimization) is lost.
+    if (!workers_)
     {
-        read_[hash].emplace_back(ledgerSeq, std::move(cb));
-        readCondVar_.notify_one();
+        if (!isStopping())
+            callback(fetchNodeObject(hash, seq, FetchType::async));
+
+        return;
     }
+
+    bool newKey = [&]() {
+        std::lock_guard lock(readLock_);
+        if (isStopping())
+            return false;
+
+        auto& v = read_[hash];
+        v.emplace_back(seq, std::move(callback));
+
+        return (v.size() == 1);
+    }();
+
+    if (newKey)
+        workers_->addTask();
 }
 
 void
@@ -194,15 +201,16 @@ Database::importInternal(Backend& dstBackend, Database& srcDB)
 {
     Batch batch;
     batch.reserve(batchWritePreallocationSize);
-    auto storeBatch = [&, fname = __func__]() {
+    auto storeBatch = [&]() {
         try
         {
             dstBackend.storeBatch(batch);
         }
         catch (std::exception const& e)
         {
-            JLOG(j_.error()) << "Exception caught in function " << fname
-                             << ". Error: " << e.what();
+            JLOG(j_.error()) << "Database::importInternal: Exception caught "
+                                "from storeBatch: "
+                             << e.what();
             return;
         }
 
@@ -364,13 +372,17 @@ Database::getCountsJson(Json::Value& obj)
         "ripple::NodeStore::Database::getCountsJson : valid input type");
 
     {
-        std::unique_lock<std::mutex> lock(readLock_);
+        std::unique_lock lock(readLock_);
         obj["read_queue"] = static_cast<Json::UInt>(read_.size());
     }
 
-    obj["read_threads_total"] = readThreads_.load();
-    obj["read_threads_running"] = runningThreads_.load();
-    obj["read_request_bundle"] = requestBundle_;
+    if (workers_)
+        obj["read_threads_total"] = safe_cast<Json::UInt>(workers_->count());
+    else
+        obj["read_threads_total"] = 0;
+
+    if (auto name = getName(); !name.empty())
+        obj[jss::name] = name;
 
     obj[jss::node_writes] = std::to_string(storeCount_);
     obj[jss::node_reads_total] = std::to_string(fetchTotalCount_);

@@ -56,7 +56,7 @@ public:
     clampFetchDepth(std::uint32_t fetch_depth) const = 0;
 
     virtual std::unique_ptr<NodeStore::Database>
-    makeNodeStore(int readThreads) = 0;
+    makeNodeStore(unsigned int readThreads) = 0;
 
     /** Highest ledger that may be deleted. */
     virtual LedgerIndex

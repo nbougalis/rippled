@@ -258,7 +258,7 @@ public:
     std::size_t WORKERS = 0;
 
     int IO_WORKERS = 0;        // io svc thread count. default: 2
-    int PREFETCH_WORKERS = 0;  // prefetch thread count. default: 4
+    unsigned int PREFETCH_WORKERS = 3;  // prefetch thread count.
 
     // Can only be set in code, specifically unit tests
     bool FORCE_MULTI_THREAD = false;

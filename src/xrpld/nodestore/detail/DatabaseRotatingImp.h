@@ -43,7 +43,7 @@ public:
     DatabaseRotatingImp(
         Application& app,
         Scheduler& scheduler,
-        int readThreads,
+        unsigned int threads,
         std::shared_ptr<Backend> writableBackend,
         std::shared_ptr<Backend> archiveBackend,
         Section const& config,
