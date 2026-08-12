@@ -23,147 +23,6 @@
 
 namespace ripple {
 
-void
-SHAMap::visitLeaves(
-    std::function<void(boost::intrusive_ptr<SHAMapItem const> const&
-                           item)> const& leafFunction) const
-{
-    visitNodes([&leafFunction](SHAMapTreeNode& node) {
-        if (!node.isInner())
-            leafFunction(static_cast<SHAMapLeafNode&>(node).peekItem());
-        return true;
-    });
-}
-
-void
-SHAMap::visitNodes(std::function<bool(SHAMapTreeNode&)> const& function) const
-{
-    if (!root_)
-        return;
-
-    function(*root_);
-
-    if (!root_->isInner())
-        return;
-
-    using StackEntry = std::pair<int, std::shared_ptr<SHAMapInnerNode>>;
-    std::stack<StackEntry, std::vector<StackEntry>> stack;
-
-    auto node = std::static_pointer_cast<SHAMapInnerNode>(root_);
-    int pos = 0;
-
-    while (true)
-    {
-        while (pos < 16)
-        {
-            if (!node->isEmptyBranch(pos))
-            {
-                std::shared_ptr<SHAMapTreeNode> child =
-                    descendNoStore(node, pos);
-                if (!function(*child))
-                    return;
-
-                if (child->isLeaf())
-                    ++pos;
-                else
-                {
-                    // If there are no more children, don't push this node
-                    while ((pos != 15) && (node->isEmptyBranch(pos + 1)))
-                        ++pos;
-
-                    if (pos != 15)
-                    {
-                        // save next position to resume at
-                        stack.push(std::make_pair(pos + 1, std::move(node)));
-                    }
-
-                    // descend to the child's first position
-                    node = std::static_pointer_cast<SHAMapInnerNode>(child);
-                    pos = 0;
-                }
-            }
-            else
-            {
-                ++pos;  // move to next position
-            }
-        }
-
-        if (stack.empty())
-            break;
-
-        std::tie(pos, node) = stack.top();
-        stack.pop();
-    }
-}
-
-void
-SHAMap::visitDifferences(
-    SHAMap const* have,
-    std::function<bool(SHAMapTreeNode const&)> const& function) const
-{
-    // Visit every node in this SHAMap that is not present
-    // in the specified SHAMap
-    if (!root_)
-        return;
-
-    if (root_->getHash().isZero())
-        return;
-
-    if (have && (root_->getHash() == have->root_->getHash()))
-        return;
-
-    if (root_->isLeaf())
-    {
-        auto leaf = std::static_pointer_cast<SHAMapLeafNode>(root_);
-        if (!have ||
-            !have->hasLeafNode(leaf->peekItem()->key(), leaf->getHash()))
-            function(*root_);
-        return;
-    }
-    // contains unexplored non-matching inner node entries
-    using StackEntry = std::pair<SHAMapInnerNode*, SHAMapNodeID>;
-    std::stack<StackEntry, std::vector<StackEntry>> stack;
-
-    stack.push({static_cast<SHAMapInnerNode*>(root_.get()), SHAMapNodeID{}});
-
-    while (!stack.empty())
-    {
-        auto const [node, nodeID] = stack.top();
-        stack.pop();
-
-        // 1) Add this node to the pack
-        if (!function(*node))
-            return;
-
-        // 2) push non-matching child inner nodes
-        for (int i = 0; i < 16; ++i)
-        {
-            if (!node->isEmptyBranch(i))
-            {
-                auto const& childHash = node->getChildHash(i);
-                SHAMapNodeID childID = nodeID.getChildNodeID(i);
-                auto next = descendThrow(node, i);
-
-                if (next->isInner())
-                {
-                    if (!have || !have->hasInnerNode(childID, childHash))
-                        stack.push(
-                            {static_cast<SHAMapInnerNode*>(next), childID});
-                }
-                else if (
-                    !have ||
-                    !have->hasLeafNode(
-                        static_cast<SHAMapLeafNode*>(next)->peekItem()->key(),
-                        childHash))
-                {
-                    if (!function(*next))
-                        return;
-                }
-            }
-        }
-    }
-}
-
 // Starting at the position referred to by the specfied
 // StackEntry, process that node and its first resident
 // children, descending the SHAMap until we complete the
@@ -435,9 +294,6 @@ SHAMap::getNodeFat(
     bool fatLeaves,
     std::uint32_t depth) const
 {
-    // Gets a node and some of its children
-    // to a specified depth
-
     auto node = root_.get();
     SHAMapNodeID nodeID;
 
@@ -468,7 +324,18 @@ SHAMap::getNodeFat(
     std::stack<std::tuple<SHAMapTreeNode*, SHAMapNodeID, int>> stack;
     stack.emplace(node, nodeID, depth);
 
+    // The serializer is reused across nodes: erase() retains the buffer's
+    // capacity, so we amortize the cost of the allocation.
     Serializer s(8192);
+
+    auto const addToReply =
+        [&s, &data](SHAMapTreeNode const* n, SHAMapNodeID const& id) {
+            s.erase();
+            n->serializeForWire(s);
+
+            auto const bytes = s.slice();
+            data.emplace_back(id, Blob(bytes.begin(), bytes.end()));
+        };
 
     while (!stack.empty())
     {
@@ -476,9 +343,7 @@ SHAMap::getNodeFat(
         stack.pop();
 
         // Add this node to the reply
-        s.erase();
-        node->serializeForWire(s);
-        data.emplace_back(std::make_pair(nodeID, s.getData()));
+        addToReply(node, nodeID);
 
         if (node->isInner())
         {
@@ -489,7 +354,7 @@ SHAMap::getNodeFat(
 
             if ((depth > 0) || (bc == 1))
             {
-                // We need to process this node's children
+                // We need to process this node's childrenreportFeeChange
                 for (int i = 0; i < 16; ++i)
                 {
                     if (!inner->isEmptyBranch(i))
@@ -509,10 +374,7 @@ SHAMap::getNodeFat(
                         else if (childNode->isInner() || fatLeaves)
                         {
                             // Just include this node
-                            s.erase();
-                            childNode->serializeForWire(s);
-                            data.emplace_back(
-                                std::make_pair(childID, s.getData()));
+                            addToReply(childNode, childID);
                         }
                     }
                 }

@@ -34,8 +34,8 @@
 #include <xrpl/basics/UnorderedContainers.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <boost/iostreams/filtering_stream.hpp>
 #include <cassert>
+#include <concepts>
 #include <stack>
 #include <vector>
 
@@ -96,7 +96,6 @@ enum class SHAMapState : std::uint8_t {
  */
 class SHAMap
 {
-private:
     Family& f_;
     beast::Journal journal_;
 
@@ -238,13 +237,91 @@ public:
     const_iterator
     lower_bound(uint256 const& id) const;
 
-    /**  Visit every node in this SHAMap
+    /** Visit every node in this SHAMap.
 
-         @param function called with every node visited.
-         If function returns false, visitNodes exits.
-    */
+        Traversal is depth-first, pre-order, and stops early if the
+        visitor returns false.
+
+        @param visitor An invocable with signature bool(SHAMapTreeNode&).
+                       Return true to continue the traversal, false to
+                       stop it.
+     */
+    template <std::invocable<SHAMapTreeNode&> F>
     void
-    visitNodes(std::function<bool(SHAMapTreeNode&)> const& function) const;
+    visitNodes(F&& visitor) const
+    {
+        if (!root_)
+            return;
+
+        if (!visitor(*root_))
+            return;
+
+        if (!root_->isInner())
+            return;
+
+        using StackEntry = std::pair<int, std::shared_ptr<SHAMapInnerNode>>;
+
+        // The key space is 256 bits consumed 4 bits per level, so the
+        // depth of the tree cannot exceed 64. The traversal stack only
+        // holds inner nodes with unvisited siblings, so it is strictly
+        // shallower still; 64 is a safe, tight bound.
+        std::array<StackEntry, 64> stack;
+        std::size_t depth = 0;
+
+        auto node = std::static_pointer_cast<SHAMapInnerNode>(root_);
+        int pos = 0;
+
+        while (true)
+        {
+            while (pos < 16)
+            {
+                if (!node->isEmptyBranch(pos))
+                {
+                    std::shared_ptr<SHAMapTreeNode> child =
+                        descendNoStore(node, pos);
+
+                    if (!visitor(*child))
+                        return;
+
+                    if (child->isLeaf())
+                        ++pos;
+                    else
+                    {
+                        // If there are no more children, don't push this
+                        // node.
+                        while ((pos != 15) && (node->isEmptyBranch(pos + 1)))
+                            ++pos;
+
+                        if (pos != 15)
+                        {
+                            XRPL_ASSERT(
+                                depth < stack.size(),
+                                "ripple::SHAMap::visitNodes : within depth "
+                                "bound");
+
+                            // Save the next position, to resume at:
+                            stack[depth++] = {pos + 1, std::move(node)};
+                        }
+
+                        // Descend to the child's first position:
+                        node = std::static_pointer_cast<SHAMapInnerNode>(child);
+                        pos = 0;
+                    }
+                }
+                else
+                {
+                    ++pos;  // move to next position
+                }
+            }
+
+            if (depth == 0)
+                break;
+
+            auto& [p, n] = stack[--depth];
+            pos = p;
+            node = std::move(n);
+        }
+    }
 
     /**  Visit every node in this SHAMap that
          is not present in the specified SHAMap
@@ -252,19 +329,151 @@ public:
          @param function called with every node visited.
          If function returns false, visitDifferences exits.
     */
-    void
-    visitDifferences(
-        SHAMap const* have,
-        std::function<bool(SHAMapTreeNode const&)> const&) const;
+    // void
+    // visitDifferences(
+    //     SHAMap const* have,
+    //     std::function<bool(SHAMapTreeNode const&)> const&) const;
+    /** Visit every node in this SHAMap that is not present in another.
 
-    /**  Visit every leaf node in this SHAMap
+        Traversal is depth-first, pre-order; subtrees whose root hash is
+        present in `have` are skipped entirely. Stops early if the
+        visitor returns false.
 
-         @param function called with every non inner node visited.
-    */
+        @param have The map to diff against, or nullptr to visit every
+                    node.
+        @param visitor An invocable with signature
+                       bool(SHAMapTreeNode const&). Return true to
+                       continue, false to stop.
+
+        @throws SHAMapMissingNode if a node in this map cannot be
+                loaded, and anything the visitor throws. The visit may
+                be partial in either case.
+     */
+    template <std::invocable<SHAMapTreeNode const&> F>
     void
-    visitLeaves(
-        std::function<
-            void(boost::intrusive_ptr<SHAMapItem const> const&)> const&) const;
+    visitDifferences(SHAMap const* have, F&& visitor) const
+    {
+        if (!root_)
+            return;
+
+        if (root_->getHash().isZero())
+            return;
+
+        if (have && root_->getHash() == have->root_->getHash())
+            return;
+
+        if (root_->isLeaf())
+        {
+            auto const& leaf = static_cast<SHAMapLeafNode const&>(*root_);
+
+            if (!have ||
+                !have->hasLeafNode(leaf.peekItem()->key(), leaf.getHash()))
+                visitor(*root_);
+
+            return;
+        }
+
+        struct StackEntry
+        {
+            SHAMapInnerNode* node;
+            SHAMapNodeID id;
+            int pos;
+        };
+
+        // Depth is bounded by the key size: 256 bits at 4 bits per
+        // level.
+        std::array<StackEntry, 64> stack;
+        std::size_t depth = 0;
+
+        auto* node = static_cast<SHAMapInnerNode*>(root_.get());
+        SHAMapNodeID nodeID;
+        int pos = 0;
+
+        if (!visitor(*node))
+            return;
+
+        while (true)
+        {
+            while (pos < 16)
+            {
+                if (node->isEmptyBranch(pos))
+                {
+                    ++pos;
+                    continue;
+                }
+
+                auto const& childHash = node->getChildHash(pos);
+                auto* child = descendThrow(node, pos);
+
+                if (child->isInner())
+                {
+                    if (!have ||
+                        !have->hasInnerNode(
+                            nodeID.getChildNodeID(pos), childHash))
+                    {
+                        // Descend: this subtree differs. Save where to
+                        // resume.
+                        XRPL_ASSERT(
+                            depth < stack.size(),
+                            "ripple::SHAMap::visitDifferences : within "
+                            "depth bound");
+
+                        stack[depth++] = {node, nodeID, pos + 1};
+
+                        nodeID = nodeID.getChildNodeID(pos);
+                        node = static_cast<SHAMapInnerNode*>(child);
+                        pos = 0;
+
+                        if (!visitor(*node))
+                            return;
+
+                        continue;
+                    }
+                }
+                else if (
+                    !have ||
+                    !have->hasLeafNode(
+                        static_cast<SHAMapLeafNode*>(child)->peekItem()->key(),
+                        childHash))
+                {
+                    if (!visitor(*child))
+                        return;
+                }
+
+                ++pos;
+            }
+
+            if (depth == 0)
+                break;
+
+            auto const& e = stack[--depth];
+            node = e.node;
+            nodeID = e.id;
+            pos = e.pos;
+        }
+    }
+
+    /** Visit every leaf node in this SHAMap.
+
+        @param visitor An invocable with signature
+                       void(boost::intrusive_ptr<SHAMapItem const> const&),
+                       called once per leaf.
+
+        @throws SHAMapMissingNode if a node in the trie cannot be
+                loaded, and anything the visitor throws. The visit may
+                be partial in either case.
+     */
+    template <std::invocable<boost::intrusive_ptr<SHAMapItem const> const&> F>
+    void
+    visitLeaves(F&& visitor) const
+    {
+        visitNodes([&visitor](SHAMapTreeNode& node) {
+            if (!node.isInner())
+                visitor(static_cast<SHAMapLeafNode&>(node).peekItem());
+
+            return true;
+        });
+    }
 
     // comparison/sync functions
 
@@ -370,6 +579,7 @@ public:
 private:
     using SharedPtrNodeStack =
         std::stack<std::pair<std::shared_ptr<SHAMapTreeNode>, SHAMapNodeID>>;
+
     using DeltaRef = std::pair<
         boost::intrusive_ptr<SHAMapItem const>,
         boost::intrusive_ptr<SHAMapItem const>>;
@@ -425,30 +635,93 @@ private:
     std::shared_ptr<SHAMapTreeNode>
     writeNode(NodeObjectType t, std::shared_ptr<SHAMapTreeNode> node) const;
 
-    // returns the first item at or below this node
-    SHAMapLeafNode*
-    firstBelow(
-        std::shared_ptr<SHAMapTreeNode>,
+    [[nodiscard]] static SHAMapLeafNode*
+    belowHelper(
+        SHAMap const& self,
+        int init,
+        int step,
+        std::shared_ptr<SHAMapTreeNode> node,
         SharedPtrNodeStack& stack,
-        int branch = 0) const;
+        int branch)
+    {
+        auto const pushLeaf = [&stack](std::shared_ptr<SHAMapTreeNode> n) {
+            auto leaf = std::static_pointer_cast<SHAMapLeafNode>(std::move(n));
+            auto* ret = leaf.get();
 
-    // returns the last item at or below this node
-    SHAMapLeafNode*
+            stack.push({std::move(leaf), {leafDepth, ret->peekItem()->key()}});
+
+            return ret;
+        };
+
+        if (node->isLeaf())
+            return pushLeaf(std::move(node));
+
+        auto inner = std::static_pointer_cast<SHAMapInnerNode>(std::move(node));
+
+        if (stack.empty())
+            stack.emplace(inner, SHAMapNodeID{});
+        else
+            stack.emplace(inner, stack.top().second.getChildNodeID(branch));
+
+        for (int i = init; i >= 0 && i < branchFactor; i += step)
+        {
+            if (inner->isEmptyBranch(i))
+                continue;
+
+            auto child = self.descendThrow(inner, i);
+
+            XRPL_ASSERT(
+                !stack.empty(),
+                "ripple::SHAMap::BelowHelper::helper : non-empty stack");
+
+            if (child->isLeaf())
+                return pushLeaf(std::move(child));
+
+            inner = std::static_pointer_cast<SHAMapInnerNode>(std::move(child));
+            stack.emplace(inner, stack.top().second.getChildNodeID(branch));
+
+            i = init - step;  // restart the scan inside the new node
+        }
+
+        return nullptr;
+    }
+
+    /** Returns the first leaf at or below this node.
+
+            The path traversed, including the given node, is pushed onto
+            the stack.
+
+            @note branch is only used when the stack is non-empty, to
+                  identify which branch of the node at the top of the
+                  stack led to `node`.
+         */
+    [[nodiscard]] SHAMapLeafNode*
+    firstBelow(
+        std::shared_ptr<SHAMapTreeNode> node,
+        SharedPtrNodeStack& stack,
+        int branch = 0) const
+    {
+        return belowHelper(*this, 0, 1, std::move(node), stack, branch);
+    }
+
+    /** Returns the last leaf at or below this node.
+
+        The path traversed, including the given node, is pushed onto
+        the stack.
+
+        @note branch is only used when the stack is non-empty, to
+              identify which branch of the node at the top of the
+              stack led to `node`.
+     */
+    [[nodiscard]] SHAMapLeafNode*
     lastBelow(
         std::shared_ptr<SHAMapTreeNode> node,
         SharedPtrNodeStack& stack,
-        int branch = branchFactor) const;
-
-    // helper function for firstBelow and lastBelow
-    SHAMapLeafNode*
-    belowHelper(
-        std::shared_ptr<SHAMapTreeNode> node,
-        SharedPtrNodeStack& stack,
-        int branch,
-        std::tuple<
-            int,
-            std::function<bool(int)>,
-            std::function<void(int&)>> const& loopParams) const;
+        int branch = branchFactor) const
+    {
+        return belowHelper(
+            *this, branchFactor - 1, -1, std::move(node), stack, branch);
+    }
 
     // Simple descent
     // Get a child of the specified node
