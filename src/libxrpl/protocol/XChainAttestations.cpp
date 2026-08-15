@@ -236,7 +236,7 @@ AttestationClaim::message(
     Serializer s;
     o.add(s);
 
-    return std::move(s.modData());
+    return s.takeData();
 }
 
 std::vector<std::uint8_t>
@@ -382,7 +382,7 @@ AttestationCreateAccount::message(
     Serializer s;
     o.add(s);
 
-    return std::move(s.modData());
+    return s.takeData();
 }
 
 std::vector<std::uint8_t>

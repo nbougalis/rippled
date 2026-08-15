@@ -67,7 +67,10 @@ SHAMapNodeID::getRawString() const
     Serializer s(33);
     s.addBitString(id_);
     s.add8(depth_);
-    return s.getString();
+
+    auto slice = s.slice();
+
+    return {reinterpret_cast<char const*>(slice.data()), slice.size()};
 }
 
 SHAMapNodeID

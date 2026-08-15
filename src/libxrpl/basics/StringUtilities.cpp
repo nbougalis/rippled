@@ -30,7 +30,7 @@
 namespace ripple {
 
 std::string
-sqlBlobLiteral(Blob const& blob)
+sqlBlobLiteral(Slice blob)
 {
     std::string j;
 

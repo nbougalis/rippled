@@ -856,7 +856,7 @@ InboundLedger::takeHeader(std::string const& data)
     Serializer s(data.size() + 4);
     s.add32(HashPrefix::ledgerMaster);
     s.addRaw(makeSlice(data));
-    f->db().store(hotLEDGER, std::move(s.modData()), hash_, mSeq);
+    f->db().store(hotLEDGER, s.slice(), hash_, mSeq);
 
     if (mLedger->info().txHash.isZero())
         mHaveTransactions = true;

@@ -137,7 +137,7 @@ STValidation::getSerialized() const
 {
     Serializer s;
     add(s);
-    return s.peekData();
+    return s.takeData();
 }
 
 }  // namespace ripple

@@ -27,13 +27,12 @@
 namespace ripple {
 
 /** Serialize an object to a blob. */
-template <class Object>
-Blob
-serializeBlob(Object const& o)
+inline Blob
+serializeBlob(STObject const& o)
 {
     Serializer s;
     o.add(s);
-    return s.peekData();
+    return s.takeData();
 }
 
 /** Serialize an object to a hex string. */

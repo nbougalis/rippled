@@ -5,6 +5,7 @@
 #include <xrpld/app/ledger/TransactionMaster.h>
 #include <xrpld/app/tx/detail/Import.h>
 #include <xrpl/protocol/STParsedJSON.h>
+#include <xrpl/protocol/serialize.h>
 
 namespace hook {
 
@@ -452,41 +453,28 @@ HookAPI::prepare(Slice const& txBlob) const
         }
     }
 
-    Blob tx_blob;
+    auto const serializeJson = [](Json::Value const& j) -> std::optional<Blob> {
+        STParsedJSONObject parsed(std::string(jss::tx_json), j);
+
+        if (!parsed.object)
+            return std::nullopt;
+
+        return serializeBlob(*parsed.object);
+    };
+
+    if (auto feeBlob = serializeJson(json))
     {
-        STParsedJSONObject parsed(std::string(jss::tx_json), json);
-        if (!parsed.object.has_value())
-            return Unexpected(INVALID_ARGUMENT);
+        // run it through the fee estimate, this doubles as a txn sanity check
+        if (auto const fee = etxn_fee_base(makeSlice(*feeBlob)))
+        {
+            json[jss::Fee] = to_string(fee.value());
 
-        STObject& obj = *(parsed.object);
-
-        // serialize it
-        Serializer s;
-        obj.add(s);
-        tx_blob = s.getData();
+            if (auto txBlob = serializeJson(json))
+                return *txBlob;
+        }
     }
 
-    // run it through the fee estimate, this doubles as a txn sanity check
-    auto fee = etxn_fee_base(Slice(tx_blob.data(), tx_blob.size()));
-    if (!fee)
-        return Unexpected(INVALID_ARGUMENT);
-
-    json[jss::Fee] = to_string(fee.value());
-
-    {
-        STParsedJSONObject parsed(std::string(jss::tx_json), json);
-        if (!parsed.object.has_value())
-            return Unexpected(INVALID_ARGUMENT);
-
-        STObject& obj = *(parsed.object);
-
-        // serialize it
-        Serializer s;
-        obj.add(s);
-        tx_blob = s.getData();
-    }
-
-    return tx_blob;
+    return Unexpected(INVALID_ARGUMENT);
 }
 
 Expected<std::shared_ptr<Transaction>, HookReturnCode>
@@ -1974,8 +1962,8 @@ HookAPI::state_foreign_set(
             else
             {
                 // fetch the hook definition
-                auto const def =
-                    hookCtx.applyCtx.view().read(ripple::keylet::hookDefinition(
+                auto const def = hookCtx.applyCtx.view().read(
+                    ripple::keylet::hookDefinition(
                         hookObj.getFieldH256(sfHookHash)));
                 if (!def)  // should never happen except in a rare race
                            // condition

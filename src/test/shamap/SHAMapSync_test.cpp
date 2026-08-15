@@ -25,6 +25,7 @@
 #include <xrpl/basics/random.h>
 #include <xrpl/beast/unit_test.h>
 #include <xrpl/beast/xor_shift_engine.h>
+#include <xrpl/protocol/digest.h>
 
 namespace ripple {
 namespace tests {
@@ -41,7 +42,7 @@ public:
 
         for (int d = 0; d < 3; ++d)
             s.add32(rand_int<std::uint32_t>(eng_));
-        return make_shamapitem(s.getSHA512Half(), s.slice());
+        return make_shamapitem(sha512Half(s.slice()), s.slice());
     }
 
     bool

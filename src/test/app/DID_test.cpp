@@ -35,7 +35,7 @@ checkVL(Slice const& result, std::string expected)
 {
     Serializer s;
     s.addRaw(result);
-    return s.getString() == expected;
+    return s.slice() == makeSlice(expected);
 }
 
 struct DID_test : public beast::unit_test::suite

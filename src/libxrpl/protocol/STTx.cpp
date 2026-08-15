@@ -251,7 +251,7 @@ STTx::getJson(JsonOptions options, bool binary) const
     if (binary)
     {
         Serializer s = STObject::getSerializer();
-        std::string const dataBin = strHex(s.peekData());
+        std::string const dataBin = strHex(s.slice());
 
         if (V1)
         {
@@ -302,7 +302,7 @@ STTx::getMetaSQL(
 {
     static boost::format bfTrans(
         "('%s', '%s', '%s', '%d', '%d', '%c', %s, %s)");
-    std::string rTxn = sqlBlobLiteral(rawTxn.peekData());
+    std::string rTxn = sqlBlobLiteral(rawTxn.slice());
 
     auto format = TxFormats::getInstance().findByType(tx_type_);
     XRPL_ASSERT(format, "ripple::STTx::getMetaSQL : non-null type format");

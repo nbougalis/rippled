@@ -653,7 +653,7 @@ transactionFormatResultImpl(
             apiVersion);
 
         jvResult[jss::tx_blob] =
-            strHex(tpTrans->getSTransaction()->getSerializer().peekData());
+            strHex(tpTrans->getSTransaction()->getSerializer().slice());
 
         if (temUNCERTAIN != tpTrans->getResult())
         {

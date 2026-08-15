@@ -285,7 +285,7 @@ public:
             Serializer nData;
             ripple::addRaw(info, nData);
             ledgerData->add_nodes()->set_nodedata(
-                nData.getDataPtr(), nData.getLength());
+                nData.getDataPtr(), nData.getDataLength());
         }
 
         return ledgerData;

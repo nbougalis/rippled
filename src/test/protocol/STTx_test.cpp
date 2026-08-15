@@ -27,6 +27,7 @@
 #include <xrpl/protocol/TxFormats.h>
 #include <xrpl/protocol/UintTypes.h>
 #include <xrpl/protocol/messages.h>
+#include <xrpl/protocol/serialize.h>
 #include <memory>
 #include <regex>
 
@@ -1515,35 +1516,30 @@ public:
         }
 
         {
-            // Make an otherwise legit STTx with a duplicate field.  Should
-            // generate an exception when we deserialize.
             auto const keypair = randomKeyPair(KeyType::secp256k1);
-            STTx acctSet(ttACCOUNT_SET, [&keypair](auto& obj) {
-                obj.setAccountID(sfAccount, calcAccountID(keypair.first));
-                obj.setFieldU32(sfSequence, 7);
-                obj.setFieldAmount(sfFee, STAmount(2557891634ull));
-                obj.setFieldVL(sfSigningPubKey, keypair.first.slice());
-                obj.setFieldU32(sfSetFlag, 0x0DDBA11);
-                obj.setFieldU32(sfClearFlag, 0xB01DFACE);
-            });
 
-            Serializer serialized{acctSet.getSerializer()};
-            {
-                // Verify we have a valid transaction.
-                SerialIter sit{serialized.slice()};
-                auto stx = std::make_shared<ripple::STTx const>(sit);
-            }
+            // Generate a legitimate STTx, serialize it and modify the
+            // serialized form to include a duplicate field.
+            Blob serialized = serializeBlob(
+                STTx{ttACCOUNT_SET, [&keypair](auto& obj) {
+                         obj.setAccountID(
+                             sfAccount, calcAccountID(keypair.first));
+                         obj.setFieldU32(sfSequence, 7);
+                         obj.setFieldAmount(sfFee, STAmount(2557891634ull));
+                         obj.setFieldVL(sfSigningPubKey, keypair.first.slice());
+                         obj.setFieldU32(sfSetFlag, 0x0DDBA11);
+                         obj.setFieldU32(sfClearFlag, 0xB01DFACE);
+                     }});
 
-            // Tweak the serialized data to change the ClearFlag to
-            // a SetFlag.  This will leave us with two SetFlag fields
-            // which we should trap as a duplicate field.
-            BEAST_EXPECT(serialized.modData()[15] == sfClearFlag.fieldValue);
-            serialized.modData()[15] = sfSetFlag.fieldValue;
+            // Tweak the serialized data to change the ClearFlag to a SetFlag.
+            // This will leave us with two SetFlag fields which we should trap
+            // as a duplicate field.
+            BEAST_EXPECT(serialized[15] == sfClearFlag.fieldValue);
+            serialized[15] = sfSetFlag.fieldValue;
 
-            SerialIter sit{serialized.slice()};
             try
             {
-                auto stx = std::make_shared<ripple::STTx const>(sit);
+                auto stx = std::make_shared<STTx>(makeSlice(serialized));
                 fail("An exception should have been thrown");
             }
             catch (std::exception const& ex)

@@ -603,8 +603,8 @@ Ledger::rawTxInsert(
 
     // low-level - just add to table
     Serializer s(txn->getDataLength() + metaData->getDataLength() + 16);
-    s.addVL(txn->peekData());
-    s.addVL(metaData->peekData());
+    s.addVL(txn->slice());
+    s.addVL(metaData->slice());
     if (!txMap_.addGiveItem(
             SHAMapNodeType::tnTRANSACTION_MD, make_shamapitem(key, s.slice())))
         LogicError("duplicate_tx: " + to_string(key));
@@ -622,8 +622,8 @@ Ledger::rawTxInsertWithHash(
 
     // low-level - just add to table
     Serializer s(txn->getDataLength() + metaData->getDataLength() + 16);
-    s.addVL(txn->peekData());
-    s.addVL(metaData->peekData());
+    s.addVL(txn->slice());
+    s.addVL(metaData->slice());
     auto item = make_shamapitem(key, s.slice());
     auto hash = sha512Half(HashPrefix::txNode, item->slice(), item->key());
     if (!txMap_.addGiveItem(SHAMapNodeType::tnTRANSACTION_MD, std::move(item)))

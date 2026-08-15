@@ -27,6 +27,7 @@
 #include <xrpl/protocol/STCurrency.h>
 #include <xrpl/protocol/STNumber.h>
 #include <xrpl/protocol/STObject.h>
+#include <xrpl/protocol/digest.h>
 
 namespace ripple {
 
@@ -324,7 +325,7 @@ STObject::getHash(HashPrefix prefix) const
     Serializer s;
     s.add32(prefix);
     add(s, withAllFields);
-    return s.getSHA512Half();
+    return sha512Half(s.slice());
 }
 
 uint256
@@ -333,7 +334,7 @@ STObject::getSigningHash(HashPrefix prefix) const
     Serializer s;
     s.add32(prefix);
     add(s, omitSigningFields);
-    return s.getSHA512Half();
+    return sha512Half(s.slice());
 }
 
 int

@@ -29,6 +29,7 @@
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/RPCErr.h>
 #include <xrpl/protocol/STParsedJSON.h>
+#include <xrpl/protocol/serialize.h>
 #include <xrpl/resource/Fees.h>
 
 namespace ripple {
@@ -265,28 +266,17 @@ simulateTxn(RPC::JsonContext& context, std::shared_ptr<Transaction> transaction)
     if (result.metadata)
     {
         if (isBinaryOutput)
-        {
-            auto const metaBlob =
-                result.metadata->getAsObject().getSerializer().getData();
-            jvResult[jss::meta_blob] = strHex(makeSlice(metaBlob));
-        }
+            jvResult[jss::meta_blob] =
+                serializeHex(result.metadata->getAsObject());
         else
-        {
             jvResult[jss::meta] = result.metadata->getJson(JsonOptions::none);
-        }
     }
 
     if (isBinaryOutput)
-    {
-        auto const txBlob =
-            transaction->getSTransaction()->getSerializer().getData();
-        jvResult[jss::tx_blob] = strHex(makeSlice(txBlob));
-    }
+        jvResult[jss::tx_blob] = serializeHex(*transaction->getSTransaction());
     else
-    {
         jvResult[jss::tx_json] =
             transaction->getJson(JsonOptions::none, context.app);
-    }
 
     return jvResult;
 }

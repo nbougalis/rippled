@@ -196,7 +196,7 @@ doLedgerDataGrpc(
         auto stateObject = response.mutable_ledger_objects()->add_objects();
         Serializer s;
         sle->add(s);
-        stateObject->set_data(s.peekData().data(), s.getLength());
+        stateObject->set_data(s.getDataPtr(), s.getDataLength());
         stateObject->set_key(sle->key().data(), sle->key().size());
     }
     return {response, status};

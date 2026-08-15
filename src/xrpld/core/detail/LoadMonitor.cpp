@@ -80,10 +80,11 @@ LoadMonitor::update()
 
     if (auto const now = beast::basic_seconds_clock::now(); now != lastUpdate_)
     {
-        // VFALCO TODO Why 8?
-        if ((now < lastUpdate_) || (now > (lastUpdate_ + 8s)))
+        // We idled long enough that decay would effectively zero everything,
+        // so just reset. The 8s treshold is the point by which decaying is
+        // effectively indistinguishable from resetting (0.75^8 is ~10%)
+        if (now < lastUpdate_ || now - lastUpdate_ > 8s)
         {
-            // way out of date
             samples_ = 0;
             averageLatency_ = 0ms;
             peakLatency_ = 0ms;
@@ -91,21 +92,15 @@ LoadMonitor::update()
             return;
         }
 
-        // do exponential decay
-        /*
-            David:
-
-            "Imagine if you add 10 to something every second. And you
-             also reduce it by 1/4 every second. It will "idle" at 40,
-             correponding to 10 counts per second."
-        */
-        do
+        // Exponential decay: reduce by 25% for each elapsed second. With
+        // steady inflow of N per second this idles at 4N, which getStats
+        // compensates for.
+        for (; lastUpdate_ < now; lastUpdate_ += 1s)
         {
-            lastUpdate_ += 1s;
-            samples_ -= ((samples_ + 3) / 4);
-            averageLatency_ -= (averageLatency_ / 4);
-            peakLatency_ -= (peakLatency_ / 4);
-        } while (lastUpdate_ < now);
+            samples_ -= (samples_ + 3) / 4;
+            averageLatency_ -= averageLatency_ / 4;
+            peakLatency_ -= peakLatency_ / 4;
+        }
     }
 }
 

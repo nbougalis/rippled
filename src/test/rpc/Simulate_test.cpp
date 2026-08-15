@@ -116,7 +116,7 @@ class Simulate_test : public beast::unit_test::suite
             // will crash
             STParsedJSONObject const parsed(std::string(jss::tx_json), tx);
             auto const tx_blob =
-                strHex(parsed.object->getSerializer().peekData());
+                strHex(parsed.object->getSerializer().slice());
             if (BEAST_EXPECT(parsed.object.has_value()))
             {
                 Json::Value params;

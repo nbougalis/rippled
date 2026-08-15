@@ -91,7 +91,7 @@ LedgerReplayMsgHandler::processProofPathRequest(
     // pack header
     Serializer nData(128);
     addRaw(ledger->info(), nData);
-    reply.set_ledgerheader(nData.getDataPtr(), nData.getLength());
+    reply.set_ledgerheader(nData.getDataPtr(), nData.getDataLength());
     // pack path
     for (auto const& b : *path)
         reply.add_path(b.data(), b.size());
@@ -211,7 +211,7 @@ LedgerReplayMsgHandler::processReplayDeltaRequest(
     // pack header
     Serializer nData(128);
     addRaw(ledger->info(), nData);
-    reply.set_ledgerheader(nData.getDataPtr(), nData.getLength());
+    reply.set_ledgerheader(nData.getDataPtr(), nData.getDataLength());
     // pack transactions
     auto const& txMap = ledger->txMap();
     txMap.visitLeaves(

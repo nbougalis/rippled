@@ -81,7 +81,7 @@ proposalUniqueId(
     s.addVL(publicKey);
     s.addVL(signature);
 
-    return s.getSHA512Half();
+    return sha512Half(s.slice());
 }
 
 }  // namespace ripple

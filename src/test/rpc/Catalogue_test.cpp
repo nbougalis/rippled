@@ -628,7 +628,7 @@ class Catalogue_test : public beast::unit_test::suite
                     Serializer s1, s2;
                     sle->add(s1);
                     loadedSle->add(s2);
-                    bool serializedEqual = (s1.peekData() == s2.peekData());
+                    bool serializedEqual = (s1.slice() == s2.slice());
 
                     if (!serializedEqual)
                     {
@@ -676,7 +676,7 @@ class Catalogue_test : public beast::unit_test::suite
             bobAcct->add(s1);
             loadedBobAcct->add(s2);
         }
-        BEAST_EXPECT(loaded && s1.peekData() == s2.peekData());
+        BEAST_EXPECT(loaded && s1.slice() == s2.slice());
 
         if (loaded)
         {
@@ -685,7 +685,7 @@ class Catalogue_test : public beast::unit_test::suite
             charlieAcct->add(s1);
             loadedCharlieAcct->add(s2);
         }
-        BEAST_EXPECT(loaded && s1.peekData() == s2.peekData());
+        BEAST_EXPECT(loaded && s1.slice() == s2.slice());
 
         if (loaded)
         {
@@ -695,7 +695,7 @@ class Catalogue_test : public beast::unit_test::suite
             loadedEurTrust->add(s2);
         }
 
-        BEAST_EXPECT(loaded && s1.peekData() == s2.peekData());
+        BEAST_EXPECT(loaded && s1.slice() == s2.slice());
 
         // Verify trust line amount matches
         BEAST_EXPECT(

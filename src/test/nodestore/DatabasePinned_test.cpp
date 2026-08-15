@@ -56,8 +56,8 @@ class DatabasePinned_test : public beast::unit_test::suite
         Serializer s;
         s.add32(static_cast<std::uint32_t>(type));
         s.add8(marker);
-        auto const hash = sha512Half(makeSlice(s.peekData()));
-        return NodeObject::createObject(type, std::move(data), hash);
+        return NodeObject::createObject(
+            type, std::move(data), sha512Half(s.slice()));
     }
 
     // Borrow the running app's nodestore. With pinned_type configured

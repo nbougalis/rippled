@@ -21,6 +21,7 @@
 #define RIPPLE_BASICS_STRINGUTILITIES_H_INCLUDED
 
 #include <xrpl/basics/Blob.h>
+#include <xrpl/basics/Slice.h>
 #include <xrpl/basics/strHex.h>
 
 #include <boost/format.hpp>
@@ -45,7 +46,7 @@ namespace ripple {
     @return The input, encoded as a blob literal.
  */
 std::string
-sqlBlobLiteral(Blob const& blob);
+sqlBlobLiteral(Slice blob);
 
 template <class Iterator>
 std::optional<Blob>

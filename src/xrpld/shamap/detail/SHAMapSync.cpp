@@ -428,7 +428,7 @@ SHAMap::addRootNode(
             false,
             root_->getHash(),
             ledgerSeq_,
-            std::move(s.modData()),
+            s.takeData(),
             root_->getType());
     }
 
@@ -520,7 +520,7 @@ SHAMap::addKnownNode(
                     false,
                     childHash,
                     ledgerSeq_,
-                    std::move(s.modData()),
+                    s.takeData(),
                     newNode->getType());
             }
 
@@ -682,7 +682,7 @@ SHAMap::getProofPath(uint256 const& key) const
     {
         Serializer s;
         stack.top().first->serializeForWire(s);
-        path.emplace_back(std::move(s.modData()));
+        path.emplace_back(s.takeData());
         stack.pop();
     }
 

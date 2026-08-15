@@ -315,7 +315,7 @@ Database::storeLedger(
         s.add32(HashPrefix::ledgerMaster);
         addRaw(srcLedger.info(), s);
         auto nObj = NodeObject::createObject(
-            hotLEDGER, std::move(s.modData()), srcLedger.info().hash);
+            hotLEDGER, s.slice(), srcLedger.info().hash);
         batch.emplace_back(std::move(nObj));
     }
 

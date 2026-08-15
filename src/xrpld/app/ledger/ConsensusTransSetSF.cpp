@@ -102,7 +102,7 @@ ConsensusTransSetSF::getNode(SHAMapHash const& nodeHash) const
     XRPL_ASSERT(
         sha512Half(s.slice()) == nodeHash.as_uint256(),
         "ripple::ConsensusTransSetSF::getNode : transaction hash match");
-    return std::move(s.modData());
+    return s.takeData();
 }
 
 }  // namespace ripple

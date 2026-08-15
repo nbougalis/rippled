@@ -3039,7 +3039,7 @@ PeerImp::sendLedgerBase(
 
     Serializer s(sizeof(LedgerInfo));
     addRaw(ledger->info(), s);
-    ledgerData.add_nodes()->set_nodedata(s.getDataPtr(), s.getLength());
+    ledgerData.add_nodes()->set_nodedata(s.getDataPtr(), s.getDataLength());
 
     auto const& stateMap{ledger->stateMap()};
     if (stateMap.getHash() != beast::zero)
@@ -3049,7 +3049,7 @@ PeerImp::sendLedgerBase(
 
         stateMap.serializeRoot(root);
         ledgerData.add_nodes()->set_nodedata(
-            root.getDataPtr(), root.getLength());
+            root.getDataPtr(), root.getDataLength());
 
         if (ledger->info().txHash != beast::zero)
         {
@@ -3060,7 +3060,7 @@ PeerImp::sendLedgerBase(
                 root.erase();
                 txMap.serializeRoot(root);
                 ledgerData.add_nodes()->set_nodedata(
-                    root.getDataPtr(), root.getLength());
+                    root.getDataPtr(), root.getDataLength());
             }
         }
     }

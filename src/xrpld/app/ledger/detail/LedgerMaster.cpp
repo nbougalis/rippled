@@ -2319,7 +2319,7 @@ populateFetchPack(
             protocol::TMIndexedObject* obj = into->add_objects();
             obj->set_ledgerseq(seq);
             obj->set_hash(hash.data(), hash.size());
-            obj->set_data(s.getDataPtr(), s.getLength());
+            obj->set_data(s.getDataPtr(), s.getDataLength());
 
             return --cnt != 0;
         });
@@ -2423,7 +2423,7 @@ LedgerMaster::makeFetchPack(
                 protocol::TMIndexedObject* obj = reply.add_objects();
                 obj->set_hash(
                     want->info().hash.data(), want->info().hash.size());
-                obj->set_data(hdr.getDataPtr(), hdr.getLength());
+                obj->set_data(hdr.getDataPtr(), hdr.getDataLength());
                 obj->set_ledgerseq(lSeq);
             }
 

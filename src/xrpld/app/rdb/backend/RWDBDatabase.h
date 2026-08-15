@@ -249,7 +249,7 @@ public:
             s.add32(HashPrefix::ledgerMaster);
             addRaw(ledger->info(), s);
             app_.getNodeStore().store(
-                hotLEDGER, std::move(s.modData()), ledger->info().hash, seq);
+                hotLEDGER, s.slice(), ledger->info().hash, seq);
         }
 
         std::shared_ptr<AcceptedLedger> aLedger;
@@ -497,15 +497,10 @@ private:
         for (const auto& [_, accountTx] : transactionMap_)
         {
             if (accountTx.first)
-                size += accountTx.first->getSTransaction()
-                            ->getSerializer()
-                            .peekData()
-                            .size();
+                size +=
+                    accountTx.first->getSTransaction()->getSerializer().size();
             if (accountTx.second)
-                size += accountTx.second->getAsObject()
-                            .getSerializer()
-                            .peekData()
-                            .size();
+                size += accountTx.second->getAsObject().getSerializer().size();
         }
 
         // Count structural overhead of account transaction index
@@ -861,8 +856,8 @@ public:
                 }
                 const auto& [txn, txMeta] = accountTx;
                 result.emplace_back(
-                    txn->getSTransaction()->getSerializer().peekData(),
-                    txMeta->getAsObject().getSerializer().peekData(),
+                    txn->getSTransaction()->getSerializer().takeData(),
+                    txMeta->getAsObject().getSerializer().takeData(),
                     txIt->first);
                 if (!options.bUnlimited && result.size() >= options.limit)
                     break;
@@ -905,8 +900,8 @@ public:
                 }
                 const auto& [txn, txMeta] = *innerRIt;
                 result.emplace_back(
-                    txn->getSTransaction()->getSerializer().peekData(),
-                    txMeta->getAsObject().getSerializer().peekData(),
+                    txn->getSTransaction()->getSerializer().takeData(),
+                    txMeta->getAsObject().getSerializer().takeData(),
                     rIt->first);
                 if (!options.bUnlimited && result.size() >= options.limit)
                     break;
@@ -999,10 +994,10 @@ public:
 
                     Blob rawTxn = accountTx.first->getSTransaction()
                                       ->getSerializer()
-                                      .peekData();
+                                      .takeData();
                     Blob rawMeta = accountTx.second->getAsObject()
                                        .getSerializer()
-                                       .peekData();
+                                       .takeData();
 
                     if (rawMeta.size() == 0)
                         onUnsavedLedger(ledgerSeq);
@@ -1057,10 +1052,10 @@ public:
                     const auto& accountTx = *innerRIt;
                     Blob rawTxn = accountTx.first->getSTransaction()
                                       ->getSerializer()
-                                      .peekData();
+                                      .takeData();
                     Blob rawMeta = accountTx.second->getAsObject()
                                        .getSerializer()
-                                       .peekData();
+                                       .takeData();
 
                     if (rawMeta.size() == 0)
                         onUnsavedLedger(ledgerSeq);

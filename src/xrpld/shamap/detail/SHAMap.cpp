@@ -919,7 +919,10 @@ SHAMap::fetchRoot(SHAMapHash const& hash, SHAMapSyncFilter* filter)
           first call SHAMapTreeNode::unshare().
  */
 std::shared_ptr<SHAMapTreeNode>
-SHAMap::writeNode(NodeObjectType t, std::shared_ptr<SHAMapTreeNode> node) const
+SHAMap::writeNode(
+    NodeObjectType t,
+    std::shared_ptr<SHAMapTreeNode> node,
+    Serializer& scratch) const
 {
     XRPL_ASSERT(
         node->cowid() == 0, "ripple::SHAMap::writeNode : valid input node");
@@ -927,10 +930,9 @@ SHAMap::writeNode(NodeObjectType t, std::shared_ptr<SHAMapTreeNode> node) const
 
     node = canonicalize(node->getHash(), node);
 
-    Serializer s;
-    node->serializeWithPrefix(s);
-    f_.db().store(
-        t, std::move(s.modData()), node->getHash().as_uint256(), ledgerSeq_);
+    scratch.erase();
+    node->serializeWithPrefix(scratch);
+    f_.db().store(t, scratch.slice(), node->getHash().as_uint256(), ledgerSeq_);
     return node;
 }
 
@@ -980,6 +982,8 @@ SHAMap::walkSubTree(bool doWrite, NodeObjectType t)
     if (!root_ || (root_->cowid() == 0))
         return flushed;
 
+    Serializer scratch(2048);
+
     if (root_->isLeaf())
     {  // special case -- root_ is leaf
         root_ = preFlushNode(std::move(root_));
@@ -987,7 +991,7 @@ SHAMap::walkSubTree(bool doWrite, NodeObjectType t)
         root_->unshare();
 
         if (doWrite)
-            root_ = writeNode(t, std::move(root_));
+            root_ = writeNode(t, std::move(root_), scratch);
 
         return 1;
     }
@@ -1056,7 +1060,7 @@ SHAMap::walkSubTree(bool doWrite, NodeObjectType t)
                         child->unshare();
 
                         if (doWrite)
-                            child = writeNode(t, std::move(child));
+                            child = writeNode(t, std::move(child), scratch);
 
                         node->shareChild(branch, child);
                     }
@@ -1072,7 +1076,7 @@ SHAMap::walkSubTree(bool doWrite, NodeObjectType t)
 
         if (doWrite)
             node = std::static_pointer_cast<SHAMapInnerNode>(
-                writeNode(t, std::move(node)));
+                writeNode(t, std::move(node), scratch));
 
         ++flushed;
 

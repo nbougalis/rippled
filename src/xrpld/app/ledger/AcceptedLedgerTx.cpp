@@ -32,14 +32,15 @@ AcceptedLedgerTx::AcceptedLedgerTx(
     : mTxn(txn)
     , mMeta(txn->getTransactionID(), ledger->seq(), *met)
     , mAffected(mMeta.getAffectedAccounts())
+    , mRawMeta([&met]() {
+        Serializer s;
+        met->add(s);
+        return s.takeData();
+    }())
 {
     XRPL_ASSERT(
         !ledger->open(),
         "ripple::AcceptedLedgerTx::AcceptedLedgerTx : valid ledger state");
-
-    Serializer s;
-    met->add(s);
-    mRawMeta = std::move(s.modData());
 
     mJson = Json::objectValue;
     mJson[jss::transaction] = mTxn->getJson(JsonOptions::none);
@@ -81,7 +82,7 @@ AcceptedLedgerTx::getEscMeta() const
     XRPL_ASSERT(
         !mRawMeta.empty(),
         "ripple::AcceptedLedgerTx::getEscMeta : metadata is set");
-    return sqlBlobLiteral(mRawMeta);
+    return sqlBlobLiteral(makeSlice(mRawMeta));
 }
 
 }  // namespace ripple
