@@ -247,7 +247,8 @@ private:
         });
 
         // OpenEnded (absent/0) with SubscriptionDate or RedemptionDate present
-        // => temMALFORMED.
+        // => temMALFORMED. Under LP V1.1 the OpenEnded rejection gate fires
+        // first; either way the result is temMALFORMED.
         withEnv(testableAmendments(), [&](Env& env, Account const& owner, Vault& vault) {
             auto const sub = env.now().time_since_epoch().count() + 60;
             auto [tx, keylet] =
@@ -270,39 +271,44 @@ private:
             env(tx, Ter{temMALFORMED});
         });
 
-        // Happy path: open-ended vault (no new fields present) is unaffected.
+        // LP V1.1 gate: with the amendment enabled, an open-ended
+        // VaultCreate (sfVaultKind absent) is rejected with temMALFORMED.
+        // See VaultCreate::preflight.
         withEnv(testableAmendments(), [&](Env& env, Account const& owner, Vault& vault) {
             auto [tx, keylet] = vault.create({.owner = owner, .asset = asset});
-            env(tx);
-            env.close();
-            auto const sle = env.le(keylet);
-            if (BEAST_EXPECT(sle))
-            {
-                BEAST_EXPECT(!sle->isFieldPresent(sfVaultKind));
-                BEAST_EXPECT(!sle->isFieldPresent(sfSubscriptionDate));
-                BEAST_EXPECT(!sle->isFieldPresent(sfRedemptionDate));
-            }
+            env(tx, Ter{temMALFORMED});
         });
 
-        // Happy path: explicit `VaultKind = 0` (OpenEnded) behaves the same
-        // as absent. Per spec, absent and OpenEnded are equivalent.
+        // LP V1.1 gate: explicit `VaultKind = 0` (OpenEnded) is likewise
+        // rejected under LP V1.1. Per spec, absent and OpenEnded are
+        // equivalent, so both paths hit the same gate.
         withEnv(testableAmendments(), [&](Env& env, Account const& owner, Vault& vault) {
             auto [tx, keylet] = vault.create(
                 {.owner = owner,
                  .asset = asset,
                  .vaultKind = std::to_underlying(VaultKind::OpenEnded)});
-            env(tx);
-            env.close();
-            auto const sle = env.le(keylet);
-            if (BEAST_EXPECT(sle))
-            {
-                // OpenEnded is sfVaultKind's default; SoeDefault fields
-                // aren't serialized when they hold the default value.
-                BEAST_EXPECT(!sle->isFieldPresent(sfVaultKind));
-                BEAST_EXPECT(!sle->isFieldPresent(sfSubscriptionDate));
-                BEAST_EXPECT(!sle->isFieldPresent(sfRedemptionDate));
-            }
+            env(tx, Ter{temMALFORMED});
         });
+
+        // Pre-LP V1.1 baseline: open-ended VaultCreate still works when
+        // LP V1.1 is disabled, since the open-ended rejection is gated on
+        // the amendment. Legacy on-ledger open-ended vaults are unaffected
+        // by the amendment; only new VaultCreate transactions are
+        // constrained.
+        withEnv(
+            testableAmendments() - featureLendingProtocolV1_1,
+            [&](Env& env, Account const& owner, Vault& vault) {
+                auto [tx, keylet] = vault.create({.owner = owner, .asset = asset});
+                env(tx);
+                env.close();
+                auto const sle = env.le(keylet);
+                if (BEAST_EXPECT(sle))
+                {
+                    BEAST_EXPECT(!sle->isFieldPresent(sfVaultKind));
+                    BEAST_EXPECT(!sle->isFieldPresent(sfSubscriptionDate));
+                    BEAST_EXPECT(!sle->isFieldPresent(sfRedemptionDate));
+                }
+            });
     }
 
     // SubscriptionDate boundary cases at the top of the UINT32 range.
@@ -449,14 +455,17 @@ private:
     }
 
     // Open-ended vaults are always in VaultPhase::NoPhase, regardless of the ledger clock or any
-    // dates present on the vault.
+    // dates present on the vault. Runs on pre-LP V1.1 rules because
+    // VaultCreate rejects open-ended vaults when LP V1.1 is enabled;
+    // existing on-ledger open-ended vaults continue to derive NoPhase
+    // regardless of the active amendment set.
     void
     testVaultPhaseDerivationOpenEnded()
     {
         testcase("open-ended phase derivation");
         using namespace test::jtx;
 
-        Env env{*this, testableAmendments()};
+        Env env{*this, testableAmendments() - featureLendingProtocolV1_1};
         Account const owner{"owner"};
         env.fund(XRP(1000), owner);
         env.close();

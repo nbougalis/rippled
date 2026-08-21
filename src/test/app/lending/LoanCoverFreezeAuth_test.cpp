@@ -298,7 +298,7 @@ private:
 
         for (bool const deepFreeze : {true, false})
         {
-            Env env(*this);
+            Env env(*this, all_);
 
             auto getCoverBalance = [&](BrokerInfo const& brokerInfo, auto const& accountField) {
                 if (auto const le = env.le(keylet::loanBroker(brokerInfo.brokerID));
@@ -381,7 +381,7 @@ private:
         Account const borrower{"borrower"};
         auto const iou = issuer["IOU"];
 
-        Env env(*this);
+        Env env(*this, all_);
         env.fund(XRP(1'000), lender, issuer, borrower);
         env(trust(lender, iou(10'000'000)));
         env(pay(issuer, lender, iou(5'000'000)));
@@ -436,7 +436,7 @@ private:
         Account const lender{"lender"};
         Account const borrower{"borrower"};
 
-        Env env(*this);
+        Env env(*this, all_);
         env.fund(XRP(1'000'000), issuer, lender, borrower);
         env.close();
 
@@ -505,7 +505,7 @@ private:
         Account const borrower{"borrower"};
         auto const iou = issuer["IOU"];
 
-        Env env(*this);
+        Env env(*this, all_);
         env.fund(XRP(1'000), lender, issuer, borrower);
         env(trust(lender, iou(10'000'000)));
         env(pay(issuer, lender, iou(5'000'000)));

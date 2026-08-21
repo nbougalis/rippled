@@ -47,7 +47,7 @@ private:
 
         testcase("private vault");
 
-        Env env{*this, testableAmendments()};
+        Env env{*this, all_};
         Account const issuer{"issuer"};
         Account const owner{"owner"};
         Account const depositor{"depositor"};
@@ -309,7 +309,7 @@ private:
         // carry authorization forward once the account's domain credential is
         // gone, and both actions below are correctly blocked.
 
-        Env env{*this, testableAmendments()};
+        Env env{*this, all_};
         Account const issuer{"issuer"};
         Account const owner{"owner"};
         Account const depositor{"depositor"};
@@ -409,7 +409,7 @@ private:
         // of a DEX trade in private-vault shares to hold Layer 1 and Layer 2 as
         // well, not just the seller.
 
-        Env env{*this, testableAmendments()};
+        Env env{*this, all_};
         Account const issuer{"issuer"};
         Account const owner{"owner"};
         Account const bob{"bob"};
@@ -481,7 +481,7 @@ private:
 
         testcase("private XRP vault");
 
-        Env env{*this, testableAmendments()};
+        Env env{*this, all_};
         Account const owner{"owner"};
         Account const depositor{"depositor"};
         Account const alice{"charlie"};

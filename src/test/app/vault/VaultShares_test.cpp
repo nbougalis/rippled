@@ -61,7 +61,7 @@ private:
     {
         using namespace test::jtx;
 
-        Env env{*this, testableAmendments()};
+        Env env{*this, all_};
         Account const issuer{"issuer"};
         Account const owner{"owner"};
         Account const depositor{"depositor"};
@@ -158,7 +158,7 @@ private:
         using namespace test::jtx;
 
         testcase("fail pseudo-account allocation");
-        Env env{*this, testableAmendments()};
+        Env env{*this, all_};
         Account const owner{"owner"};
         Vault const vault{env};
         env.fund(XRP(1000), owner);
@@ -186,7 +186,7 @@ private:
         using namespace test::jtx;
         using namespace std::literals;
 
-        auto const amendments = testableAmendments();
+        auto const amendments = all_;
         auto runTest = [&](FeatureBitset f) {
             Env env{*this, f};
             auto const baseFee = env.current()->fees().base;
@@ -283,7 +283,7 @@ private:
         testcase("removeEmptyHolding keeps MPToken with confidential balances");
         using namespace test::jtx;
 
-        Env env{*this, testableAmendments()};
+        Env env{*this, all_};
 
         Account const issuer{"issuer"};
         Account const holder{"holder"};
@@ -339,7 +339,7 @@ private:
         // or RippleState (for IOU-backed vaults).
         {
             testcase("sfReferenceHolding: MPT-backed vault, post-amendment");
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             env.fund(XRP(10'000), issuer, owner);
@@ -369,7 +369,7 @@ private:
 
         {
             testcase("sfReferenceHolding: IOU-backed vault, post-amendment");
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             env.fund(XRP(10'000), issuer, owner);
@@ -401,7 +401,7 @@ private:
         // holding ledger entry and no transferability concept to inherit.
         {
             testcase("sfReferenceHolding: XRP-backed vault, field absent");
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const owner{"owner"};
             env.fund(XRP(10'000), owner);
             env.close();
@@ -419,7 +419,7 @@ private:
         // of underlying type.
         {
             testcase("sfReferenceHolding: vault share, pre-amendment");
-            Env env{*this, testableAmendments() - fixCleanup3_2_0};
+            Env env{*this, all_ - fixCleanup3_2_0};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             env.fund(XRP(10'000), issuer, owner);
@@ -443,7 +443,7 @@ private:
         // interesting; pre-amendment nothing writes the field at all.
         {
             testcase("sfReferenceHolding: plain MPT issuance never set");
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             env.fund(XRP(10'000), issuer);
             env.close();
@@ -488,7 +488,7 @@ private:
         // ---- MPT-backed vault ----------------------------------------
         {
             testcase("vault pseudo MPToken: Clawback blocked by tecPSEUDO_ACCOUNT");
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             Account const depositor{"depositor"};
@@ -530,7 +530,7 @@ private:
 
         {
             testcase("vault pseudo MPToken: Issuer cannot Unauthorize pseudo");
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             env.fund(XRP(10'000), issuer, owner);
@@ -570,7 +570,7 @@ private:
 
         {
             testcase("vault pseudo MPToken: MPTokenIssuanceDestroy blocked while vault holds");
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             Account const depositor{"depositor"};
@@ -608,7 +608,7 @@ private:
         // ---- IOU-backed vault ----------------------------------------
         {
             testcase("vault pseudo trust line: Clawback blocked by tecPSEUDO_ACCOUNT");
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             env.fund(XRP(10'000), issuer, owner);
@@ -648,7 +648,7 @@ private:
 
         {
             testcase("vault pseudo trust line: TrustSet limit=0 from issuer preserves line");
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             env.fund(XRP(10'000), issuer, owner);
@@ -685,7 +685,7 @@ private:
         // ---- Positive control: VaultDelete is the only legitimate path
         {
             testcase("vault pseudo holding: VaultDelete is the legitimate cleanup path");
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             env.fund(XRP(10'000), issuer, owner);

@@ -108,13 +108,13 @@ private:
             testcase(
                 "bug: VaultWithdraw to destination at IOU precision boundary fires "
                 "invariant (pre-fixCleanup3_2_0)");
-            runScenario(testableAmendments() - fixCleanup3_2_0, tecINVARIANT_FAILED);
+            runScenario(all_ - fixCleanup3_2_0, tecINVARIANT_FAILED);
         }
         {
             testcase(
                 "bug: VaultWithdraw to destination at IOU precision boundary succeeds "
                 "when destroyed amount is sub-ULP (post-fixCleanup3_2_0)");
-            runScenario(testableAmendments(), tesSUCCESS);
+            runScenario(all_, tesSUCCESS);
         }
     }
 
@@ -173,13 +173,13 @@ private:
             testcase(
                 "bug: VaultDeposit by issuer at IOU edge fires "
                 "tecINVARIANT_FAILED at finalize (pre-fixCleanup3_2_0)");
-            runScenario(testableAmendments() - fixCleanup3_2_0, tecINVARIANT_FAILED);
+            runScenario(all_ - fixCleanup3_2_0, tecINVARIANT_FAILED);
         }
         {
             testcase(
                 "bug: VaultDeposit by issuer at IOU edge rejects with "
                 "tecPRECISION_LOSS proactively (post-fixCleanup3_2_0)");
-            runScenario(testableAmendments(), tecPRECISION_LOSS);
+            runScenario(all_, tecPRECISION_LOSS);
         }
     }
 
@@ -252,13 +252,13 @@ private:
             testcase(
                 "bug: VaultDeposit across IOU scale boundary fires invariant "
                 "(pre-fixCleanup3_2_0)");
-            runScenario(testableAmendments() - fixCleanup3_2_0, tecINVARIANT_FAILED);
+            runScenario(all_ - fixCleanup3_2_0, tecINVARIANT_FAILED);
         }
         {
             testcase(
                 "bug: VaultDeposit across IOU scale boundary succeeds "
                 "(post-fixCleanup3_2_0)");
-            runScenario(testableAmendments(), tecPRECISION_LOSS);
+            runScenario(all_, tecPRECISION_LOSS);
         }
     }
 
@@ -325,13 +325,13 @@ private:
             testcase(
                 "bug: VaultWithdraw across IOU scale boundary fires invariant "
                 "(pre-fixCleanup3_2_0)");
-            runScenario(testableAmendments() - fixCleanup3_2_0, tecINVARIANT_FAILED);
+            runScenario(all_ - fixCleanup3_2_0, tecINVARIANT_FAILED);
         }
         {
             testcase(
                 "bug: VaultWithdraw across IOU scale boundary succeeds "
                 "(post-fixCleanup3_2_0)");
-            runScenario(testableAmendments(), tesSUCCESS);
+            runScenario(all_, tesSUCCESS);
         }
     }
 
@@ -411,13 +411,13 @@ private:
             testcase(
                 "bug: VaultDeposit below Vault precision canonicalized to zero "
                 "(pre-fixCleanup3_2_0)");
-            runScenario(testableAmendments() - fixCleanup3_2_0, tecINVARIANT_FAILED);
+            runScenario(all_ - fixCleanup3_2_0, tecINVARIANT_FAILED);
         }
         {
             testcase(
                 "bug: VaultDeposit below Vault precision canonicalized to zero "
                 "(post-fixCleanup3_2_0)");
-            runScenario(testableAmendments(), tecPRECISION_LOSS);
+            runScenario(all_, tecPRECISION_LOSS);
         }
     }
 
@@ -497,27 +497,25 @@ private:
             testcase(
                 "bug: VaultWithdraw to third-party at IOU edge fires invariant "
                 "(pre-fixCleanup3_2_0)");
-            runScenario(
-                testableAmendments() - fixCleanup3_2_0, DestKind::ThirdParty, tecINVARIANT_FAILED);
+            runScenario(all_ - fixCleanup3_2_0, DestKind::ThirdParty, tecINVARIANT_FAILED);
         }
         {
             testcase(
                 "bug: VaultWithdraw to third-party at IOU edge succeeds "
                 "(post-fixCleanup3_2_0)");
-            runScenario(testableAmendments(), DestKind::ThirdParty, tesSUCCESS);
+            runScenario(all_, DestKind::ThirdParty, tesSUCCESS);
         }
         {
             testcase(
                 "bug: VaultWithdraw to self at IOU edge fires invariant "
                 "(pre-fixCleanup3_2_0)");
-            runScenario(
-                testableAmendments() - fixCleanup3_2_0, DestKind::Self, tecINVARIANT_FAILED);
+            runScenario(all_ - fixCleanup3_2_0, DestKind::Self, tecINVARIANT_FAILED);
         }
         {
             testcase(
                 "bug: VaultWithdraw to self at IOU edge succeeds "
                 "(post-fixCleanup3_2_0)");
-            runScenario(testableAmendments(), DestKind::Self, tesSUCCESS);
+            runScenario(all_, DestKind::Self, tesSUCCESS);
         }
     }
 
@@ -685,14 +683,14 @@ private:
                 "IOU vault deposit exceeding depositor's balance but "
                 "within counterparty's trust limit, pre-fixCleanup3_2_0 "
                 "(tefINTERNAL)");
-            runTest(test::jtx::testableAmendments() - fixCleanup3_2_0, tefINTERNAL);
+            runTest(all_ - fixCleanup3_2_0, tefINTERNAL);
         }
         {
             testcase(
                 "IOU vault deposit exceeding depositor's balance but "
                 "within counterparty's trust limit, post-fixCleanup3_2_0 "
                 "(tesSUCCESS)");
-            runTest(test::jtx::testableAmendments(), tesSUCCESS);
+            runTest(all_, tesSUCCESS);
         }
     }
 
@@ -704,7 +702,7 @@ private:
         using namespace test::jtx;
         testcase("Bug6 - limit bypass with share-denominated withdrawal");
 
-        auto const allAmendments = testableAmendments() | featureSingleAssetVault;
+        auto const allAmendments = all_ | featureSingleAssetVault;
 
         for (auto const& features : {allAmendments, allAmendments - fixCleanup3_1_3})
         {

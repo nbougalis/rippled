@@ -496,9 +496,23 @@ protected:
 
         auto const coverRateMinValue = params.coverRateMin;
 
+        // VaultCreate rejects open-ended vaults under
+        // featureLendingProtocolV1_1. When the caller left vaultKind at the
+        // OpenEnded default but the enabled amendment set requires
+        // ClosedEnded, transparently promote to ClosedEnded so LP V1.1
+        // tests keep working without threading vaultKind through every
+        // call site. Callers that explicitly asked for ClosedEnded are
+        // untouched.
+        auto effectiveVaultKind = params.vaultKind;
+        if (env.current()->rules().enabled(featureLendingProtocolV1_1) &&
+            effectiveVaultKind == VaultKind::OpenEnded)
+        {
+            effectiveVaultKind = VaultKind::ClosedEnded;
+        }
+
         std::optional<std::uint32_t> subscriptionDate;
         std::optional<std::uint32_t> redemptionDate;
-        if (params.vaultKind == VaultKind::ClosedEnded)
+        if (effectiveVaultKind == VaultKind::ClosedEnded)
         {
             auto const nowSec = env.now().time_since_epoch().count();
             subscriptionDate = nowSec + params.subscriptionOffset;
@@ -508,9 +522,9 @@ protected:
         auto [tx, vaultKeylet] = vault.create(
             {.owner = lender,
              .asset = asset,
-             .vaultKind = params.vaultKind == VaultKind::OpenEnded
+             .vaultKind = effectiveVaultKind == VaultKind::OpenEnded
                  ? std::optional<std::uint8_t>{}
-                 : std::optional<std::uint8_t>{std::to_underlying(params.vaultKind)},
+                 : std::optional<std::uint8_t>{std::to_underlying(effectiveVaultKind)},
              .subscriptionDate = subscriptionDate,
              .redemptionDate = redemptionDate});
         if (params.vaultScale)

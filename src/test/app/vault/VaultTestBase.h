@@ -113,7 +113,12 @@ protected:
         return {.vault = vault, .keylet = keylet, .sub = sub, .red = red};
     }
 
-    FeatureBitset const all_{test::jtx::testableAmendments()};
+    // Open-ended vaults are disabled under featureLendingProtocolV1_1
+    // (see VaultCreate::preflight), so Vault suites default to running
+    // without that amendment. Suites that need LP V1.1 (closed-ended
+    // vaults, LEVersion, memo/data on VaultDelete) must opt in
+    // explicitly, e.g. `all_ | featureLendingProtocolV1_1`.
+    FeatureBitset const all_{test::jtx::testableAmendments() - featureLendingProtocolV1_1};
     std::string const iouCurrency_{"IOU"};
 };
 

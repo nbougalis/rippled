@@ -71,7 +71,7 @@ private:
 
         auto testCase = [&, this](
                             std::uint8_t scale, std::function<void(Env & env, Data data)> test) {
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const owner{"owner"};
             Account const issuer{"issuer"};
             Account const depositor{"depositor"};
@@ -906,7 +906,7 @@ private:
 
         using namespace test::jtx;
 
-        Env env{*this, testableAmendments()};
+        Env env{*this, all_};
         Account const owner{"owner"};
         Account const issuer{"issuer"};
 

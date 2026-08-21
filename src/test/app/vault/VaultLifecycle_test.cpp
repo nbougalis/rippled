@@ -513,7 +513,7 @@ private:
 
         auto testCases = [&, this](
                              std::string prefix, std::function<PrettyAsset(Env & env)> setup) {
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
 
             Vault vault{env};
             env.fund(XRP(1000), issuer, owner, depositor, charlie, dave);
@@ -569,7 +569,10 @@ private:
             bool enableClawback = true;
             bool requireAuth = true;
             int initialXRP = 1000;
-            FeatureBitset features = testableAmendments();
+            // Open-ended VaultCreate is rejected under
+            // featureLendingProtocolV1_1; exercise pre-LP V1.1 rules by
+            // default.
+            FeatureBitset features = testableAmendments() - featureLendingProtocolV1_1;
         };
 
         auto testCase = [this](
@@ -796,7 +799,7 @@ private:
             {.requireAuth = false});
 
         auto const [acctReserve, incReserve] = [this]() -> std::pair<int, int> {
-            Env const env{*this, testableAmendments()};
+            Env const env{*this, all_};
             return {
                 env.current()->fees().accountReserve(0, 1).drops() / kDropsPerXrp.drops(),
                 env.current()->fees().increment.drops() / kDropsPerXrp.drops()};
@@ -1079,7 +1082,7 @@ private:
         {
             testcase("MPT shares to a vault");
 
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const owner{"owner"};
             Account const issuer{"issuer"};
             env.fund(XRP(1000000), owner, issuer);
@@ -1111,7 +1114,7 @@ private:
         {
             testcase("MPT locked: vault shares inherit underlying lock");
 
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             Account const alice{"alice"};
@@ -1188,7 +1191,7 @@ private:
         {
             testcase("MPT CanTrade governance: share inherits underlying on DEX and AMM");
 
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             Account const alice{"alice"};
@@ -1255,7 +1258,7 @@ private:
         {
             testcase("MPT OutstandingAmount > MaximumAmount");
 
-            Env env{*this, testableAmendments() | featureSingleAssetVault};
+            Env env{*this, all_ | featureSingleAssetVault};
             Account const alice{"alice"};
             Account const issuer{"issuer"};
             env.fund(XRP(1'000), alice, issuer);
@@ -1301,7 +1304,10 @@ private:
             Number initialIOU = 200;
             double transferRate = 1.0;
             bool charlieRipple = true;
-            FeatureBitset features = testableAmendments();
+            // Open-ended VaultCreate is rejected under
+            // featureLendingProtocolV1_1; exercise pre-LP V1.1 rules by
+            // default.
+            FeatureBitset features = testableAmendments() - featureLendingProtocolV1_1;
         };
 
         auto testCase = [&, this](
@@ -1676,7 +1682,7 @@ private:
             {.initialIOU = Number(11875, -2)});
 
         auto const [acctReserve, incReserve] = [this]() -> std::pair<int, int> {
-            Env const env{*this, testableAmendments()};
+            Env const env{*this, all_};
             return {
                 env.current()->fees().accountReserve(0, 1).drops() / kDropsPerXrp.drops(),
                 env.current()->fees().increment.drops() / kDropsPerXrp.drops()};

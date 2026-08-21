@@ -105,7 +105,13 @@ private:
         auto const iou = issuer["IOU"];
 
         auto testWrapper = [&](auto&& test) {
-            Env env(*this);
+            // ClosedEnded vault fields (sfVaultKind, sfSubscriptionDate,
+            // sfRedemptionDate) are gated behind
+            // featureLendingProtocolV1_1; opt in when the fixture asks
+            // for a closed-ended vault.
+            auto const features =
+                vaultKind == VaultKind::ClosedEnded ? all_ | featureLendingProtocolV1_1 : all_;
+            Env env(*this, features);
             env.fund(XRP(1'000), lender, issuer, borrower, sponsor);
             env(trust(lender, iou(10'000'000)));
             env(pay(issuer, lender, iou(5'000'000)));
@@ -253,7 +259,7 @@ private:
         // preflight: temINVALID, LoanID == zero
         {
             Account const alice{"alice"};
-            Env env(*this);
+            Env env(*this, all_);
             env.fund(XRP(1'000), alice);
             env.close();
             env(del(alice, beast::kZero), Ter(temINVALID));
@@ -270,7 +276,7 @@ private:
         // preflight: temINVALID, LoanID == zero
         {
             Account const alice{"alice"};
-            Env env(*this);
+            Env env(*this, all_);
             env.fund(XRP(1'000), alice);
             env.close();
             env(manage(alice, beast::kZero, tfLoanDefault), Ter(temINVALID));
@@ -289,7 +295,7 @@ private:
         auto const iou = issuer["IOU"];
 
         // preclaim
-        Env env(*this);
+        Env env(*this, all_);
         env.fund(XRP(1'000), lender, issuer, borrower);
         env(trust(lender, iou(10'000'000)));
         env(pay(issuer, lender, iou(5'000'000)));
@@ -365,7 +371,7 @@ private:
         Account const lender{"lender"};
         Account const issuer{"issuer"};
         Account const borrower{"borrower"};
-        Env env(*this);
+        Env env(*this, all_);
 
         env.fund(XRP(100'000), issuer, lender, borrower);
         env.close();

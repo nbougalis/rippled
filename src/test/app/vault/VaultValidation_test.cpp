@@ -50,7 +50,11 @@ private:
 
         struct CaseArgs
         {
-            FeatureBitset features = testableAmendments();
+            // Open-ended VaultCreate is rejected under
+            // featureLendingProtocolV1_1; this suite exercises
+            // preflight/create paths on pre-LP V1.1 rules unless a
+            // specific case opts back in.
+            FeatureBitset features = testableAmendments() - featureLendingProtocolV1_1;
         };
 
         auto testCase = [&, this](
@@ -123,9 +127,14 @@ private:
             };
         };
 
-        testCase(testDisabled(), {.features = testableAmendments() - featureSingleAssetVault});
+        testCase(
+            testDisabled(),
+            {.features =
+                 testableAmendments() - featureSingleAssetVault - featureLendingProtocolV1_1});
 
-        testCase(testDisabled(tecNO_ENTRY), {.features = testableAmendments() - featureMPTokensV1});
+        testCase(
+            testDisabled(tecNO_ENTRY),
+            {.features = testableAmendments() - featureMPTokensV1 - featureLendingProtocolV1_1});
 
         testCase(
             [&](Env& env,
@@ -150,7 +159,8 @@ private:
                     env(tx, Ter{temDISABLED});
                 }
             },
-            {.features = testableAmendments() - featurePermissionedDomains});
+            {.features =
+                 testableAmendments() - featurePermissionedDomains - featureLendingProtocolV1_1});
 
         testCase([&](Env& env,
                      Account const& issuer,
@@ -573,7 +583,10 @@ private:
                                 Account const& depositor,
                                 Asset const& asset,
                                 Vault& vault)> test) {
-            Env env{*this, testableAmendments()};
+            // Open-ended VaultCreate is rejected under
+            // featureLendingProtocolV1_1; XRP happy paths exercised here
+            // run on pre-LP V1.1 rules.
+            Env env{*this, testableAmendments() - featureLendingProtocolV1_1};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             Account const depositor{"depositor"};
@@ -754,7 +767,10 @@ private:
 
             {
                 testcase("IOU fail create frozen");
-                Env env{*this, testableAmendments()};
+                // Open-ended VaultCreate is rejected under LP V1.1; this
+                // case wants to exercise the tecFROZEN preclaim path on
+                // an open-ended vault, so LP V1.1 is disabled here.
+                Env env{*this, testableAmendments() - featureLendingProtocolV1_1};
                 Account const issuer{"issuer"};
                 Account const owner{"owner"};
                 env.fund(XRP(1000), issuer, owner);
@@ -772,7 +788,9 @@ private:
 
             {
                 testcase("IOU fail create no ripling");
-                Env env{*this, testableAmendments()};
+                // See "IOU fail create frozen" above for why LP V1.1 is
+                // disabled here (exercises terNO_RIPPLE on open-ended).
+                Env env{*this, testableAmendments() - featureLendingProtocolV1_1};
                 Account const issuer{"issuer"};
                 Account const owner{"owner"};
                 env.fund(XRP(1000), issuer, owner);
@@ -789,7 +807,9 @@ private:
 
             {
                 testcase("IOU no issuer");
-                Env env{*this, testableAmendments()};
+                // See "IOU fail create frozen" above for why LP V1.1 is
+                // disabled here (exercises terNO_ACCOUNT on open-ended).
+                Env env{*this, testableAmendments() - featureLendingProtocolV1_1};
                 Account const issuer{"issuer"};
                 Account const owner{"owner"};
                 env.fund(XRP(1000), owner);
@@ -807,7 +827,9 @@ private:
 
         {
             testcase("IOU fail create vault for AMM LPToken");
-            Env env{*this, testableAmendments()};
+            // See "IOU fail create frozen" above for why LP V1.1 is
+            // disabled here (exercises tecWRONG_ASSET on open-ended).
+            Env env{*this, testableAmendments() - featureLendingProtocolV1_1};
             Account const gw("gateway");
             Account const alice("alice");
             Account const carol("carol");
@@ -869,7 +891,10 @@ private:
                                 Account const& depositor,
                                 Asset const& asset,
                                 Vault& vault)> test) {
-            Env env{*this, testableAmendments()};
+            // Open-ended VaultCreate is rejected under
+            // featureLendingProtocolV1_1; MPT create-failure paths
+            // exercised here run on pre-LP V1.1 rules.
+            Env env{*this, testableAmendments() - featureLendingProtocolV1_1};
             Account const issuer{"issuer"};
             Account const owner{"owner"};
             Account const depositor{"depositor"};
@@ -980,11 +1005,12 @@ private:
         {
             testcase("VaultDelete memo data featureLendingProtocolV1_1 enabled data valid");
             PrettyAsset const xrpAsset = xrpIssue();
-            auto const [tx, keylet] = vault.create({.owner = owner, .asset = xrpAsset});
-            env(tx, Ter(tesSUCCESS));
-            env.close();
-            // Recreate the transaction as the vault keylet changed
-            auto delTx = vault.del({.owner = owner, .id = keylet.key});
+            // Under LP V1.1 only closed-ended vaults can be created; the
+            // vault is empty right after creation, so VaultDelete is
+            // permitted without waiting for Redemption.
+            auto const closedEndedSetup =
+                makeClosedEndedVault(env, owner, xrpAsset, 60u, kMinInvestmentPeriod);
+            auto delTx = vault.del({.owner = owner, .id = closedEndedSetup.keylet.key});
             delTx[sfMemoData] = strHex(std::string(kMaxDataPayloadLength, 'A'));
             env(delTx, Ter(tesSUCCESS));
             env.close();
@@ -1024,10 +1050,9 @@ private:
             env.fund(XRP(1'000'000), owner);
             env.close();
 
-            Vault const vault{env};
-            auto const [tx, keylet] = vault.create({.owner = owner, .asset = xrpAsset});
-            env(tx, Ter(tesSUCCESS));
-            env.close();
+            // Under LP V1.1 only closed-ended vaults can be created.
+            auto const [_v, keylet, _s, _r] =
+                makeClosedEndedVault(env, owner, xrpAsset, 60u, kMinInvestmentPeriod);
 
             auto const sleVault = env.le(keylet);
             BEAST_EXPECT(sleVault);
@@ -1042,7 +1067,17 @@ private:
             env.close();
 
             Vault const vault{env};
-            auto [tx, keylet] = vault.create({.owner = owner, .asset = xrpAsset});
+            // Build a valid closed-ended VaultCreate then tack on
+            // sfLEVersion; without the sfLEVersion tweak this tx would
+            // succeed, so the temMALFORMED is attributable to the
+            // LEVersion rejection rather than the LP V1.1 open-ended gate.
+            auto const sub = env.now().time_since_epoch().count() + 60;
+            auto [tx, keylet] = vault.create(
+                {.owner = owner,
+                 .asset = xrpAsset,
+                 .vaultKind = std::to_underlying(VaultKind::ClosedEnded),
+                 .subscriptionDate = sub,
+                 .redemptionDate = sub + kMinInvestmentPeriod});
             tx[sfLEVersion] = 2;
             env(tx, Ter(temMALFORMED));
             env.close();
@@ -1057,9 +1092,9 @@ private:
             env.close();
 
             Vault const vault{env};
-            auto const [createTx, keylet] = vault.create({.owner = owner, .asset = xrpAsset});
-            env(createTx, Ter(tesSUCCESS));
-            env.close();
+            // Under LP V1.1 only closed-ended vaults can be created.
+            auto const [_v, keylet, _s, _r] =
+                makeClosedEndedVault(env, owner, xrpAsset, 60u, kMinInvestmentPeriod);
 
             auto setTx = vault.set({.owner = owner, .id = keylet.key});
             setTx[sfLEVersion] = 2;

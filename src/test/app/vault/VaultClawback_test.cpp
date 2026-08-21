@@ -49,7 +49,7 @@ private:
         using namespace test::jtx;
         using namespace loan_broker;
         using namespace loan;
-        Env env(*this, beast::Severity::Warning);
+        Env env(*this, envconfig(), all_, nullptr, beast::Severity::Warning);
 
         auto const vaultAssetBalance = [&](Keylet const& vaultKeylet) {
             auto const sleVault = env.le(vaultKeylet);
@@ -310,7 +310,7 @@ private:
         using namespace test::jtx;
         using namespace loan_broker;
         using namespace loan;
-        Env env(*this);
+        Env env(*this, all_);
         env.enableFeature(fixCleanup3_1_3);
 
         auto const setupVault = [&](PrettyAsset const& asset,
@@ -888,7 +888,7 @@ private:
         {
             testcase("Vault deposit fails when MPT asset is escrowed");
 
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             auto const baseFee = env.current()->fees().base;
             Account const owner{"owner"};
             Account const depositor{"depositor"};
@@ -950,7 +950,7 @@ private:
         {
             testcase("Vault withdraw respects escrowed shares");
 
-            Env env{*this, testableAmendments()};
+            Env env{*this, all_};
             auto const baseFee = env.current()->fees().base;
             Account const owner{"owner"};
             Account const depositor{"depositor"};
@@ -1027,7 +1027,7 @@ private:
         {
             testcase("Vault clawback only recovers unlocked shares");
 
-            Env env{*this, testableAmendments() | fixCleanup3_1_3};
+            Env env{*this, all_ | fixCleanup3_1_3};
             auto const baseFee = env.current()->fees().base;
             Account const owner{"owner"};
             Account const depositor{"depositor"};

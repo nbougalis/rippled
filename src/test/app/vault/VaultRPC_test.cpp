@@ -40,7 +40,7 @@ private:
         using namespace test::jtx;
 
         testcase("RPC");
-        Env env{*this, testableAmendments()};
+        Env env{*this, all_};
         Account const owner{"owner"};
         Account const issuer{"issuer"};
         Vault const vault{env};
@@ -524,85 +524,110 @@ private:
 
     // RPC coverage: closed-ended vaults must return VaultKind, SubscriptionDate and RedemptionDate
     // in both vault_info and ledger_entry responses. Open-ended vaults must not.
+    //
+    // Under featureLendingProtocolV1_1 new vaults can only be closed-ended,
+    // so the closed-ended and open-ended halves must run on different
+    // rulesets: closed-ended requires LP V1.1, open-ended requires it
+    // disabled. The invariants over what each SLE surfaces via RPC are
+    // otherwise unchanged.
     void
     testRPCClosedEnded()
     {
         using namespace test::jtx;
 
-        testcase("RPC closed-ended vault fields");
-        Env env{*this, testableAmendments()};
-        Account const owner{"owner"};
-        Account const owner2{"owner2"};
-        env.fund(XRP(1000), owner, owner2);
-        env.close();
-
-        auto const closedEnded = std::to_underlying(VaultKind::ClosedEnded);
-        Asset const asset = xrpIssue();
-        auto const sub = env.now().time_since_epoch().count() + 60;
-        auto const red = sub + kMinInvestmentPeriod;
-
-        Vault const vault{env};
-        auto [tx, keylet] = vault.create(
-            {.owner = owner,
-             .asset = asset,
-             .vaultKind = closedEnded,
-             .subscriptionDate = sub,
-             .redemptionDate = red});
-        env(tx);
-        env.close();
-
-        auto [tx2, keylet2] = vault.create({.owner = owner2, .asset = asset});
-        env(tx2);
-        env.close();
-
         auto const asUInt = [](json::Value const& jv) -> json::UInt {
             return jv.isUInt() ? jv.asUInt() : json::UInt(jv.asInt());
         };
-        auto const checkClosedEnded = [&](json::Value const& v) {
-            BEAST_EXPECT(v.isObject());
-            BEAST_EXPECT(v.isMember(sfVaultKind.fieldName));
-            BEAST_EXPECT(asUInt(v[sfVaultKind.fieldName]) == json::UInt(closedEnded));
-            BEAST_EXPECT(v.isMember(sfSubscriptionDate.fieldName));
-            BEAST_EXPECT(asUInt(v[sfSubscriptionDate.fieldName]) == json::UInt(sub));
-            BEAST_EXPECT(v.isMember(sfRedemptionDate.fieldName));
-            BEAST_EXPECT(asUInt(v[sfRedemptionDate.fieldName]) == json::UInt(red));
-        };
-        auto const checkOpenEnded = [&](json::Value const& v) {
-            BEAST_EXPECT(v.isObject());
-            BEAST_EXPECT(!v.isMember(sfVaultKind.fieldName));
-            BEAST_EXPECT(!v.isMember(sfSubscriptionDate.fieldName));
-            BEAST_EXPECT(!v.isMember(sfRedemptionDate.fieldName));
-        };
 
         {
-            json::Value jvParams;
-            jvParams[jss::vault_id] = strHex(keylet.key);
-            auto jv = env.rpc("json", "vault_info", to_string(jvParams));
-            BEAST_EXPECT(!jv[jss::result].isMember(jss::error));
-            checkClosedEnded(jv[jss::result][jss::vault]);
+            testcase("RPC closed-ended vault fields");
+            // LP V1.1 required to create a closed-ended vault.
+            Env env{*this, all_ | featureLendingProtocolV1_1};
+            Account const owner{"owner"};
+            env.fund(XRP(1000), owner);
+            env.close();
+
+            auto const closedEnded = std::to_underlying(VaultKind::ClosedEnded);
+            Asset const asset = xrpIssue();
+            auto const sub = env.now().time_since_epoch().count() + 60;
+            auto const red = sub + kMinInvestmentPeriod;
+
+            Vault const vault{env};
+            auto [tx, keylet] = vault.create(
+                {.owner = owner,
+                 .asset = asset,
+                 .vaultKind = closedEnded,
+                 .subscriptionDate = sub,
+                 .redemptionDate = red});
+            env(tx);
+            env.close();
+
+            auto const checkClosedEnded = [&](json::Value const& v) {
+                BEAST_EXPECT(v.isObject());
+                BEAST_EXPECT(v.isMember(sfVaultKind.fieldName));
+                BEAST_EXPECT(asUInt(v[sfVaultKind.fieldName]) == json::UInt(closedEnded));
+                BEAST_EXPECT(v.isMember(sfSubscriptionDate.fieldName));
+                BEAST_EXPECT(asUInt(v[sfSubscriptionDate.fieldName]) == json::UInt(sub));
+                BEAST_EXPECT(v.isMember(sfRedemptionDate.fieldName));
+                BEAST_EXPECT(asUInt(v[sfRedemptionDate.fieldName]) == json::UInt(red));
+            };
+
+            {
+                json::Value jvParams;
+                jvParams[jss::vault_id] = strHex(keylet.key);
+                auto jv = env.rpc("json", "vault_info", to_string(jvParams));
+                BEAST_EXPECT(!jv[jss::result].isMember(jss::error));
+                checkClosedEnded(jv[jss::result][jss::vault]);
+            }
+            {
+                json::Value jvParams;
+                jvParams[jss::ledger_index] = jss::validated;
+                jvParams[jss::vault] = strHex(keylet.key);
+                auto jv = env.rpc("json", "ledger_entry", to_string(jvParams));
+                BEAST_EXPECT(!jv[jss::result].isMember(jss::error));
+                checkClosedEnded(jv[jss::result][jss::node]);
+            }
         }
+
         {
-            json::Value jvParams;
-            jvParams[jss::ledger_index] = jss::validated;
-            jvParams[jss::vault] = strHex(keylet.key);
-            auto jv = env.rpc("json", "ledger_entry", to_string(jvParams));
-            BEAST_EXPECT(!jv[jss::result].isMember(jss::error));
-            checkClosedEnded(jv[jss::result][jss::node]);
-        }
-        {
-            json::Value jvParams;
-            jvParams[jss::vault_id] = strHex(keylet2.key);
-            auto jv = env.rpc("json", "vault_info", to_string(jvParams));
-            BEAST_EXPECT(!jv[jss::result].isMember(jss::error));
-            checkOpenEnded(jv[jss::result][jss::vault]);
-        }
-        {
-            json::Value jvParams;
-            jvParams[jss::ledger_index] = jss::validated;
-            jvParams[jss::vault] = strHex(keylet2.key);
-            auto jv = env.rpc("json", "ledger_entry", to_string(jvParams));
-            BEAST_EXPECT(!jv[jss::result].isMember(jss::error));
-            checkOpenEnded(jv[jss::result][jss::node]);
+            testcase("RPC open-ended vault fields");
+            // Open-ended VaultCreate is rejected under LP V1.1, so the
+            // open-ended half runs on pre-LP V1.1 rules; this exercises
+            // the RPC-shape invariant that legacy on-ledger open-ended
+            // vaults never surface the closed-ended-only fields.
+            Env env{*this, all_};
+            Account const owner2{"owner2"};
+            env.fund(XRP(1000), owner2);
+            env.close();
+
+            Asset const asset = xrpIssue();
+            Vault const vault{env};
+            auto [tx2, keylet2] = vault.create({.owner = owner2, .asset = asset});
+            env(tx2);
+            env.close();
+
+            auto const checkOpenEnded = [&](json::Value const& v) {
+                BEAST_EXPECT(v.isObject());
+                BEAST_EXPECT(!v.isMember(sfVaultKind.fieldName));
+                BEAST_EXPECT(!v.isMember(sfSubscriptionDate.fieldName));
+                BEAST_EXPECT(!v.isMember(sfRedemptionDate.fieldName));
+            };
+
+            {
+                json::Value jvParams;
+                jvParams[jss::vault_id] = strHex(keylet2.key);
+                auto jv = env.rpc("json", "vault_info", to_string(jvParams));
+                BEAST_EXPECT(!jv[jss::result].isMember(jss::error));
+                checkOpenEnded(jv[jss::result][jss::vault]);
+            }
+            {
+                json::Value jvParams;
+                jvParams[jss::ledger_index] = jss::validated;
+                jvParams[jss::vault] = strHex(keylet2.key);
+                auto jv = env.rpc("json", "ledger_entry", to_string(jvParams));
+                BEAST_EXPECT(!jv[jss::result].isMember(jss::error));
+                checkOpenEnded(jv[jss::result][jss::node]);
+            }
         }
     }
 

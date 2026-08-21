@@ -111,6 +111,13 @@ VaultCreate::preflight(PreflightContext const& ctx)
     auto const hasSubscription = ctx.tx.isFieldPresent(sfSubscriptionDate);
     auto const hasRedemption = ctx.tx.isFieldPresent(sfRedemptionDate);
     auto const isClosedEnded = kind == VaultKind::ClosedEnded;
+
+    // LP V1.1: open-ended vaults are disabled at creation time. Legacy
+    // open-ended vaults already on the ledger keep working; only new
+    // VaultCreate transactions are constrained to ClosedEnded.
+    if (ctx.rules.enabled(featureLendingProtocolV1_1) && !isClosedEnded)
+        return temMALFORMED;
+
     if (!isClosedEnded && (hasSubscription || hasRedemption))
         return temMALFORMED;
     if (isClosedEnded)

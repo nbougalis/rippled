@@ -286,7 +286,7 @@ private:
         Account const issuer("issuer");
         Account const borrower = issuer;
         Account const lender("lender");
-        Env env(*this);
+        Env env(*this, all_);
 
         env.fund(XRP(1'000), issuer, lender);
 
@@ -326,7 +326,7 @@ private:
         Account const depositor{"depositor"};
 
         auto testLoanAsset = [&](auto&& getMaxDebt, auto const& borrower) {
-            Env env(*this);
+            Env env(*this, all_);
             Vault const vault(env);
 
             if (borrower == broker)

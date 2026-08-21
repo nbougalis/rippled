@@ -411,7 +411,7 @@ private:
         Account const depositor{"depositor"};
         auto const txFee = Fee(XRP(100));
 
-        Env env(*this);
+        Env env(*this, all_);
         Vault const vault(env);
 
         env.fund(XRP(10'000), lender, issuer, borrower, depositor);
