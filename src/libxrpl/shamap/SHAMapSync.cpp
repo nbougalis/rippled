@@ -541,7 +541,7 @@ SHAMap::addRootNode(
         Serializer s;
         root_->serializeWithPrefix(s);
         filter->gotNode(
-            false, root_->getHash(), ledgerSeq_, std::move(s.modData()), root_->getType());
+            false, root_->getHash(), ledgerSeq(), std::move(s.modData()), root_->getType());
     }
 
     return SHAMapAddNode::useful();
@@ -609,7 +609,7 @@ SHAMap::addKnownNode(
             (treeNode->isInner() && currNodeID.getDepth() == kLeafDepth))
         {
             // Map is provably invalid
-            state_ = SHAMapState::Invalid;
+            setInvalid();
             return SHAMapAddNode::useful();
         }
 
@@ -633,7 +633,7 @@ SHAMap::addKnownNode(
             Serializer s;
             treeNode->serializeWithPrefix(s);
             filter->gotNode(
-                false, childHash, ledgerSeq_, std::move(s.modData()), treeNode->getType());
+                false, childHash, ledgerSeq(), std::move(s.modData()), treeNode->getType());
         }
 
         return SHAMapAddNode::useful();
