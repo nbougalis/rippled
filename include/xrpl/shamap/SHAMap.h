@@ -2,6 +2,7 @@
 
 #include <xrpl/basics/Blob.h>
 #include <xrpl/basics/IntrusivePointer.h>
+#include <xrpl/basics/Log.h>
 #include <xrpl/basics/SHAMapHash.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/utility/Journal.h>
@@ -180,7 +181,14 @@ public:
     SHAMap&
     operator=(SHAMap const&) = delete;
 
-    // Take a snapshot of the given map:
+    /**
+     * Take a snapshot of the given map.
+     *
+     * @param other The map to snapshot. An Invalid source yields an Invalid
+     *        snapshot, since the two share the same node structure.
+     * @param isMutable Whether the snapshot may be modified. Ignored when other
+     *        is Invalid, since that state outranks both alternatives.
+     */
     SHAMap(SHAMap const& other, bool isMutable);
 
     // build new map
@@ -218,8 +226,15 @@ public:
 
     //--------------------------------------------------------------------------
 
-    // Returns a new map that's a snapshot of this one.
-    // Handles copy on write for mutable snapshots.
+    /**
+     * Return a new map that is a snapshot of this one.
+     *
+     * Handles copy on write for mutable snapshots. An invalid map yields an
+     * invalid snapshot, since the two share the same node structure.
+     *
+     * @param isMutable Whether the snapshot may be modified.
+     * @return The snapshot.
+     */
     std::shared_ptr<SHAMap>
     snapShot(bool isMutable) const;
 
@@ -408,7 +423,13 @@ public:
         SHAMapTreeNodePtr treeNode,
         SHAMapSyncFilter const* filter);
 
-    void
+    /**
+     * Mark this map as immutable, so it can no longer be modified.
+     *
+     * @return false if the map is Invalid and was left unchanged, true
+     *         otherwise.
+     */
+    [[nodiscard]] bool
     setImmutable();
 
     /**
@@ -418,8 +439,24 @@ public:
      */
     [[nodiscard]] bool
     isSynching() const;
+
+    /**
+     * Mark this map as syncing, fixing its hash while still allowing missing
+     * nodes to be added.
+     *
+     * Left unchanged if the map is Invalid, which is terminal - though that
+     * case is itself treated as unreachable (and asserts in a build with
+     * assertions enabled), since nothing should call this on a map that has
+     * already been judged.
+     */
     void
     setSynching();
+
+    /**
+     * Mark this map as no longer syncing, so it can be modified again.
+     *
+     * Does nothing if the map is Invalid, which is terminal.
+     */
     void
     clearSynching();
 
@@ -503,6 +540,16 @@ private:
      */
     void
     setInvalid();
+
+    /**
+     * Store a new state unless the map is Invalid, atomically.
+     *
+     * @param desired The state to store.
+     * @return false if the map is Invalid and was left unchanged, true
+     *         otherwise.
+     */
+    bool
+    trySetState(SHAMapState desired);
 
     // tree node cache operations
     SHAMapTreeNodePtr
@@ -740,11 +787,30 @@ SHAMap::state() const
     return state_.load(std::memory_order_acquire);
 }
 
-inline void
+inline bool
+SHAMap::trySetState(SHAMapState desired)
+{
+    // Compare-exchange rather than check-then-store, so the refusal to leave Invalid holds no
+    // matter how this call interleaves with another thread's. Invalid is the only state this
+    // refuses to leave; the loop simply retries if another one is stored meanwhile. No load ahead
+    // of it, since a failed exchange both reports the state and refreshes expected.
+    auto expected = SHAMapState::Modifying;
+    while (expected != SHAMapState::Invalid)
+    {
+        if (state_.compare_exchange_weak(
+                expected, desired, std::memory_order_acq_rel, std::memory_order_acquire))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline bool
 SHAMap::setImmutable()
 {
-    XRPL_ASSERT(isValid(), "xrpl::SHAMap::setImmutable : state is valid");
-    state_.store(SHAMapState::Immutable, std::memory_order_release);
+    SOMETIMES(!isValid(), "xrpl::SHAMap::setImmutable : map is invalid");
+    return trySetState(SHAMapState::Immutable);
 }
 
 inline bool
@@ -756,13 +822,32 @@ SHAMap::isSynching() const
 inline void
 SHAMap::setSynching()
 {
-    state_.store(SHAMapState::Synching, std::memory_order_release);
+    // Guarded, so this is not a way out of Invalid, matching clearSynching().
+    if (!trySetState(SHAMapState::Synching))
+    {
+        // Unreachable today, though not because the map is Modifying: a ledger built from a header
+        // starts out with both maps Synching already. It is unreachable because this is only ever
+        // called on a map that has just been constructed, so nothing can have synced against it and
+        // reached a verdict on it yet.
+        // LCOV_EXCL_START
+        UNREACHABLE("xrpl::SHAMap::setSynching : map is invalid");
+        // LCOV_EXCL_STOP
+    }
 }
 
 inline void
 SHAMap::clearSynching()
 {
-    state_.store(SHAMapState::Modifying, std::memory_order_release);
+    // Guarded, so an invalid map stays invalid rather than being moved back to Modifying, which
+    // passes isValid(). Refusing is the contract rather than a broken invariant, so this reports
+    // instead of asserting: peer data produces the verdict, so an UNREACHABLE here would be an
+    // abort a peer could ask for.
+    SOMETIMES(!isValid(), "xrpl::SHAMap::clearSynching : map is invalid");
+    if (!trySetState(SHAMapState::Modifying))
+    {
+        JLOG(journal_.warn()) << "Refused to clear synching on an invalid map, root hash "
+                              << root_->getHash();
+    }
 }
 
 inline bool
