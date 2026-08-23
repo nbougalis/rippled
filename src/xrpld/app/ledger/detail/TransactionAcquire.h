@@ -54,11 +54,20 @@ public:
     /**
      * Add nodes a peer sent us to the set we are acquiring.
      *
+     * Charges the peer for data it declines, since the fee depends on
+     * whether the map stayed sound and on whether we were still asking for
+     * the set, and only this function holds the lock that decides either.
+     * A node that leaves the map invalid also fails the acquisition; see
+     * SHAMap::addKnownNode for why that verdict is final. A reply arriving
+     * after the set was settled is free once per peer we asked, since that
+     * many can be in flight; beyond that the sender is replaying.
+     *
      * @param data The nodes to add, each with its claimed position.
-     * @param peer The peer that sent them.
-     * @return The tally of useful, unwanted, and bad nodes in the batch. Useful and
-     *         bad can both be nonzero, since only the node the batch stops on is
-     *         bad.
+     * @param peer The peer that sent them, charged here if the data is
+     *        declined.
+     * @return The tally of useful, unwanted, and bad nodes in the batch.
+     *         Useful and bad can both be nonzero, since only the node the
+     *         batch stops on is bad.
      */
     SHAMapAddNode
     takeNodes(
@@ -69,13 +78,19 @@ public:
     init(int startPeers);
 
     /**
-     * Resume a timed-out acquisition, or leave a running one alone.
+     * Resume a timed-out acquisition, or leave it alone.
      *
-     * Always clamps the timeout count. An acquisition that failed has its timer
-     * chain stopped, so this also clears the failed flag and restarts the timer;
-     * one that is still running already has a timer pending.
+     * Always clamps the timeout count. An acquisition that failed with
+     * its map still valid has its timer chain stopped, so this also
+     * clears the failed flag and restarts the timer. One that failed
+     * because its map went invalid cannot be satisfied by any peer (see
+     * SHAMap::addKnownNode), so it stays failed.
+     *
+     * @return Whether the set is still worth keeping. False only for one that
+     *         cannot be revived, so the caller stops refreshing the window that
+     *         decides when it is swept.
      */
-    void
+    [[nodiscard]] bool
     stillNeed();
 
 protected:
@@ -85,17 +100,29 @@ protected:
 
 private:
     bool haveRoot_{false};
+
+    /**
+     * How many replies have arrived since the acquisition was settled.
+     *
+     * Counted rather than merely noticed, so takeNodes() can tell the
+     * replies we asked for from a sender replaying them. Reset by
+     * stillNeed() when it revives the acquisition, since the count
+     * belongs to the round that just failed, not to the one it starts.
+     */
+    std::size_t lateReplies_{0};
+
     std::unique_ptr<PeerSet> peerSet_;
 
     /**
      * Add nodes a peer sent us, on the lock takeNodes() holds.
      *
-     * Split out so recording what the batch achieved happens on one exit rather
-     * than on each of the several this has, including the ones that stop the batch
-     * early.
+     * Split out so recording what the batch achieved happens on one exit
+     * rather than on each of the several this has, including the ones
+     * that stop the batch early.
      *
      * @param data The nodes to add, each with its claimed position.
-     * @param peer The peer that sent them.
+     * @param peer The peer that sent them, charged here if the data is
+     *        declined.
      * @return The tally of useful, unwanted, and bad nodes in the batch.
      */
     SHAMapAddNode
