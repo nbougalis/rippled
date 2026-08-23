@@ -17,6 +17,7 @@
 #include <chrono>
 #include <memory>
 #include <set>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -436,13 +437,121 @@ struct TransactionAcquire_test : public beast::unit_test::Suite
     }
 
     /**
+     * A timed-out acquisition asks again, and examines data again, once
+     * stillNeed() revives it.
+     *
+     * The pending timer is private to TimeoutCounter, so what stands in
+     * for observing it is a candidate peer the acquisition can only
+     * reach from onTimer(): nothing else in this case calls addPeers(),
+     * so a request going out after stillNeed() means the timer chain was
+     * restarted rather than just the failed flag cleared.
+     *
+     * @param env The environment to run in.
+     */
+    void
+    testRevivedAcquireCanRequestAgain(jtx::Env& env)
+    {
+        testcase("A revived acquire asks again and accepts data again");
+
+        DeepChain const chain{nextSeed()};
+
+        // One candidate, offered only by onTimer()'s addPeers(1), since init() is never called.
+        auto const candidate = std::make_shared<ChargeRecordingPeer>();
+        auto peerSet =
+            std::make_unique<RequestCountingPeerSet>(std::vector<std::shared_ptr<Peer>>{candidate});
+        auto* const peerSetPtr = peerSet.get();
+
+        // A short interval, since this case waits out one of them.
+        auto const acquire = std::make_shared<TransactionAcquire>(
+            env.app(), chain.rootHash.asUInt256(), std::move(peerSet), kFastRetry);
+        auto const peer = std::make_shared<ChargeRecordingPeer>();
+
+        // Fail the acquisition, which is what stillNeed() exists to undo. cancel() stands in for
+        // a real timeout chain: stillNeed() only reads failed_, not why it became true, so a
+        // manual failure exercises the same revival path.
+        acquire->cancel();
+        BEAST_EXPECT(wasIgnored(acquire->takeNodes({{SHAMapNodeID{}, chain.nodeAt(0)}}, peer)));
+
+        // No timer is pending: none was ever armed, and a packet that a failed acquisition
+        // ignores does not arm one. Without this the wait below would prove nothing.
+        BEAST_EXPECT(peerSetPtr->requests() == 0);
+        BEAST_EXPECT(peerSetPtr->addedPeers().empty());
+
+        // Revived, so the timer chain restarts and its first tick offers the candidate.
+        acquire->stillNeed();
+        BEAST_EXPECT(waitFor([&] { return peerSetPtr->requests() > 0; }));
+        BEAST_EXPECT(peerSetPtr->addedPeers() == std::set<Peer::id_t>{candidate->id()});
+        int const requestsFromTheTimer = peerSetPtr->requests();
+
+        // Data is examined again too, and accepting the root asks for the next level. The wait
+        // above returns on the first tick, so the rest of the timeout chain has still to run
+        // before the acquisition could give up again.
+        auto const revived = acquire->takeNodes({{SHAMapNodeID{}, chain.nodeAt(0)}}, peer);
+        BEAST_EXPECT(!wasIgnored(revived));
+        BEAST_EXPECT(revived.isUseful());
+        BEAST_EXPECT(peerSetPtr->requests() > requestsFromTheTimer);
+
+        // Stop the retry loop, which would otherwise keep asking for as long as this case runs.
+        acquire->cancel();
+    }
+
+    /**
+     * A running acquisition keeps the wait it already has.
+     *
+     * The other half of the same guard: consensus asks for a set it
+     * still needs once per round, so without the early return every ask
+     * would re-arm the timer and a set asked for more often than the
+     * interval would never tick at all. setTimer() cancels any pending
+     * wait, so calling stillNeed() faster than the interval is what
+     * makes that visible.
+     *
+     * Keeps the production interval, unlike the case above: the asking
+     * has to be clearly faster than the wait for a surviving tick to
+     * mean anything.
+     *
+     * @param env The environment to run in.
+     */
+    void
+    testStillNeedLeavesARunningAcquireAlone(jtx::Env& env)
+    {
+        testcase("A running acquire keeps the wait it has");
+
+        // One candidate, so every tick that survives produces a request.
+        auto const candidate = std::make_shared<ChargeRecordingPeer>();
+        auto peerSet =
+            std::make_unique<RequestCountingPeerSet>(std::vector<std::shared_ptr<Peer>>{candidate});
+        auto* const peerSetPtr = peerSet.get();
+
+        // An unrelated hash: nothing here feeds it data, so it stays incomplete and keeps asking.
+        auto const acquire =
+            std::make_shared<TransactionAcquire>(env.app(), uint256{43}, std::move(peerSet));
+
+        // init() asks the candidate once and arms the timer. That first request is not the one
+        // under test, so count from here.
+        acquire->init(1);
+        int const requestsFromInit = peerSetPtr->requests();
+
+        // Ask again far faster than the interval, the way a short consensus round would. Every ask
+        // clamps the timeout count, so the acquisition cannot give up while this runs.
+        auto const askAgainRepeatedly = [&] {
+            acquire->stillNeed();
+            std::this_thread::sleep_for(std::chrono::milliseconds{20});
+            return peerSetPtr->requests() > requestsFromInit;
+        };
+
+        // A tick gets through despite the asking, which it could not if each ask re-armed the wait.
+        BEAST_EXPECT(waitFor(askAgainRepeatedly));
+
+        acquire->cancel();
+    }
+
+    /**
      * The retry timer re-asks with no peer of its own, then gives up on
      * its own.
      *
-     * The only case that reaches onTimer(). Pins the two behaviors, not the
-     * thresholds they trip at: bounding those means asserting on wall clock.
-     * Both are read in one poll, so a fast interval cannot let the give-up land
-     * between the two readings.
+     * Pins the two behaviors, not the thresholds they trip at: bounding those
+     * means asserting on wall clock. Both are read in one poll, so a fast
+     * interval cannot let the give-up land between the two readings.
      *
      * @param env The environment to run in.
      */
@@ -498,6 +607,8 @@ struct TransactionAcquire_test : public beast::unit_test::Suite
         testDuplicateNonRootReplyIsFree(env);
         testUndeserializableNodeIsCharged(env);
         testInitAsksOnlyPeersWithTheSet(env);
+        testRevivedAcquireCanRequestAgain(env);
+        testStillNeedLeavesARunningAcquireAlone(env);
 
         // Last: the only case that waits out a whole timeout chain.
         testTimerRetriesThenGivesUp(env);
