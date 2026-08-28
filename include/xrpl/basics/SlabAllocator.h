@@ -1,193 +1,895 @@
-// Copyright (c) 2022, Nikolaos D. Bougalis <nikb@bougalis.net>
+// Copyright (c) 2022, 2026, Nikolaos D. Bougalis <nikb@bougalis.net>
 
 #pragma once
 
 #include <xrpl/basics/ByteUtilities.h>
+#include <xrpl/basics/spinlock.h>
 #include <xrpl/beast/utility/instrumentation.h>
 
 #include <boost/align.hpp>
-#include <boost/container/static_vector.hpp>
 #include <boost/core/type_name.hpp>
-#include <boost/predef.h>
+#include <boost/predef/os.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <bit>
+#include <concepts>
+#include <cstddef>
 #include <cstdint>
-#include <cstring>
-#include <mutex>
-#include <stdexcept>
-#include <typeinfo>
-#include <vector>
+#include <limits>
+#include <memory>
+#include <new>
+#include <span>
+#include <utility>
 
 #if BOOST_OS_LINUX
 #include <sys/mman.h>
 #endif
 
-namespace xrpl {
+namespace xrpl::slab {
 
-template <typename Type>
-class SlabAllocator
+namespace detail {
+
+/**
+ * Parking allows allocations and deallocations to complete without locking.
+ *
+ * Each slab carries a small array of "parking" spots that are accessed
+ * in a lock-free manner. Deallocation attempts will park an item in an
+ * available spot using CAS; allocation attempts will get a parked item
+ * by using an exchange. If a slab cannot satisfy an operation by using
+ * the parking, it will fall back to the locked path.
+ *
+ * Parked items still count as outstanding because we cannot adjust the
+ * number of outstanding items without holding a lock. This is a detail
+ * that does not impact users of this allocator.
+ *
+ * A slab only accepts parked items while it has more outstanding items
+ * than parking spots. At or below that threshold the slab may be about
+ * to drain, so deallocations take the lock instead, which ensures that
+ * the last one of them observes the slab becoming empty and can release
+ * its buffer. The tail slab never releases its buffer and is exempt.
+ *
+ * That check is made without holding the lock, so on its own it could
+ * race with a deallocation that is draining the slab. To close the gap
+ * both sides publish before they look: a draining deallocation lowers
+ * the count before it reads the parking spots, and a thread that parks
+ * an item reads the count again afterwards, taking the item back if the
+ * slab has dropped to the threshold. These four operations have to stay
+ * sequentially consistent, and in that order, for at least one side to
+ * be guaranteed to observe the other.
+ *
+ * Parking avoids more than the lock: pops from the freelist must first
+ * follow the link stored inside the item being popped, a load that can
+ * take a cache miss while the lock is held. Parked handoffs will never
+ * dereference the item; once parked, the memory is next touched by its
+ * new owner.
+ *
+ * When disabled, allocation and deallocation requests always go through
+ * the locked freelist path.
+ */
+inline constexpr bool allowParking = true;
+
+/**
+ * The number of items in the parking.
+ *
+ * This value is here for documentation purposes and should not be
+ * adjusted; it has implications on the size and alignment of slab
+ * objects.
+ */
+inline constexpr std::size_t parkingCapacity = 4;
+
+/**
+ * The minimum number of items per slab.
+ *
+ * It is hard to set a reasonable minimum value for an allocator
+ * that is intended as somewhat-general-purpose and which allows
+ * a wide range of sizes.
+ *
+ * When parking is enabled, a slab needs to have enough capacity
+ * to allocate at least parkingCapacity + 1 items.
+ */
+inline constexpr std::size_t minimumSlabItems = 4 * parkingCapacity;
+
+/**
+ * Alignment for hugepage support.
+ */
+inline constexpr std::size_t pageSize = megabytes<std::size_t>(2);
+
+/**
+ * The size of the memory blocks needed to satisfy a request.
+ *
+ * This is the only definition of the item size: SizedAllocator uses it
+ * to carve up its slabs and AlignedAllocator uses it to route requests
+ * to size classes, so that the two can never disagree.
+ *
+ * @param size The size of the object, in bytes.
+ * @param extra Extra bytes requested beyond the size of the object.
+ * @param align The alignment of the block; must be a power of two.
+ * @return The sum of size and extra, rounded up to a multiple of align.
+ */
+[[nodiscard]] constexpr std::size_t
+itemSize(std::size_t size, std::size_t extra, std::size_t align) noexcept
 {
-    static_assert(
-        sizeof(Type) >= sizeof(std::uint8_t*),
-        "SlabAllocator: the requested object must be larger than a pointer.");
+    return (size + extra + align - 1) & ~(align - 1);
+}
 
-    static_assert(alignof(Type) == 8 || alignof(Type) == 4);
+/**
+ * Allocate a new 2MB-aligned data buffer.
+ *
+ * @param size Size of the buffer to allocate in bytes.
+ * @return Pointer to allocated memory, or nullptr on failure.
+ *
+ * @note On Linux, advises the kernel to back the allocation with
+ *       transparent huge pages if available.
+ */
+[[nodiscard, gnu::malloc]] inline std::uint8_t*
+allocateBuffer(std::size_t size) noexcept
+{
+    auto ptr = static_cast<std::uint8_t*>(boost::alignment::aligned_alloc(pageSize, size));
+
+#if BOOST_OS_LINUX
+    if (ptr != nullptr) [[likely]]
+        madvise(ptr, size, MADV_HUGEPAGE);
+#endif
+
+    return ptr;
+}
+
+/**
+ * Deallocate a buffer previously allocated by allocateBuffer.
+ *
+ * @param ptr Pointer to buffer, or nullptr (no-op).
+ */
+inline void
+deallocateBuffer(std::uint8_t* ptr) noexcept
+{
+    boost::alignment::aligned_free(ptr);
+}
+
+//------------------------------------------------------------------------------
+
+/**
+ * A node in the intrusive free list.
+ *
+ * Constructed in-place within free memory blocks. The next pointer
+ * is const because nodes are never modified after construction;
+ * they are simply constructed anew when reused.
+ */
+struct Item
+{
+    Item* const next;
+
+    constexpr explicit Item(Item* n) noexcept : next(n)
+    {
+    }
+};
+
+// We need this to be trivially destructible so that we do not
+// have to explicitly invoke the destructor when popping items
+// from the free list or when deallocating the slab buffer.
+static_assert(std::is_trivially_destructible_v<Item>);
+
+/**
+ * A slab-sized buffer, not yet owned by any slab, arranged into a freelist.
+ *
+ * The buffer must be private to the constructing thread, because the
+ * freelist nodes are built with plain stores, and are only published
+ * to other threads when the buffer is grafted onto a slab.
+ */
+class BuiltBuffer
+{
+    std::uint8_t* base_ = nullptr;
+    Item* head_ = nullptr;
+
+public:
+    BuiltBuffer(std::span<std::uint8_t> mem, std::size_t count) noexcept : base_(mem.data())
+    {
+        while (mem.size() >= count)
+        {
+            head_ = std::construct_at(reinterpret_cast<Item*>(mem.data()), head_);
+            mem = mem.subspan(count);
+        }
+    }
 
     /**
-     * A block of memory that is owned by a slab allocator
+     * Transfer the freelist out; the buffer is then consumed.
      */
-    struct SlabBlock
+    [[nodiscard]] Item*
+    take() noexcept
     {
-        // A mutex to protect the freelist for this block:
-        std::mutex m;
+        XRPL_ASSERT(head_ != nullptr, "xrpl::slab::detail::BuiltBuffer::take : not yet consumed");
+        return std::exchange(head_, nullptr);
+    }
 
-        // A linked list of appropriately sized free buffers:
-        std::uint8_t* l = nullptr;
+    /**
+     * True once the freelist has been taken.
+     */
+    [[nodiscard]] bool
+    consumed() const noexcept
+    {
+        return head_ == nullptr;
+    }
 
-        // The next memory block
-        SlabBlock* next;
+    /**
+     * The base address associated with this buffer.
+     */
+    [[nodiscard]] std::uint8_t*
+    base() const noexcept
+    {
+        return base_;
+    }
+};
 
-        // The underlying memory block:
-        std::uint8_t const* const p = nullptr;
+/**
+ * A block of memory metadata for slab allocators.
+ *
+ * Each block manages a single slab buffer along with an associated free
+ * list. Blocks are then chained together to form a linked list of slabs
+ * per allocator.
+ *
+ * Blocks are sized and aligned to exactly one cache line: they contain
+ * heavily contended atomics and are handed out from a dense array (see
+ * SlabPool), so two blocks sharing a line would false-share, taxing
+ * every operation on one slab with coherence traffic caused by threads
+ * operating on its neighbor.
+ *
+ * @note SlabBlock instances are never destroyed or reclaimed once they
+ *       are allocated to support lock-free iteration of lists of slabs
+ *       without introducing ABA hazards. The data buffer which is held
+ *       by an instance can be released independently.
+ */
+struct alignas(64) SlabBlock
+{
+    /**
+     * Head of the intrusive freelist of available items.
+     *
+     * This is only ever mutated while holding the lock; but what the
+     * atomic gets us is the ability to check whether the slab has an
+     * empty freelist without taking a lock. Stale reads are benign.
+     */
+    std::atomic<Item*> head = nullptr;
 
-        // The extent of the underlying memory block:
-        std::size_t const size;
+    /**
+     * The next slab in this allocator's list, or nullptr at the tail.
+     */
+    SlabBlock* const next = nullptr;
 
-        SlabBlock(SlabBlock* next, std::uint8_t* data, std::size_t size, std::size_t item)
-            : next(next), p(data), size(size)
+    /**
+     * The slab's data buffer, or nullptr if the slab has no buffer.
+     */
+    std::atomic<std::uint8_t*> data = nullptr;
+
+    /**
+     * Spinlock guarding head, outstanding and cycles.
+     */
+    std::atomic<std::uint8_t> lock = 0;
+
+    /**
+     * Number of buffer release cycles; retained for debugging.
+     */
+    std::uint16_t cycles = 0;
+
+    /**
+     * Number of items from this slab's buffer not on the freelist.
+     *
+     * This is only ever mutated while holding the lock; but what the
+     * atomic gets us is the ability to check whether the slab is near
+     * empty without taking a lock (see tryDeallocate).
+     */
+    std::atomic<std::uint32_t> outstanding = 0;
+
+    /**
+     * Recently freed items available for immediate, lock-free reuse.
+     */
+    std::array<std::atomic<std::uint8_t*>, parkingCapacity> parking{};
+
+    /**
+     * Construct a block that is unlinked.
+     */
+    constexpr SlabBlock() noexcept = default;
+
+    /**
+     * Construct a block with a link to the next block in the chain.
+     *
+     * @param n Pointer to the next block, or nullptr for the tail.
+     */
+    constexpr explicit SlabBlock(SlabBlock* n) noexcept : next(n)
+    {
+    }
+
+    ~SlabBlock() = default;
+
+    SlabBlock(SlabBlock const&) = delete;
+    SlabBlock&
+    operator=(SlabBlock const&) = delete;
+    SlabBlock(SlabBlock&&) = delete;
+    SlabBlock&
+    operator=(SlabBlock&&) = delete;
+
+    /**
+     * Whether putItem must make the updated count visible to all other
+     * threads before it returns.
+     */
+    enum class Barrier : bool { No, Yes };
+
+    /**
+     * Take an item from the freelist. Must hold lock to call.
+     *
+     * The item is counted as outstanding. This and putItem are the only
+     * functions that link items into, or unlink them from, the freelist
+     * so that the count cannot drift from the list.
+     *
+     * @return Pointer to the item, or nullptr if the freelist is empty.
+     */
+    [[nodiscard]] std::uint8_t*
+    getItem() noexcept
+    {
+        auto* item = head.load(std::memory_order::relaxed);
+
+        if (item != nullptr)
         {
-            // We don't need to grab the mutex here, since we're the only
-            // ones with access at this moment.
+            head.store(item->next, std::memory_order::relaxed);
 
-            while (data + item <= p + size)
+            // Writers are serialized by the lock, so a plain load and
+            // store is used instead of an atomic read-modify-write.
+            outstanding.store(
+                outstanding.load(std::memory_order::relaxed) + 1, std::memory_order::relaxed);
+        }
+
+        return reinterpret_cast<std::uint8_t*>(item);
+    }
+
+    /**
+     * Return an item to the freelist. Must hold lock to call.
+     *
+     * The item is no longer counted as outstanding.
+     *
+     * @param p Pointer to an item from this slab's buffer that is not on
+     *          the freelist.
+     * @param barrier Barrier::No updates the count with a plain load and
+     *                store. Barrier::Yes uses a sequentially consistent
+     *                read-modify-write instead, which is more expensive
+     *                but guarantees that a thread which parks an item
+     *                after this function returns will observe the new
+     *                count (see tryDeallocate).
+     * @return The number of items that remain outstanding.
+     */
+    std::uint32_t
+    putItem(std::uint8_t* p, Barrier barrier = Barrier::No) noexcept
+    {
+        XRPL_ASSERT(p != nullptr, "xrpl::slab::detail::SlabBlock::putItem : non-null item");
+        XRPL_ASSERT(
+            outstanding.load(std::memory_order::relaxed) > 0,
+            "xrpl::slab::detail::SlabBlock::putItem : item is outstanding");
+
+        head.store(
+            std::construct_at(reinterpret_cast<Item*>(p), head.load(std::memory_order::relaxed)),
+            std::memory_order::relaxed);
+
+        if (barrier == Barrier::Yes)
+            return outstanding.fetch_sub(1, std::memory_order::seq_cst) - 1;
+
+        auto const n = outstanding.load(std::memory_order::relaxed) - 1;
+        outstanding.store(n, std::memory_order::relaxed);
+        return n;
+    }
+
+    /**
+     * Determines whether this block owns the provided pointer.
+     */
+    [[nodiscard]] bool
+    owns(std::uint8_t const* ptr, std::size_t size) const noexcept
+    {
+        XRPL_ASSERT(ptr != nullptr, "xrpl::slab::detail::SlabBlock::owns : non-null pointer");
+
+        auto const d = data.load(std::memory_order::acquire);
+
+        if (d == nullptr)
+            return false;
+
+        auto const b = reinterpret_cast<std::uintptr_t>(d);
+        auto const p = reinterpret_cast<std::uintptr_t>(ptr);
+
+        return (p >= b) && (p < b + size);
+    }
+
+    /**
+     * Attempt to allocate from this block.
+     *
+     * @return Pointer to allocated memory, or nullptr if block is empty.
+     */
+    [[nodiscard]] std::uint8_t*
+    tryAllocate() noexcept
+    {
+        // Quickly reject slabs that don't have a buffer without taking a
+        // lock. The relaxed read may be stale, this is fine:
+        //
+        // - A stale null will only happen when we are racing a concurrent
+        //   buffer assignment to this slab; the caller continues scanning
+        //   other slabs and, if none can satisfy the request, the scan is
+        //   re-run under the block lock, which closes the race.
+        // - A stale non-null will fall through, executing the code which
+        //   would have run if the check was not here in the first place.
+        if (data.load(std::memory_order::relaxed) == nullptr)
+            return nullptr;
+
+        if constexpr (allowParking)
+        {
+            // Lookaside first: peek (read-only, so the line stays shared) at
+            // the parked slots; only attempt an exchange, if we have a hit.
+            for (auto& slot : parking)
             {
-                // Use memcpy to avoid unaligned UB
-                // (will optimize to equivalent code)
-                std::memcpy(data, static_cast<void const*>(&l), sizeof(std::uint8_t*));
-                l = data;
-                data += item;
+                if (slot.load(std::memory_order::relaxed) != nullptr)
+                {
+                    // We can race against, and lose to someone else; that is
+                    // fine.
+                    if (auto* p = slot.exchange(nullptr, std::memory_order::acquire))
+                        return p;
+                }
             }
         }
 
-        // Calling this destructor will release the allocated memory but
-        // will not properly destroy any objects that are constructed in
-        // the block itself.
-        ~SlabBlock() = default;
+        std::uint8_t* ret = nullptr;
 
-        SlabBlock(SlabBlock const& other) = delete;
-        SlabBlock&
-        operator=(SlabBlock const& other) = delete;
-
-        SlabBlock(SlabBlock&& other) = delete;
-        SlabBlock&
-        operator=(SlabBlock&& other) = delete;
-
-        /**
-         * Determines whether the given pointer belongs to this allocator
-         */
-        bool
-        own(std::uint8_t const* pIn) const noexcept
+        if (head.load(std::memory_order::relaxed) != nullptr)
         {
-            return (pIn >= p) && (pIn < p + size);
+            spinLock(lock);
+            ret = getItem();
+            spinUnlock(lock);
         }
 
-        std::uint8_t*
-        allocate() noexcept
+        return ret;
+    }
+
+    /**
+     * Attempt to allocate from this block, while also offering it a buffer.
+     *
+     * Prefers existing capacity. If this slab has no buffer, it takes
+     * ownership of the buffer we provided and satisfies the request.
+     *
+     * @param bb A built buffer.
+     *
+     * @return Pointer to allocated memory, or nullptr.
+     */
+    [[nodiscard]] std::uint8_t*
+    tryAllocate(BuiltBuffer& bb) noexcept
+    {
+        if (auto ret = tryAllocate())
+            return ret;
+
+        if (std::uint8_t* expected = nullptr; !data.compare_exchange_strong(
+                expected, bb.base(), std::memory_order::release, std::memory_order::relaxed))
+            return nullptr;
+
+        spinLock(lock);
+
+        XRPL_ASSERT(
+            head.load(std::memory_order::relaxed) == nullptr &&
+                outstanding.load(std::memory_order::relaxed) == 0,
+            "xrpl::slab::detail::SlabBlock::tryAllocate : slab is empty");
+
+        // Take ownership of this buffer
+        head.store(bb.take(), std::memory_order::relaxed);
+
+        if constexpr (allowParking)
         {
-            std::uint8_t* ret = nullptr;  // NOLINT(misc-const-correctness)
-
+            // Pre-populate the parking, so that the next allocations can
+            // be satisfied without the lock. Parked items are outstanding,
+            // which also puts the slab above the threshold below which no
+            // item is parked (see tryDeallocate).
+            for (auto& slot : parking)
             {
-                std::scoped_lock const lock(m);
-                ret = l;
+                auto* item = getItem();
+                XRPL_ASSERT(
+                    item != nullptr, "xrpl::slab::detail::SlabBlock::tryAllocate : item to park");
 
-                if (ret != nullptr)
+                slot.store(item, std::memory_order::release);
+            }
+        }
+
+        auto* ret = getItem();
+        XRPL_ASSERT(
+            ret != nullptr, "xrpl::slab::detail::SlabBlock::tryAllocate : item to allocate");
+
+        spinUnlock(lock);
+
+        return ret;
+    }
+
+    /**
+     * Attempt to return a pointer to this block.
+     *
+     * The item is parked if the slab can accept it, which requires no
+     * lock; otherwise it is returned to the freelist under the lock, and
+     * the slab's buffer is released if that leaves the slab empty.
+     *
+     * @tparam ReleaseFunc A callable that accepts a std::uint8_t* and
+     *                     does not throw.
+     * @param ptr Pointer to memory block.
+     * @param slabSize Size of the slab's data buffer.
+     * @param releaseBuffer Callback invoked with a pointer to the block's
+     *                      buffer so that it can be released.
+     * @return true if ptr belonged to this block and was freed,
+     *         false otherwise.
+     */
+    template <typename ReleaseFunc>
+        requires std::is_nothrow_invocable_v<ReleaseFunc&, std::uint8_t*>
+    [[nodiscard]] bool
+    tryDeallocate(std::uint8_t* ptr, std::size_t slabSize, ReleaseFunc&& releaseBuffer) noexcept
+    {
+        if (!owns(ptr, slabSize))
+            return false;
+
+        if constexpr (allowParking)
+        {
+            // Try to see if we can park this item without grabbing the
+            // lock. If we succeed, a future allocation will be able to
+            // satisfy an allocation request without grabbing a lock.
+            //
+            // We only park while the slab cannot be about to drain: if it
+            // has no more outstanding items than parking spots, every one
+            // of them could end up parked, and no free would ever get to
+            // take the lock and release the buffer. The first block never
+            // releases its buffer, so it can always park.
+            if (next == nullptr || outstanding.load(std::memory_order::relaxed) > parking.size())
+            {
+                for (auto& slot : parking)
                 {
-                    // Use memcpy to avoid unaligned UB
-                    // (will optimize to equivalent code)
-                    std::memcpy(static_cast<void*>(&l), ret, sizeof(std::uint8_t*));
+                    if (auto x = slot.load(std::memory_order::relaxed); x == nullptr)
+                    {
+                        if (!slot.compare_exchange_strong(
+                                x, ptr, std::memory_order::seq_cst, std::memory_order::relaxed))
+                            continue;
+
+                        // The check we made above can race with a free
+                        // that is draining the slab under the lock, so we
+                        // look again now that the item is parked. Such a
+                        // free lowers the count before it reads the slots
+                        // which means that either it sees this item or we
+                        // see its count.
+                        if (next == nullptr ||
+                            outstanding.load(std::memory_order::seq_cst) > parking.size())
+                            return true;
+
+                        // The slab is draining: take the item back so that
+                        // we can free it under the lock. If it is gone, an
+                        // allocation or the draining free already has it.
+                        if (auto mine = ptr; !slot.compare_exchange_strong(
+                                mine,
+                                nullptr,
+                                std::memory_order::seq_cst,
+                                std::memory_order::relaxed))
+                            return true;
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        std::uint8_t* buf = nullptr;
+
+        spinLock(lock);
+
+        XRPL_ASSERT(
+            ptr != nullptr, "xrpl::slab::detail::SlabBlock::tryDeallocate : non-null pointer");
+        XRPL_ASSERT(
+            outstanding.load(std::memory_order::relaxed) > 0,
+            "xrpl::slab::detail::SlabBlock::tryDeallocate : has outstanding items");
+
+        // The slab could end up with no outstanding allocations when the
+        // number of outstanding items is at most the number of parking
+        // spots, plus one (for the item we are freeing) and the slab isn't
+        // the first block.
+        bool const draining = allowParking && next != nullptr &&
+            outstanding.load(std::memory_order::relaxed) <= parking.size() + 1;
+
+        // When draining, the count must be lowered, with a full barrier,
+        // before any of the parked slots is read: a thread that parks an
+        // item checks the count again afterwards, and this ordering is
+        // what guarantees that one of us will notice the other.
+        auto remaining = putItem(ptr, draining ? Barrier::Yes : Barrier::No);
+
+        if (draining)
+        {
+            // Because the parked slots are handled lock-free, we must be
+            // extra vigilant, since someone could have allocated an item
+            // from there.
+            for (auto& slot : parking)
+            {
+                // Peek first: a slab this close to empty often has
+                // nothing parked, and the exchange is expensive even
+                // when all it finds is an empty slot.
+                if (slot.load(std::memory_order::seq_cst) == nullptr)
+                    continue;
+
+                if (auto park = slot.exchange(nullptr, std::memory_order::acquire))
+                    remaining = putItem(park);
+            }
+        }
+
+        // If this block became empty, and it is not the first block, we
+        // can release its buffer. The first block (which is at the tail
+        // of the list with next == nullptr) is exempt from this policy
+        // so that we can always have one block ready.
+        if (remaining == 0 && next != nullptr)
+        {
+            head.store(nullptr, std::memory_order::relaxed);
+            buf = data.exchange(buf, std::memory_order::relaxed);
+            cycles += (cycles < std::numeric_limits<std::uint16_t>::max());
+        }
+
+        spinUnlock(lock);
+
+        if (buf != nullptr)
+            releaseBuffer(buf);
+
+        return true;
+    }
+};
+
+static_assert(sizeof(SlabBlock) == 64 && alignof(SlabBlock) == 64);
+
+//------------------------------------------------------------------------------
+
+/**
+ * Global pool of SlabBlock objects shared by all slab allocators.
+ *
+ * Provides a fixed-size array of pre-allocated slabs with fallback
+ * to heap allocation if exhausted.
+ */
+class SlabPool
+{
+    std::array<SlabBlock, 32768> blocks_{};
+    std::atomic<std::size_t> count_{0};
+
+public:
+    constexpr SlabPool() = default;
+
+    SlabPool(SlabPool const&) = delete;
+    SlabPool&
+    operator=(SlabPool const&) = delete;
+    SlabPool(SlabPool&&) = delete;
+    SlabPool&
+    operator=(SlabPool&&) = delete;
+
+    /**
+     * Acquire a slab from the pool.
+     *
+     * @param next Pointer to link as the slab's next pointer.
+     * @return Pointer to acquired block, or nullptr if allocation failed.
+     */
+    [[nodiscard]] SlabBlock*
+    acquire(SlabBlock* next) noexcept
+    {
+        auto idx = count_.load(std::memory_order::relaxed);
+
+        while (idx < blocks_.size())
+        {
+            if (count_.compare_exchange_weak(idx, idx + 1, std::memory_order::relaxed))
+            {
+                return std::construct_at(&blocks_[idx], next);
+            }
+        }
+
+        // Pool exhausted (unlikely!) so fall back to heap
+        return new (std::nothrow) SlabBlock(next);
+    }
+};
+
+/**
+ * Single global block pool for all slab allocators.
+ */
+inline constinit SlabPool gSlabPool;
+
+}  // namespace detail
+//------------------------------------------------------------------------------
+
+/**
+ * A slab allocator for fixed-size memory blocks.
+ *
+ * Allocates memory in large slabs (multiples of 2MB) and sub-allocates
+ * fixed-size blocks from them. Provides fast allocation with minimal
+ * fragmentation for objects of uniform size.
+ *
+ * @tparam Type The type used to determine minimum block size and alignment.
+ * @tparam Align Alignment for allocated blocks (must be >= alignof(Type)).
+ */
+template <typename Type, std::size_t Align = alignof(Type)>
+    requires(
+        std::has_single_bit(Align) && sizeof(Type) >= sizeof(detail::Item) &&
+        Align >= std::max(alignof(detail::Item), alignof(Type)))
+class alignas(64) SizedAllocator
+{
+    /**
+     * Linked list of slabs for this allocator.
+     */
+    std::atomic<detail::SlabBlock*> slabs_{nullptr};
+
+    /**
+     * A spare slab-sized buffer retained for reuse, or nullptr.
+     *
+     * When a slab drains completely, its buffer is released; when demand
+     * returns, a slab needs a buffer again. If we are operating near the
+     * boundary of a slab, we may end having to release and reacquire the
+     * buffer repeatedly. By caching the released buffer, we can reuse it
+     * directly for the expansion, avoiding that overhead.
+     */
+    std::atomic<std::uint8_t*> cachedBuffer_{nullptr};
+
+    /**
+     * The slab that we used most recently allocated memory from.
+     *
+     * This slab exists in the list of slabs_, but may be deep enough
+     * that it requires a lot of work to get to. By caching a pointer
+     * to it, we can check it preferentially, which helps keep memory
+     * hot.
+     */
+    std::atomic<detail::SlabBlock*> cachedSlab_{nullptr};
+
+    /**
+     * Item size (sizeof(Type) + extra, rounded up for alignment).
+     */
+    std::size_t const itemSize_;
+
+    /**
+     * Size of each slab's data buffer (multiple of 2 MB).
+     */
+    std::size_t const slabSize_;
+
+    /**
+     * Spinlock to serialize the slow allocation path.
+     */
+    std::atomic<std::uint8_t> blockLock_{0};
+
+    /**
+     * Retain a slab-sized buffer for later reuse, or release it.
+     *
+     * The allocator keeps at most one spare buffer, so that any
+     * workloads oscillating around a slab boundary, do not have
+     * to round-trip through the operating system.
+     *
+     * @param buf A buffer of exactly slabSize_ bytes that was
+     *            obtained from allocateBuffer, or nullptr (no-op).
+     */
+    void
+    discard(std::uint8_t* buf) noexcept
+    {
+        if (buf == nullptr)
+            return;
+
+        if (std::uint8_t* expected = nullptr;
+            !cachedBuffer_.compare_exchange_strong(expected, buf, std::memory_order::release))
+            detail::deallocateBuffer(buf);
+    }
+
+    /**
+     * Allocate a memory block from the existing slabs.
+     *
+     * Probes each slab in the list, except the one passed in, which the
+     * caller already tried. If a slab successfully services the request,
+     * we store it into cachedSlab_, to preferentially use it.
+     *
+     * This does not acquire the blockLock_, but can take the individual
+     * slab locks during traversal.
+     *
+     * @param hint The slab the caller already tried to allocate memory
+     *             from, if any. We skip it if we come across it.
+     *
+     * @return Pointer to allocated memory, or nullptr if no existing
+     *         slab can satisfy the request.
+     */
+    [[nodiscard]] std::uint8_t*
+    fastAllocate(detail::SlabBlock const* hint) noexcept
+    {
+        auto slab = slabs_.load(std::memory_order::acquire);
+
+        while (slab != nullptr)
+        {
+            if (slab != hint)
+            {
+                if (auto ret = slab->tryAllocate())
+                {
+                    cachedSlab_.store(slab, std::memory_order::release);
+                    return ret;
                 }
             }
 
-            return ret;
+            slab = slab->next;
         }
 
-        /**
-         * Return an item to this allocator's freelist.
-         *
-         * @param ptr The pointer to the chunk of memory being deallocated.
-         *
-         * @note This is a dangerous, private interface; the item being
-         *       returned should belong to this allocator. Debug builds
-         *       will check and assert if this is not the case. Release
-         *       builds will not.
-         */
-        void
-        deallocate(std::uint8_t* ptr) noexcept
+        return nullptr;
+    }
+
+    /**
+     * Allocate a memory block, potentially adding new capacity.
+     *
+     * Must be called with blockLock_ held.
+     *
+     * @param bb A built buffer, private to the calling thread. The
+     *           buffer may or may not be consumed.
+     *
+     * @return Pointer to allocated memory, or nullptr on failure.
+     */
+    [[nodiscard]] std::uint8_t*
+    slowAllocate(detail::BuiltBuffer& bb) noexcept
+    {
+        // Try to allocate again; if a slab is empty, offer it the newly
+        // allocated memory.
+        auto slab = slabs_.load(std::memory_order::acquire);
+
+        while (slab != nullptr)
         {
-            XRPL_ASSERT(own(ptr), "xrpl::SlabAllocator::SlabBlock::deallocate : own input");
+            if (auto ret = slab->tryAllocate(bb))
+            {
+                cachedSlab_.store(slab, std::memory_order::release);
+                return ret;
+            }
 
-            std::scoped_lock const lock(m);
-
-            // Use memcpy to avoid unaligned UB
-            // (will optimize to equivalent code)
-            std::memcpy(ptr, static_cast<void const*>(&l), sizeof(std::uint8_t*));
-            l = ptr;
+            slab = slab->next;
         }
-    };
 
-private:
-    // A linked list of slabs
-    std::atomic<SlabBlock*> slabs_ = nullptr;
+        // No existing slab could take the buffer; get a new slab from
+        // the global pool.
+        slab = detail::gSlabPool.acquire(slabs_.load(std::memory_order::relaxed));
 
-    // The alignment requirements of the item we're allocating:
-    std::size_t const itemAlignment_;
+        if (slab == nullptr) [[unlikely]]
+            return nullptr;
 
-    // The size of an item, including the extra bytes requested and
-    // any padding needed for alignment purposes:
-    std::size_t const itemSize_;
+        // This is a fresh slab, so it must accept the buffer we provided
+        // it with and return a valid pointer.
+        auto ret = slab->tryAllocate(bb);
+        XRPL_ASSERT(
+            ret != nullptr && slab->owns(ret, slabSize_),
+            "xrpl::slab::SizedAllocator::slowAllocate : new slab satisfies request");
 
-    // The size of each individual slab:
-    std::size_t const slabSize_;
+        // Publish the slab to the list before publishing it as the hint:
+        // a thread that reaches the slab through cachedSlab_ can allocate
+        // from it at once, and the matching free must be able to find the
+        // slab by walking slabs_ if the hint has moved on by then.
+        slabs_.store(slab, std::memory_order::release);
+        cachedSlab_.store(slab, std::memory_order::release);
+
+        return ret;
+    }
 
 public:
     /**
-     * Constructs a slab allocator able to allocate objects of a fixed size
+     * Construct a slab allocator.
      *
-     * @param count the number of items the slab allocator can allocate; note
-     *              that a count of 0 is valid and means that the allocator
-     *              is, effectively, disabled. This can be very useful in some
-     *              contexts (e.g. when minimal memory usage is needed) and
-     *              allows for graceful failure.
+     * @param extra Extra bytes per item beyond sizeof(Type).
+     * @param minItems Minimum number of items per slab (rounded up to 2MB).
      */
-    constexpr explicit SlabAllocator(
-        std::size_t extra,
-        std::size_t alloc = 0,
-        std::size_t align = 0)
-        : itemAlignment_((align != 0u) ? align : alignof(Type))
-        , itemSize_(boost::alignment::align_up(sizeof(Type) + extra, itemAlignment_))
-        , slabSize_(alloc)
+    constexpr explicit SizedAllocator(std::size_t extra, std::size_t minItems) noexcept
+        : itemSize_(detail::itemSize(sizeof(Type), extra, Align))
+        , slabSize_(
+              boost::alignment::align_up(
+                  itemSize_ * std::max(minItems, detail::minimumSlabItems),
+                  detail::pageSize))
     {
-        XRPL_ASSERT(
-            (itemAlignment_ & (itemAlignment_ - 1)) == 0,
-            "xrpl::SlabAllocator::SlabAllocator : valid alignment");
     }
 
-    SlabAllocator(SlabAllocator const& other) = delete;
-    SlabAllocator&
-    operator=(SlabAllocator const& other) = delete;
+    ~SizedAllocator() noexcept
+    {
+        // We can free the cached buffer, if one is available. As for the data
+        // buffers, they are intentionally not released: C++ destruction order
+        // does not allow us to assume that all items that were allocated from
+        // this allocator have been freed by the time this destructor runs.
+        detail::deallocateBuffer(cachedBuffer_.exchange(nullptr));
+    }
 
-    SlabAllocator(SlabAllocator&& other) = delete;
-    SlabAllocator&
-    operator=(SlabAllocator&& other) = delete;
-
-    // FIXME: We can't destroy the memory blocks we've allocated, because
-    //        we can't be sure that they are not being used. Cleaning the
-    //        shutdown process up could make this possible.
-    ~SlabAllocator() = default;
+    SizedAllocator(SizedAllocator const&) = delete;
+    SizedAllocator&
+    operator=(SizedAllocator const&) = delete;
+    SizedAllocator(SizedAllocator&&) = delete;
+    SizedAllocator&
+    operator=(SizedAllocator&&) = delete;
 
     /**
-     * Returns the size of the memory block this allocator returns.
+     * Returns the size of memory blocks returned by this allocator.
+     *
+     * @return Size of each allocated block in bytes.
      */
     [[nodiscard]] constexpr std::size_t
     size() const noexcept
@@ -196,211 +898,404 @@ public:
     }
 
     /**
-     * Returns a suitably aligned pointer, if one is available.
+     * Allocate a memory block.
      *
-     * @return a pointer to a block of memory from the allocator, or
-     *         nullptr if the allocator can't satisfy this request.
+     * @return Pointer to allocated memory, or nullptr on failure.
+     *
+     * @note The gnu::malloc attribute is an optimization hint that can
+     *       be leveraged by GCC and Clang.
      */
-    std::uint8_t*
+    [[nodiscard, gnu::malloc]] void*
     allocate() noexcept
     {
-        auto slab = slabs_.load();
+        // Check if the cached slab has memory available:
+        auto const hint = cachedSlab_.load(std::memory_order::acquire);
+
+        if (hint != nullptr)
+        {
+            if (auto ret = hint->tryAllocate())
+                return ret;
+        }
+
+        // Fast path: try existing slabs
+        if (auto ret = fastAllocate(hint))
+            return ret;
+
+        // Prepare capacity before taking the lock: obtain and build a
+        // buffer with no locks held.
+        auto buf = cachedBuffer_.exchange(nullptr, std::memory_order::acquire);
+
+        if (buf == nullptr)
+        {
+            buf = detail::allocateBuffer(slabSize_);
+
+            if (buf == nullptr) [[unlikely]]
+                return nullptr;
+        }
+
+        detail::BuiltBuffer bb(std::span{buf, slabSize_}, itemSize_);
+
+        spinLock(blockLock_);
+        auto ret = slowAllocate(bb);
+        spinUnlock(blockLock_);
+
+        // It is possible that the slowAllocate used existing memory, which
+        // became available after the fastAllocate above. If so, the buffer
+        // we allocated can be discarded.
+        if (!bb.consumed())
+            discard(bb.base());
+
+        return ret;
+    }
+
+    /**
+     * Return a memory block to the allocator.
+     *
+     * @param ptr Pointer to memory block.
+     * @return true if the block belonged to this allocator and was freed.
+     */
+    [[nodiscard]] bool
+    deallocate(void* ptr) noexcept
+    {
+        XRPL_ASSERT(ptr != nullptr, "xrpl::slab::SizedAllocator::deallocate : non-null pointer");
+
+        auto p = static_cast<std::uint8_t*>(ptr);
+
+        auto const release = [this](std::uint8_t* buf) noexcept { discard(buf); };
+
+        auto const hint = cachedSlab_.load(std::memory_order::acquire);
+
+        if (hint != nullptr)
+        {
+            if (hint->tryDeallocate(p, slabSize_, release))
+                return true;
+        }
+
+        auto slab = slabs_.load(std::memory_order::acquire);
 
         while (slab != nullptr)
         {
-            if (auto ret = slab->allocate())
-                return ret;
+            if (slab != hint && slab->tryDeallocate(p, slabSize_, release))
+                return true;
 
             slab = slab->next;
         }
 
-        // No slab can satisfy our request, so we attempt to allocate a new
-        // one here:
-        std::size_t const size = slabSize_;
+        return false;
+    }
 
-        // We want to allocate the memory at a 2 MiB boundary, to make it
-        // possible to use hugepage mappings on Linux:
-        auto buf = boost::alignment::aligned_alloc(megabytes(std::size_t(2)), size);
-        if (buf == nullptr) [[unlikely]]
-            return nullptr;
+    [[nodiscard]] bool
+    deallocate(void const* ptr) noexcept
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+        return deallocate(const_cast<void*>(ptr));
+    }
+};
 
-#if BOOST_OS_LINUX
-        // When allocating large blocks, attempt to leverage Linux's
-        // transparent hugepage support. It is unclear and difficult
-        // to accurately determine if doing this impacts performance
-        // enough to justify using platform-specific tricks.
-        if (size >= megabytes(std::size_t(4)))
-            madvise(buf, size, MADV_HUGEPAGE);
-#endif
+//------------------------------------------------------------------------------
+/**
+ * Requirements for a fallback policy used by AlignedAllocator.
+ *
+ * A fallback handles requests the slab bins cannot satisfy. Policies
+ * must be constructible in a constant expression (the allocator is
+ * typically a constinit global) and all operations must be noexcept.
+ */
+template <typename T>
+concept FallbackAllocator = std::is_nothrow_default_constructible_v<T> &&
+    requires(T f, void* p, std::size_t align, std::size_t size) {
+        { f.allocate(align, size) } noexcept -> std::same_as<void*>;
+        { f.deallocate(p) } noexcept -> std::same_as<bool>;
+    };
 
-        // We need to carve out a bit of memory for the slab header
-        // and then align the rest appropriately:
-        auto slabData =
-            reinterpret_cast<void*>(reinterpret_cast<std::uint8_t*>(buf) + sizeof(SlabBlock));
-        auto slabSize = size - sizeof(SlabBlock);
+/**
+ * Fallback policy that routes to the aligned heap.
+ *
+ * Requests the slab bins cannot satisfy are served by the general
+ * purpose allocator; deallocation is total.
+ */
+struct HeapFallback
+{
+    /**
+     * Allocate size bytes aligned to align.
+     *
+     * @return Pointer to allocated memory, or nullptr on failure.
+     */
+    [[nodiscard, gnu::malloc]] void*
+    allocate(std::size_t align, std::size_t size) noexcept
+    {
+        XRPL_ASSERT(size != 0, "xrpl::slab::HeapFallback::allocate : non-zero size");
+        XRPL_ASSERT(
+            std::has_single_bit(align),
+            "xrpl::slab::HeapFallback::allocate : power-of-two alignment");
 
-        // This operation is essentially guaranteed not to fail but
-        // let's be careful anyways.
-        if (boost::alignment::align(itemAlignment_, itemSize_, slabData, slabSize) == nullptr)
-        {
-            boost::alignment::aligned_free(buf);
-            return nullptr;
-        }
-
-        slab = new (buf) SlabBlock(
-            slabs_.load(), reinterpret_cast<std::uint8_t*>(slabData), slabSize, itemSize_);
-
-        // Link the new slab
-        while (!slabs_.compare_exchange_weak(
-            slab->next, slab, std::memory_order_release, std::memory_order_relaxed))
-        {
-            ;  // Nothing to do
-        }
-
-        return slab->allocate();
+        return boost::alignment::aligned_alloc(align, size);
     }
 
     /**
-     * Returns the memory block to the allocator.
+     * Release memory previously obtained from allocate.
      *
-     * @param ptr A pointer to a memory block.
-     * @param size If non-zero, a hint as to the size of the block.
-     * @return true if this memory block belonged to the allocator and has
-     *              been released; false otherwise.
+     * @return true, unconditionally: this policy handles every pointer
+     *         given to it.
      */
     bool
-    deallocate(std::uint8_t* ptr) noexcept
+    deallocate(void* ptr) noexcept
     {
-        XRPL_ASSERT(
-            ptr,
-            "xrpl::SlabAllocator::SlabAllocator::deallocate : non-null "
-            "input");
-
-        for (auto slab = slabs_.load(); slab != nullptr; slab = slab->next)
-        {
-            if (slab->own(ptr))
-            {
-                slab->deallocate(ptr);
-                return true;
-            }
-        }
-
-        return false;
+        boost::alignment::aligned_free(ptr);
+        return true;
     }
 };
 
 /**
- * A collection of slab allocators of various sizes for a given type.
+ * Fallback policy that refuses requests.
+ *
+ * Allocation beyond the slab bins fails with nullptr; deallocation of
+ * memory the bins do not own is reported back to the caller, which is
+ * responsible for releasing it through whatever mechanism produced it.
  */
-template <typename Type>
-class SlabAllocatorSet
+struct NoFallback
 {
-private:
-    // The list of allocators that belong to this set
-    boost::container::static_vector<SlabAllocator<Type>, 64> allocators_{};
-
-    std::size_t maxSize_ = 0;
-
-public:
-    class SlabConfig
+    [[nodiscard]] void*
+    allocate(std::size_t, std::size_t) noexcept
     {
-        friend class SlabAllocatorSet;
-
-    private:
-        std::size_t extra_;
-        std::size_t alloc_;
-        std::size_t align_;
-
-    public:
-        constexpr SlabConfig(
-            std::size_t extra,
-            std::size_t alloc = 0,
-            std::size_t align = alignof(Type))
-            : extra_(extra), alloc_(alloc), align_(align)
-        {
-        }
-    };
-
-    constexpr SlabAllocatorSet(std::vector<SlabConfig> cfg)
-    {
-        // Ensure that the specified allocators are sorted from smallest to
-        // largest by size:
-        std::sort(std::begin(cfg), std::end(cfg), [](SlabConfig const& a, SlabConfig const& b) {
-            return a.extra_ < b.extra_;
-        });
-
-        // We should never have two slabs of the same size
-        if (std::adjacent_find(
-                std::begin(cfg), std::end(cfg), [](SlabConfig const& a, SlabConfig const& b) {
-                    return a.extra_ == b.extra_;
-                }) != cfg.end())
-        {
-            throw std::runtime_error(
-                "SlabAllocatorSet<" + boost::core::type_name<Type>() + ">: duplicate slab size");
-        }
-
-        for (auto const& c : cfg)
-        {
-            auto const& a = allocators_.emplace_back(c.extra_, c.alloc_, c.align_);
-
-            if (a.size() > maxSize_)
-                maxSize_ = a.size();
-        }
-    }
-
-    SlabAllocatorSet(SlabAllocatorSet const& other) = delete;
-    SlabAllocatorSet&
-    operator=(SlabAllocatorSet const& other) = delete;
-
-    SlabAllocatorSet(SlabAllocatorSet&& other) = delete;
-    SlabAllocatorSet&
-    operator=(SlabAllocatorSet&& other) = delete;
-
-    ~SlabAllocatorSet() = default;
-
-    /**
-     * Returns a suitably aligned pointer, if one is available.
-     *
-     * @param extra The number of extra bytes, above and beyond the size of
-     *              the object, that should be returned by the allocator.
-     *
-     * @return a pointer to a block of memory, or nullptr if the allocator
-     *         can't satisfy this request.
-     */
-    std::uint8_t*
-    allocate(std::size_t extra) noexcept
-    {
-        if (auto const size = sizeof(Type) + extra; size <= maxSize_)
-        {
-            for (auto& a : allocators_)
-            {
-                if (a.size() >= size)
-                    return a.allocate();
-            }
-        }
-
         return nullptr;
     }
 
-    /**
-     * Returns the memory block to the allocator.
-     *
-     * @param ptr A pointer to a memory block.
-     *
-     * @return true if this memory block belonged to one of the allocators
-     *              in this set and has been released; false otherwise.
-     */
-    bool
-    deallocate(std::uint8_t* ptr) noexcept
+    [[nodiscard]] bool
+    deallocate(void*) noexcept
     {
+        return false;
+    }
+};
+
+static_assert(FallbackAllocator<HeapFallback>);
+static_assert(FallbackAllocator<NoFallback>);
+
+//------------------------------------------------------------------------------
+
+/**
+ * Configuration for a single slab allocator.
+ *
+ * @tparam MinItems Minimum number of items per slab (must be > 0).
+ * @tparam Extra Extra bytes per item beyond sizeof(Type).
+ */
+template <std::size_t MinItems, std::size_t Extra = 0>
+    requires(MinItems > 0)
+struct Config
+{
+    static constexpr std::size_t minItems = MinItems;
+    static constexpr std::size_t extra = Extra;
+};
+
+/**
+ * Concept for valid slab configuration types.
+ */
+template <typename T>
+concept SlabConfig = requires {
+    { T::minItems } -> std::convertible_to<std::size_t>;
+    { T::extra } -> std::convertible_to<std::size_t>;
+    requires T::minItems > 0;
+};
+
+/**
+ * Validate slab configurations at compile time.
+ *
+ * Checks that configurations produce strictly increasing sizes after
+ * alignment. This catches both unsorted configs and configs that
+ * collapse to the same size after alignment.
+ *
+ * @tparam Type The type used to determine base size.
+ * @tparam Align Alignment for allocated blocks.
+ * @tparam Configs Configuration types to validate.
+ * @return true if configurations are valid, false otherwise.
+ */
+template <typename Type, std::size_t Align, SlabConfig... Configs>
+consteval bool
+validateSlabConfig()
+{
+    constexpr std::array<std::size_t, sizeof...(Configs)> sizes{
+        detail::itemSize(sizeof(Type), Configs::extra, Align)...};
+
+    for (std::size_t i = 1; i < sizes.size(); ++i)
+    {
+        if (sizes[i - 1] >= sizes[i])
+            return false;
+    }
+
+    return true;
+}
+
+//------------------------------------------------------------------------------
+
+/**
+ * A collection of slab allocators for different sizes.
+ *
+ * Manages multiple SizedAllocator instances, each configured for a
+ * different block size. Allocations are routed to the smallest allocator
+ * that can satisfy the request.
+ *
+ * @tparam Type The type used to determine minimum block size and alignment.
+ * @tparam Align Alignment for allocated blocks (must be >= alignof(Type)).
+ * @tparam Fallback Type satisfying FallbackAllocator to handle allocations
+ *                  that cannot be satisfied by any of the size classes.
+ * @tparam Configs Configuration types specifying each size class.
+ */
+template <
+    typename Type,
+    std::size_t Align,
+    FallbackAllocator Fallback = HeapFallback,
+    SlabConfig... Configs>
+    requires(
+        sizeof(Type) >= sizeof(void*) && Align >= alignof(Type) && std::has_single_bit(Align) &&
+        sizeof...(Configs) > 0 && validateSlabConfig<Type, Align, Configs...>())
+class AlignedAllocator
+{
+    /**
+     * The largest extra that each size class can satisfy, in order.
+     *
+     * These are compile-time constants so that routing a request does
+     * not have to read the sizes from the allocators: each one shares
+     * its cache line with state that other threads write to, and none
+     * but the one that will service the request needs to be touched.
+     */
+    static constexpr std::array<std::size_t, sizeof...(Configs)> maxExtra{
+        (detail::itemSize(sizeof(Type), Configs::extra, Align) - sizeof(Type))...};
+
+    /**
+     * The allocators for each size class, in order of increasing size.
+     */
+    std::array<SizedAllocator<Type, Align>, sizeof...(Configs)> allocators_;
+
+    /**
+     * Policy handling requests the size classes cannot satisfy.
+     *
+     * A stateless policy takes up no space, which leaves the set at
+     * exactly one cache line per size class.
+     */
+    [[no_unique_address]] Fallback fallback_;
+
+public:
+    /**
+     * Construct an allocator set.
+     *
+     * @param fallback Policy handling requests the bins cannot satisfy.
+     */
+    constexpr AlignedAllocator(Fallback fallback = {}) noexcept
+        : allocators_{SizedAllocator<Type, Align>(Configs::extra, Configs::minItems)...}
+        , fallback_(std::move(fallback))
+    {
+    }
+
+    ~AlignedAllocator() = default;
+
+    AlignedAllocator(AlignedAllocator const&) = delete;
+    AlignedAllocator&
+    operator=(AlignedAllocator const&) = delete;
+    AlignedAllocator(AlignedAllocator&&) = delete;
+    AlignedAllocator&
+    operator=(AlignedAllocator&&) = delete;
+
+    /**
+     * Allocate memory for an object with extra bytes.
+     *
+     * @param extra Extra bytes needed beyond sizeof(Type).
+     * @return Pointer to memory, or nullptr if no suitable allocator
+     *         or allocation failed.
+     *
+     * @note The gnu::malloc attribute is an optimization hint that can
+     *       be leveraged by GCC and Clang.
+     */
+    [[nodiscard, gnu::malloc]] void*
+    allocate(std::size_t extra = 0) noexcept
+    {
+        for (std::size_t i = 0; i != maxExtra.size(); ++i)
+        {
+            if (extra <= maxExtra[i])
+            {
+                if (auto p = allocators_[i].allocate())
+                    return p;
+
+                break;
+            }
+        }
+
+        // Refuse requests whose size cannot be represented: the sum below
+        // would wrap around, and the fallback would then hand back a block
+        // that is smaller than what the caller asked for.
+        if (extra > std::numeric_limits<std::size_t>::max() - sizeof(Type)) [[unlikely]]
+            return nullptr;
+
+        return fallback_.allocate(Align, sizeof(Type) + extra);
+    }
+
+    /**
+     * Return memory to the allocator set.
+     *
+     * @param ptr Pointer to memory block.
+     * @param extra The number of extra bytes requested via allocate.
+     * @return true if the memory has been freed.
+     *
+     * @note When the sized overloads are used, extra must be precisely
+     *       equal to the value passed to allocate; supplying the wrong
+     *       size can cause the function to incorrectly decide that the
+     *       memory did not belong to this set, which, depending on the
+     *       fallback configuration and/or the caller's behavior, might
+     *       result in memory corruption or worse.
+     */
+    /** @{ */
+    [[nodiscard]] bool
+    deallocate(void* ptr) noexcept
+    {
+        XRPL_ASSERT(ptr != nullptr, "xrpl::slab::AlignedAllocator::deallocate : non-null pointer");
+
         for (auto& a : allocators_)
         {
             if (a.deallocate(ptr))
                 return true;
         }
 
-        return false;
+        return fallback_.deallocate(ptr);
     }
+
+    [[nodiscard]] bool
+    deallocate(void const* ptr) noexcept
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+        return deallocate(const_cast<void*>(ptr));
+    }
+
+    [[nodiscard]] bool
+    deallocate(void* ptr, std::size_t extra) noexcept
+    {
+        for (std::size_t i = 0; i != maxExtra.size(); ++i)
+        {
+            // The first bucket large enough to have allocated this
+            // must be the owner. If it is not, we did not allocate
+            // this pointer.
+            if (extra <= maxExtra[i])
+            {
+                if (allocators_[i].deallocate(ptr))
+                    return true;
+
+                break;
+            }
+        }
+
+        return fallback_.deallocate(ptr);
+    }
+
+    [[nodiscard]] bool
+    deallocate(void const* ptr, std::size_t extra) noexcept
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+        return deallocate(const_cast<void*>(ptr), extra);
+    }
+    /** @} */
 };
 
-}  // namespace xrpl
+/**
+ * Alias for AlignedAllocator with default alignment.
+ */
+template <typename Type, FallbackAllocator Fallback = HeapFallback, SlabConfig... Configs>
+using Allocator = AlignedAllocator<Type, alignof(Type), Fallback, Configs...>;
+
+}  // namespace xrpl::slab
