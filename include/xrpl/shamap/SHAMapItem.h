@@ -1,6 +1,5 @@
 #pragma once
 
-#include <xrpl/basics/ByteUtilities.h>
 #include <xrpl/basics/CountedObject.h>
 #include <xrpl/basics/SlabAllocator.h>
 #include <xrpl/basics/Slice.h>
@@ -15,12 +14,13 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <type_traits>
 
 namespace xrpl {
 
 // an item stored in a SHAMap
-class SHAMapItem : public CountedObject<SHAMapItem>
+class alignas(8) SHAMapItem : public CountedObject<SHAMapItem>
 {
     // These are used to support boost::intrusive_ptr reference counting
     // These functions are used internally by boost::intrusive_ptr to handle
@@ -97,19 +97,34 @@ public:
 
 namespace detail {
 
+/**
+ * SHAMap Slab Allocator Configuration
+ *
+ * The classes are carefully fitted, based on a histogram of request sizes
+ * collected on an XRPL mainnet node in October 2026.
+ *
+ * The distribution is strongly bimodal, with a secondary cluster between
+ * the modes and a long, thin tail beyond them:
+ *
+ * | Extra | Block | Slab    | Share | Covers                                |
+ * |------:|------:|--------:|------:|---------------------------------------|
+ * |    88 |   128 | ~50 MiB | 40.7% | mode: 87 bytes (minimal AccountRoot)  |
+ * |   152 |   192 | ~24 MiB | 13.3% | secondary cluster, 88..152 bytes      |
+ * |   216 |   256 | ~50 MiB | 39.9% | mode: 211 bytes (minimal RippleState) |
+ * |   344 |   384 | ~16 MiB |  2.7% | head of the tail, 217..344 bytes      |
+ * |     - |  heap |       - |  3.4% | tail                                  |
+ *
+ * The modal classes carry zero slack. Together the slab allocator can serve
+ * over 96% of requests without having to perform any per-request allocation
+ * at ~6% mean slack.
+ */
 // clang-format off
-// The slab cutoffs and the number of megabytes per allocation are customized
-// based on the number of objects of each size we expect to need at any point
-// in time and with an eye to minimize the number of slack bytes in a block.
-inline SlabAllocatorSet<SHAMapItem> gSlabber({
-    {  128, megabytes(std::size_t(60)) },
-    {  192, megabytes(std::size_t(46)) },
-    {  272, megabytes(std::size_t(60)) },
-    {  384, megabytes(std::size_t(56)) },
-    {  564, megabytes(std::size_t(40)) },
-    {  772, megabytes(std::size_t(46)) },
-    { 1052, megabytes(std::size_t(60)) },
-});
+inline constinit slab::Allocator<SHAMapItem, slab::HeapFallback,
+    slab::Config<400'000,  88>,   // 128-byte blocks, ~50 MiB/slab
+    slab::Config<130'000, 152>,   // 192-byte blocks, ~24 MiB/slab
+    slab::Config<200'000, 216>,   // 256-byte blocks, ~50 MiB/slab
+    slab::Config< 44'000, 344>    // 384-byte blocks, ~16 MiB/slab
+> gSlabber;
 // clang-format on
 
 }  // namespace detail
@@ -150,23 +165,13 @@ makeShamapitem(UInt256 const& tag, Slice data)
     XRPL_ASSERT(
         data.size() <= megabytes<std::size_t>(16), "xrpl::makeShamapitem : maximum input size");
 
-    // NOLINTNEXTLINE(misc-const-correctness)
-    std::uint8_t* raw = detail::gSlabber.allocate(data.size());
-
-    // If we can't grab memory from the slab allocators, we fall back to
-    // the standard library and try to grab a precisely-sized memory block:
-    if (raw == nullptr)
-        raw = new std::uint8_t[sizeof(SHAMapItem) + data.size()];
-
     // We do not increment the reference count here on purpose: the
-    // constructor of SHAMapItem explicitly sets it to 1. We use the fact
-    // that the refcount can never be zero before incrementing as an
-    // invariant.
-    return {new (raw) SHAMapItem{tag, data}, false};
-}
+    // constructor of SHAMapItem explicitly sets it to 1.
+    if (auto raw = detail::gSlabber.allocate(data.size())) [[likely]]
+        return {new (raw) SHAMapItem{tag, data}, false};
 
-static_assert(alignof(SHAMapItem) != 40);
-static_assert(alignof(SHAMapItem) == 8 || alignof(SHAMapItem) == 4);
+    Throw<std::bad_alloc>();
+}
 
 inline boost::intrusive_ptr<SHAMapItem>
 makeShamapitem(SHAMapItem const& other)
