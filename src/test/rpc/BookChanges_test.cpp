@@ -241,6 +241,8 @@ public:
             env.app().getNodeFamily());
 
         std::uint32_t seq = 0;
+        UInt256 key{};
+
         for (auto const& [gets, pays] : crossings)
         {
             ++seq;
@@ -274,7 +276,7 @@ public:
             auto const metaSerializer = std::make_shared<Serializer>();
             metadata->add(*metaSerializer);
 
-            ledger->rawTxInsert(UInt256{seq}, txSerializer, metaSerializer);
+            ledger->rawTxInsert(++key, txSerializer, metaSerializer);
         }
 
         ledger->setImmutable();

@@ -30,6 +30,8 @@ namespace xrpl::test {
 
 class LedgerHistory_test : public beast::unit_test::Suite
 {
+    UInt256 const dummyTxHash_ = uint256{1};
+
 public:
     /**
      * Generate a new ledger by hand, applying a specific close time offset
@@ -164,9 +166,8 @@ public:
             Env env{*this, envconfig(), std::make_unique<CheckMessageLogs>("MISMATCH ", &found)};
             LedgerHistory lh{beast::insight::NullCollector::make(), env.app()};
             auto const genesis = makeLedger({}, env, lh, 0s);
-            UInt256 const dummyTxHash{1};
-            lh.builtLedger(genesis, dummyTxHash, {});
-            lh.validatedLedger(genesis, dummyTxHash);
+            lh.builtLedger(genesis, dummyTxHash_, {});
+            lh.validatedLedger(genesis, dummyTxHash_);
 
             BEAST_EXPECT(!found);
         }
@@ -183,9 +184,8 @@ public:
             auto const ledgerA = makeLedger(genesis, env, lh, 4s);
             auto const ledgerB = makeLedger(genesis, env, lh, 40s);
 
-            UInt256 const dummyTxHash{1};
-            lh.builtLedger(ledgerA, dummyTxHash, {});
-            lh.validatedLedger(ledgerB, dummyTxHash);
+            lh.builtLedger(ledgerA, dummyTxHash_, {});
+            lh.validatedLedger(ledgerB, dummyTxHash_);
 
             BEAST_EXPECT(found);
         }
@@ -204,9 +204,8 @@ public:
             auto const ledgerAC = makeLedger(ledgerA, env, lh, 4s);
             auto const ledgerBD = makeLedger(ledgerB, env, lh, 4s);
 
-            UInt256 const dummyTxHash{1};
-            lh.builtLedger(ledgerAC, dummyTxHash, {});
-            lh.validatedLedger(ledgerBD, dummyTxHash);
+            lh.builtLedger(ledgerAC, dummyTxHash_, {});
+            lh.validatedLedger(ledgerBD, dummyTxHash_);
 
             BEAST_EXPECT(found);
         }
