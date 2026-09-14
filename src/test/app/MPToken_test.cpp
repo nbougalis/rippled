@@ -117,25 +117,23 @@ class MPToken_test : public beast::unit_test::Suite
             if (!features[featureSingleAssetVault] || !features[featurePermissionedDomains])
             {
                 // tries to set DomainID when SAV or PD is disabled
-                mptAlice.create({
-                    .maxAmt = 100,
-                    .assetScale = 0,
-                    .metadata = "test",
-                    .flags = tfMPTRequireAuth,
-                    .domainID = UInt256(42),
-                    .err = temDISABLED,
-                });
+                mptAlice.create(
+                    {.maxAmt = 100,
+                     .assetScale = 0,
+                     .metadata = "test",
+                     .flags = tfMPTRequireAuth,
+                     .domainID = UInt256{42},
+                     .err = temDISABLED});
             }
             else
             {
                 // tries to set DomainID when RequireAuth is not set
-                mptAlice.create({
-                    .maxAmt = 100,
-                    .assetScale = 0,
-                    .metadata = "test",
-                    .domainID = UInt256(42),
-                    .err = temMALFORMED,
-                });
+                mptAlice.create(
+                    {.maxAmt = 100,
+                     .assetScale = 0,
+                     .metadata = "test",
+                     .domainID = UInt256{42},
+                     .err = temMALFORMED});
 
                 // tries to set zero DomainID
                 mptAlice.create({
@@ -637,7 +635,7 @@ class MPToken_test : public beast::unit_test::Suite
                 });
 
                 // cannot set DomainID since SAV is not enabled
-                mptAlice.set({.account = alice, .domainID = UInt256(42), .err = temDISABLED});
+                mptAlice.set({.account = alice, .domainID = UInt256{42}, .err = temDISABLED});
             }
             else
             {
@@ -650,17 +648,16 @@ class MPToken_test : public beast::unit_test::Suite
                 if (!features[featurePermissionedDomains] || !features[featureSingleAssetVault])
                 {
                     // cannot set DomainID since PD is not enabled
-                    mptAlice.set({.account = alice, .domainID = UInt256(42), .err = temDISABLED});
+                    mptAlice.set({.account = alice, .domainID = UInt256{42}, .err = temDISABLED});
                 }
                 else if (features[featureSingleAssetVault])
                 {
                     // cannot set DomainID since Holder is set
-                    mptAlice.set({
-                        .account = alice,
-                        .holder = bob,
-                        .domainID = UInt256(42),
-                        .err = temMALFORMED,
-                    });
+                    mptAlice.set(
+                        {.account = alice,
+                         .holder = bob,
+                         .domainID = UInt256{42},
+                         .err = temMALFORMED});
                 }
             }
 
@@ -742,7 +739,7 @@ class MPToken_test : public beast::unit_test::Suite
                 mptAlice.create({});
 
                 // Trying to set DomainID on a public MPTokenIssuance
-                mptAlice.set({.domainID = UInt256(42), .err = tecNO_PERMISSION});
+                mptAlice.set({.domainID = uint256{42}, .err = tecNO_PERMISSION});
 
                 mptAlice.set({.domainID = UInt256{}, .err = tecNO_PERMISSION});
             }
@@ -754,11 +751,11 @@ class MPToken_test : public beast::unit_test::Suite
                 mptAlice.create({.flags = tfMPTRequireAuth});
 
                 // Trying to set non-existing DomainID
-                mptAlice.set({.domainID = UInt256(42), .err = tecOBJECT_NOT_FOUND});
+                mptAlice.set({.domainID = uint256{42}, .err = tecOBJECT_NOT_FOUND});
 
                 // Trying to lock but locking is disabled
                 mptAlice.set(
-                    {.flags = tfMPTUnlock, .domainID = UInt256(42), .err = tecNO_PERMISSION});
+                    {.flags = tfMPTUnlock, .domainID = UInt256{42}, .err = tecNO_PERMISSION});
 
                 mptAlice.set(
                     {.flags = tfMPTUnlock, .domainID = UInt256{}, .err = tecNO_PERMISSION});
@@ -1686,7 +1683,7 @@ class MPToken_test : public beast::unit_test::Suite
 
             env.fund(XRP(1'000), alice, bob);
 
-            STAmount const mpt{MPTID{0}, 100};
+            STAmount const mpt{MPTID{}, 100};
             auto const err =
                 !features[featureMPTokensV2] ? Ter(tecOBJECT_NOT_FOUND) : Ter(temBAD_CURRENCY);
             env(pay(alice, bob, mpt), err);

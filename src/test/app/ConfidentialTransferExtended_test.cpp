@@ -450,16 +450,17 @@ class ConfidentialTransferExtended_test : public ConfidentialTransferTestBase
                 }};
             auto& mpt = confEnv.mpt;
 
-            std::vector<std::string> tooManyCredentials;
-            tooManyCredentials.reserve(9);
-            for (int i = 0; i < 9; ++i)
-                tooManyCredentials.push_back(to_string(UInt256(i)));
-
             mpt.send({
                 .account = carol,
                 .dest = bob,
                 .amt = 10,
-                .credentials = tooManyCredentials,
+                .credentials =
+                    [] {
+                        std::vector<std::string> v;
+                        for (int i = 0; i < 9; ++i)
+                            v.push_back(std::string(63, '0') + static_cast<char>('0' + i));
+                        return v;
+                    }(),
                 .err = temMALFORMED,
             });
         }
@@ -507,7 +508,7 @@ class ConfidentialTransferExtended_test : public ConfidentialTransferTestBase
                 }};
             auto& mpt = confEnv.mpt;
 
-            std::string const fakeCredIdx = to_string(UInt256(999));
+            std::string const fakeCredIdx = to_string(UInt256{999});
             mpt.send({
                 .account = carol,
                 .dest = bob,
@@ -889,8 +890,7 @@ class ConfidentialTransferExtended_test : public ConfidentialTransferTestBase
         // than the ticket seq (ticketSeq1).
         {
             BEAST_EXPECT(env.seq(bob) != ticketSeq1);
-            UInt256 const badCtxHash =
-                getConvertContextHash(bob, mptAlice.issuanceID(), env.seq(bob));
+            auto const badCtxHash = getConvertContextHash(bob, mptAlice.issuanceID(), env.seq(bob));
             auto const badProof = requireOptional(
                 mptAlice.getSchnorrProof(bob, badCtxHash), "Missing Schnorr Proof.");
 
