@@ -53,7 +53,7 @@ struct PseudoTx_test : public beast::unit_test::Suite
 
         res.emplace_back(ttAMENDMENT, [&](auto& obj) {
             obj.setAccountID(sfAccount, AccountID());
-            obj.setFieldH256(sfAmendment, UInt256(2));
+            obj.setFieldH256(sfAmendment, UInt256{2});
             obj.setFieldU32(sfLedgerSequence, seq);
         });
 
@@ -65,11 +65,11 @@ struct PseudoTx_test : public beast::unit_test::Suite
     {
         std::vector<STTx> res;
 
-        res.emplace_back(ttACCOUNT_SET, [&](auto& obj) { obj[sfAccount] = AccountID(1); });
+        res.emplace_back(ttACCOUNT_SET, [&](auto& obj) { obj[sfAccount] = AccountID{1}; });
 
         res.emplace_back(ttPAYMENT, [&](auto& obj) {
-            obj.setAccountID(sfAccount, AccountID(2));
-            obj.setAccountID(sfDestination, AccountID(3));
+            obj.setAccountID(sfAccount, AccountID{2});
+            obj.setAccountID(sfDestination, AccountID{3});
         });
 
         return res;

@@ -2776,7 +2776,7 @@ struct EscrowToken_test : public beast::unit_test::Suite
                 Sandbox sb(&view, ApplyFlags::None);
                 auto const sleNew =
                     std::make_shared<SLE>(keylet::escrow(alice, SeqProxy::rawSequence(seq1)));
-                MPTIssue const mpt{MPTIssue{makeMptID(1, AccountID(0x4985601))}};
+                MPTIssue const mpt{MPTIssue{makeMptID(1, AccountID{0x4985601})}};
                 STAmount const amt(mpt, 10);
                 sleNew->setAccountID(sfDestination, bob);
                 sleNew->setFieldAmount(sfAmount, amt);
@@ -3006,7 +3006,7 @@ struct EscrowToken_test : public beast::unit_test::Suite
                 Sandbox sb(&view, ApplyFlags::None);
                 auto const sleNew =
                     std::make_shared<SLE>(keylet::escrow(alice, SeqProxy::rawSequence(seq1)));
-                MPTIssue const mpt{MPTIssue{makeMptID(1, AccountID(0x4985601))}};
+                MPTIssue const mpt{MPTIssue{makeMptID(1, AccountID{0x4985601})}};
                 STAmount const amt(mpt, 10);
                 sleNew->setAccountID(sfDestination, bob);
                 sleNew->setFieldAmount(sfAmount, amt);
