@@ -1616,7 +1616,7 @@ class LendingHelpers_test : public beast::unit_test::Suite
         Number const& principalOutstanding,
         Number const& managementFeeOutstanding)
     {
-        auto sle = std::make_shared<SLE>(ltLOAN, UInt256{1u});
+        auto sle = std::make_shared<SLE>(ltLOAN, UInt256{1});
         sle->at(sfTotalValueOutstanding) = totalValueOutstanding;
         sle->at(sfPrincipalOutstanding) = principalOutstanding;
         sle->at(sfManagementFeeOutstanding) = managementFeeOutstanding;
@@ -1631,7 +1631,7 @@ class LendingHelpers_test : public beast::unit_test::Suite
         std::optional<Number> assetsMaximum = std::nullopt,
         std::optional<Number> assetsTotal = std::nullopt)
     {
-        auto sle = std::make_shared<SLE>(ltVAULT, UInt256{2u});
+        auto sle = std::make_shared<SLE>(ltVAULT, UInt256{2});
         if (leVersion)
             sle->at(sfLEVersion) = std::to_underlying(*leVersion);
         if (assetsMaximum)
@@ -1904,7 +1904,7 @@ public:
         for (auto const& tc : testCases)
         {
             testcase("canApplyToBrokerCover: " + tc.name);
-            auto const sle = std::make_shared<SLE>(ltLOAN_BROKER, UInt256{1u});
+            auto const sle = std::make_shared<SLE>(ltLOAN_BROKER, UInt256{1});
             sle->at(sfCoverAvailable) = tc.coverAvailable;
             BEAST_EXPECT(
                 canApplyToBrokerCover(*env.current(), sle, iou, tc.amount, env.journal, "test") ==
@@ -1915,7 +1915,7 @@ public:
         {
             testcase("canApplyToBrokerCover: amendment disabled");
             Env const envOff{*this, testableAmendments() - fixCleanup3_2_0};
-            auto const sle = std::make_shared<SLE>(ltLOAN_BROKER, UInt256{1u});
+            auto const sle = std::make_shared<SLE>(ltLOAN_BROKER, UInt256{1});
             sle->at(sfCoverAvailable) = Number{10};
             BEAST_EXPECT(
                 canApplyToBrokerCover(

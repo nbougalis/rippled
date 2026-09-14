@@ -2283,7 +2283,7 @@ public:
                     env.le(keylet::sponsorship(sponsor, alice))->isFieldPresent(sfFeeAmount));
                 auto const sponsorAvailableFee =
                     sponsor::sponsorshipFeeBalance(env, sponsor, alice);
-                env(check::cancel(alice, UInt256(1)),
+                env(check::cancel(alice, UInt256{1}),
                     Fee(sponsorAvailableFee),
                     sponsor::As(sponsor, spfSponsorFee),
                     Ter(tecNO_ENTRY));
@@ -5573,7 +5573,7 @@ public:
         checkBlocked(token::mint(alice, 0u));
         checkBlocked(sponsor::set(alice, 0, 10, XRP(10)));
         checkBlocked(acctdelete(alice, bob));
-        checkBlocked(loan::set(alice, UInt256(1), Number{1}));
+        checkBlocked(loan::set(alice, UInt256{1}, Number{1}));
     }
 
     void

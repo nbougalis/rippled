@@ -192,7 +192,7 @@ public:
         {
             testcase("set value (iou)");
 
-            Issue const usd(Currency(0x5553440000000000), AccountID(0x4985601));
+            Issue const usd(toCurrency("USD"), AccountID{0x4985601});
 
             testSetValue("1", usd);
             testSetValue("10", usd);
@@ -748,7 +748,7 @@ public:
     {
         testcase("STAmount to XRPAmount conversions");
 
-        Issue const usd{Currency(0x5553440000000000), AccountID(0x4985601)};
+        Issue const usd{toCurrency("USD"), AccountID{0x4985601}};
         Issue const xrp{xrpIssue()};
 
         for (std::uint64_t drops = 100000000000000000; drops != 1; drops = drops / 10)
@@ -780,7 +780,7 @@ public:
     {
         testcase("STAmount to IOUAmount conversions");
 
-        Issue const usd{Currency(0x5553440000000000), AccountID(0x4985601)};
+        Issue const usd{toCurrency("USD"), AccountID{0x4985601}};
         Issue const xrp{xrpIssue()};
 
         for (std::uint64_t dollars = 10000000000; dollars != 1; dollars = dollars / 10)
@@ -871,8 +871,8 @@ public:
     {
         testcase("can add iou");
 
-        Issue const usd{Currency(0x5553440000000000), AccountID(0x4985601)};
-        Issue const eur{Currency(0x4555520000000000), AccountID(0x4985601)};
+        Issue const usd{toCurrency("USD"), AccountID{0x4985601}};
+        Issue const eur{toCurrency("EUR"), AccountID{0x4985601}};
 
         // Adding two IOU amounts
         {
@@ -929,8 +929,8 @@ public:
     {
         testcase("can add mpt");
 
-        MPTIssue const mpt{MPTIssue{makeMptID(1, AccountID(0x4985601))}};
-        MPTIssue const mpt2{MPTIssue{makeMptID(2, AccountID(0x4985601))}};
+        MPTIssue const mpt{MPTIssue{makeMptID(1, AccountID{0x4985601})}};
+        MPTIssue const mpt2{MPTIssue{makeMptID(2, AccountID{0x4985601})}};
 
         // Adding zero
         {
@@ -1006,7 +1006,7 @@ public:
     {
         testcase("MPT transfer rate rounding uses Number arithmetic");
 
-        MPTIssue const asset{makeMptID(1, AccountID(0x4985601))};
+        MPTIssue const asset{makeMptID(1, AccountID{0x4985601})};
         Rate const transferRate{1'500'000'000};
         STAmount const largeAmount{asset, UINT64_C(1'230'000'000'000'000'000)};
         STAmount const scaledAmount{asset, UINT64_C(1'845'000'000'000'000'000)};
@@ -1069,7 +1069,7 @@ public:
             // kMinValue exercises the legacy value-scaling loop that normalizes
             // the mantissa before multiply. The MPTokensV2 Number path is
             // not taken here because the target asset is an IOU.
-            Issue const usd{Currency(0x5553440000000000), AccountID(0x4985601)};
+            Issue const usd{toCurrency("USD"), AccountID{0x4985601}};
             STAmount const iouVal{usd, 5};
             STAmount const xrpVal{XRPAmount{7}};  // integral, mantissa < kMinValue
 
@@ -1176,8 +1176,8 @@ public:
     testCanSubtractIOU()
     {
         testcase("can subtract iou");
-        Issue const usd{Currency(0x5553440000000000), AccountID(0x4985601)};
-        Issue const eur{Currency(0x4555520000000000), AccountID(0x4985601)};
+        Issue const usd{toCurrency("USD"), AccountID{0x4985601}};
+        Issue const eur{toCurrency("EUR"), AccountID{0x4985601}};
 
         // Subtracting two IOU amounts
         {
@@ -1213,8 +1213,8 @@ public:
     {
         testcase("can subtract mpt");
 
-        MPTIssue const mpt{MPTIssue{makeMptID(1, AccountID(0x4985601))}};
-        MPTIssue const mpt2{MPTIssue{makeMptID(2, AccountID(0x4985601))}};
+        MPTIssue const mpt{MPTIssue{makeMptID(1, AccountID{0x4985601})}};
+        MPTIssue const mpt2{MPTIssue{makeMptID(2, AccountID{0x4985601})}};
 
         // Subtracting zero
         {
@@ -1289,7 +1289,7 @@ public:
     {
         testcase("isZeroAtScale");
 
-        Issue const usd{Currency(0x5553440000000000), AccountID(0x4985601)};
+        Issue const usd{toCurrency("USD"), AccountID{0x4985601}};
 
         // IOU: 10 IOU — mantissa = kMinValue (10^15), exponent = -14.
         // One ULP at this scale is 10^-14; half-ULP is 5*10^-15.
@@ -1366,7 +1366,7 @@ public:
 
         // MPT is integral — same short-circuit behaviour as XRP.
         {
-            MPTIssue const mpt{makeMptID(1, AccountID(0x4985601))};
+            MPTIssue const mpt{makeMptID(1, AccountID{0x4985601})};
             STAmount const mptAmt{mpt, 1};
             BEAST_EXPECT(!mptAmt.isZeroAtScale(0));
             BEAST_EXPECT(!mptAmt.isZeroAtScale(-14));
