@@ -116,7 +116,7 @@ class RCLValidations_test : public beast::unit_test::Suite
         {
             RCLValidatedLedger const a{RCLValidatedLedger::MakeGenesis{}};
             BEAST_EXPECT(a.seq() == Seq{0});
-            BEAST_EXPECT(a[Seq{0}] == ID{0});
+            BEAST_EXPECT(a[Seq{0}] == ID{});
             BEAST_EXPECT(a.minSeq() == Seq{0});
         }
 
@@ -135,7 +135,7 @@ class RCLValidations_test : public beast::unit_test::Suite
                 }
                 else
                 {
-                    BEAST_EXPECT(a[s] == ID{0});
+                    BEAST_EXPECT(a[s] == ID{});
                 }
             }
         }
