@@ -154,7 +154,7 @@ doLedgerDataGrpc(rpc::GRPCContext<org::xrpl::rpc::v1::GetLedgerDataRequest> cons
     }
 
     UInt256 startKey;
-    if (auto key = UInt256::fromVoidChecked(request.marker()))
+    if (auto key = UInt256::fromRaw(request.marker()))
     {
         startKey = *key;
     }
@@ -167,7 +167,7 @@ doLedgerDataGrpc(rpc::GRPCContext<org::xrpl::rpc::v1::GetLedgerDataRequest> cons
     auto e = ledger->sles.end();
     if (!request.end_marker().empty())
     {
-        auto const key = UInt256::fromVoidChecked(request.end_marker());
+        auto const key = UInt256::fromRaw(request.end_marker());
 
         if (!key)
             return {response, {grpc::StatusCode::INVALID_ARGUMENT, "end marker malformed"}};

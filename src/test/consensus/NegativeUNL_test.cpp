@@ -729,8 +729,7 @@ class NegativeUNLVoteInternal_test : public beast::unit_test::Suite
         testcase("Create UNLModify Tx");
         jtx::Env env(*this);
 
-        NodeID const myId(0xA0);
-        NegativeUNLVote vote(myId, env.journal);
+        NegativeUNLVote vote(NodeID{0xA0}, env.journal);
 
         // one add, one remove
         auto const txSet =
@@ -753,21 +752,24 @@ class NegativeUNLVoteInternal_test : public beast::unit_test::Suite
         testcase("Pick One Candidate");
         jtx::Env const env(*this);
 
-        NodeID const myId(0xA0);
-        NegativeUNLVote const vote(myId, env.journal);
+        NegativeUNLVote const vote(NodeID{0xA0}, env.journal);
 
-        UInt256 const pad0(0);
-        UInt256 const padF = ~pad0;
-        NodeID const n1(1);
-        NodeID const n2(2);
-        NodeID const n3(3);
-        std::vector<NodeID> candidates({n1});
+        constexpr UInt256 pad0{};
+        constexpr UInt256 padF = ~pad0;
+
+        constexpr NodeID n1{1};
+        constexpr NodeID n2{2};
+        constexpr NodeID n3{3};
+
+        std::vector<NodeID> candidates;
+
+        candidates.emplace_back(n1);
         BEAST_EXPECT(vote.choose(pad0, candidates) == n1);
         BEAST_EXPECT(vote.choose(padF, candidates) == n1);
-        candidates.emplace_back(2);
+        candidates.emplace_back(n2);
         BEAST_EXPECT(vote.choose(pad0, candidates) == n1);
         BEAST_EXPECT(vote.choose(padF, candidates) == n2);
-        candidates.emplace_back(3);
+        candidates.emplace_back(n3);
         BEAST_EXPECT(vote.choose(pad0, candidates) == n1);
         BEAST_EXPECT(vote.choose(padF, candidates) == n3);
     }
@@ -1085,8 +1087,8 @@ class NegativeUNLVoteInternal_test : public beast::unit_test::Suite
 
         {
             // 2 new validators
-            NodeID const new1(0xbead);
-            NodeID const new2(0xbeef);
+            constexpr NodeID new1(0xbead);
+            constexpr NodeID new2(0xbeef);
             HashSet<NodeID> const nowTrusted = {new1, new2};
             HashSet<NodeID> unlTemp = history.unlNodeIdSet;
             unlTemp.insert(new1);
@@ -1142,7 +1144,7 @@ class NegativeUNLVoteInternal_test : public beast::unit_test::Suite
 
         jtx::Env const env(*this);
 
-        NodeID const myId(0xA0);
+        constexpr NodeID myId{0xA0};
         NegativeUNLVote vote(myId, env.journal);
 
         std::array<std::uint32_t, 3> const unlSizes = {34, 35, 80};
@@ -1299,7 +1301,7 @@ class NegativeUNLVoteInternal_test : public beast::unit_test::Suite
         testcase("New Validators");
         jtx::Env const env(*this);
 
-        NodeID const myId(0xA0);
+        constexpr NodeID myId(0xA0);
         NegativeUNLVote vote(myId, env.journal);
 
         // test cases:
@@ -1308,9 +1310,9 @@ class NegativeUNLVoteInternal_test : public beast::unit_test::Suite
         // add a new one and some already added
         // purge and see some are expired
 
-        NodeID const n1(0xA1);
-        NodeID const n2(0xA2);
-        NodeID const n3(0xA3);
+        constexpr NodeID n1{0xA1};
+        constexpr NodeID n2{0xA2};
+        constexpr NodeID n3{0xA3};
 
         vote.newValidators(2, {n1});
         BEAST_EXPECT(vote.newValidators_.size() == 1);
@@ -1714,7 +1716,7 @@ class NegativeUNLVoteRetiredValidator_test : public beast::unit_test::Suite
                     [&](std::shared_ptr<Ledger const> const& l, std::size_t idx) -> bool {
                         return idx > 1;
                     });
-                BEAST_EXPECT(voteAndCheck(history, NodeID(0xdeadbeef), 0));
+                BEAST_EXPECT(voteAndCheck(history, NodeID{0xdeadbeef}, 0));
             }
         }
 

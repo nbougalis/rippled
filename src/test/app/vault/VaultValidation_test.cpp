@@ -143,14 +143,14 @@ private:
                 env(tx);
 
                 tx[sfFlags] = tx[sfFlags].asUInt() | tfVaultPrivate;
-                tx[sfDomainID] = to_string(BaseUInt<256>(42ul));
+                tx[sfDomainID] = to_string(uint256{42});
                 env(tx, Ter{temDISABLED});
 
                 {
                     auto tx = vault.set({.owner = owner, .id = keylet.key});
                     env(tx, kData("Test"));
 
-                    tx[sfDomainID] = to_string(BaseUInt<256>(13ul));
+                    tx[sfDomainID] = to_string(uint256{13});
                     env(tx, Ter{temDISABLED});
                 }
             },
@@ -251,12 +251,12 @@ private:
                 testcase("disabled permissioned domain");
 
                 auto [tx, keylet] = vault.create({.owner = owner, .asset = xrpIssue()});
-                tx[sfDomainID] = to_string(BaseUInt<256>(42ul));
+                tx[sfDomainID] = to_string(uint256{42});
                 env(tx, Ter{temDISABLED});
 
                 {
                     auto tx = vault.set({.owner = owner, .id = keylet.key});
-                    tx[sfDomainID] = to_string(BaseUInt<256>(42ul));
+                    tx[sfDomainID] = to_string(uint256{42});
                     env(tx, Ter{temDISABLED});
                 }
 
@@ -546,7 +546,7 @@ private:
 
                 {
                     auto tx = tx1;
-                    tx[sfDomainID] = to_string(BaseUInt<256>(42ul));
+                    tx[sfDomainID] = to_string(uint256{42});
                     env(tx, Ter{temMALFORMED});
                 }
 
@@ -705,7 +705,7 @@ private:
                      Vault& vault) {
             auto [tx, keylet] = vault.create({.owner = owner, .asset = asset});
             tx[sfFlags] = tfVaultPrivate;
-            tx[sfDomainID] = to_string(BaseUInt<256>(42ul));
+            tx[sfDomainID] = to_string(uint256{42});
             testcase("non-existing domain");
             env(tx, Ter{tecOBJECT_NOT_FOUND});
         });

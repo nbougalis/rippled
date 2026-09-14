@@ -6,6 +6,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/protocol/Serializer.h>
+#include <xrpl/protocol/digest.h>
 #include <xrpl/shamap/SHAMap.h>
 #include <xrpl/shamap/SHAMapAddNode.h>
 #include <xrpl/shamap/SHAMapLeafNode.h>
@@ -219,7 +220,7 @@ private:
         {
             // With no leaf depth given, the deepest inner node points at a child that stays
             // unresolvable.
-            buildInnersDownTo(SHAMap::kLeafDepth, SHAMapHash{UInt256{seed}}, decoy);
+            buildInnersDownTo(SHAMap::kLeafDepth, SHAMapHash{sha512Half(seed)}, decoy);
             return;
         }
 
