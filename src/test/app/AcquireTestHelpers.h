@@ -303,7 +303,7 @@ packetFor(
         node->serializeForWire(s);
 
         auto* const ledgerNode = packet->add_nodes();
-        ledgerNode->set_nodedata(s.peekData().data(), s.peekData().size());
+        ledgerNode->set_nodedata(s.data(), s.size());
 
         // A leaf carries its own key, so the receiver rebuilds its position from that plus a
         // depth. An inner node has no key and needs the full ID. The two fields are a oneof.

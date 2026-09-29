@@ -65,7 +65,7 @@ makeFullInnerNode(std::vector<InnerChild> const& children)
         s.addBitString(hash);
     s.add8(kWireTypeInner);
 
-    return SHAMapTreeNode::makeFromWire(makeSlice(s.peekData()));
+    return SHAMapTreeNode::makeFromWire(s.slice());
 }
 
 /**
@@ -94,7 +94,7 @@ makeCompressedInnerNode(std::vector<InnerChild> const& children)
     }
     s.add8(kWireTypeCompressedInner);
 
-    return SHAMapTreeNode::makeFromWire(makeSlice(s.peekData()));
+    return SHAMapTreeNode::makeFromWire(s.slice());
 }
 
 }  // namespace xrpl::tests

@@ -183,7 +183,7 @@ struct InboundLedger_test : public beast::unit_test::Suite
         addRaw(header, s);
 
         env.app().getNodeFamily().db().store(
-            NodeObjectType::Ledger, std::move(s.modData()), header.hash, header.seq);
+            NodeObjectType::Ledger, s.takeData(), header.hash, header.seq);
     }
 
     /**
@@ -233,7 +233,7 @@ struct InboundLedger_test : public beast::unit_test::Suite
         packet->set_ledgerhash(header.hash.data(), UInt256::size());
         packet->set_ledgerseq(header.seq);
         packet->set_type(protocol::liBASE);
-        packet->add_nodes()->set_nodedata(s.peekData().data(), s.peekData().size());
+        packet->add_nodes()->set_nodedata(s.data(), s.size());
         return packet;
     }
 
