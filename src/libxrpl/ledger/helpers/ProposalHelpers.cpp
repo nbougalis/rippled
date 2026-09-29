@@ -164,7 +164,7 @@ payloadMatches(STObject const& proposedTx, STObject const& tx)
         copy.setFieldVL(sfSigningPubKey, Slice{});
         Serializer s;
         copy.addWithoutSigningFields(s);
-        return s.getData();
+        return s.takeData();
     };
 
     return payloadBytes(proposedTx) == payloadBytes(tx);

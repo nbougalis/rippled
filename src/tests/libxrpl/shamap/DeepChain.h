@@ -2,7 +2,6 @@
 
 #include <xrpl/basics/Blob.h>
 #include <xrpl/basics/SHAMapHash.h>
-#include <xrpl/basics/Slice.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/protocol/Serializer.h>
@@ -137,7 +136,7 @@ struct DeepChain
     {
         Serializer s;
         nodeAt(depth)->serializeWithPrefix(s);
-        return s.modData();
+        return s.takeData();
     }
 
     /**
@@ -234,10 +233,10 @@ private:
             Throw<std::logic_error>("DeepChain: unexpected leaf payload size");
 
         Serializer wire;
-        wire.addRaw(payload.peekData());
+        wire.addRaw(payload.slice());
         wire.add8(kWireTypeTransaction);
 
-        auto const leaf = SHAMapTreeNode::makeFromWire(makeSlice(wire.peekData()));
+        auto const leaf = SHAMapTreeNode::makeFromWire(wire.slice());
 
         // A transaction leaf's key is the hash of its own contents, so its position follows
         // this key's nibbles.
@@ -301,12 +300,12 @@ private:
                 decoyHash.begin()[1] = 0xC0;
                 decoyHash.begin()[2] = static_cast<unsigned char>(depth);
                 s.addBitString(decoyHash);
-                s.add8(1);
+                s.add8(std::byte{1});
             }
 
             s.add8(kWireTypeCompressedInner);
 
-            auto node = SHAMapTreeNode::makeFromWire(makeSlice(s.peekData()));
+            auto node = SHAMapTreeNode::makeFromWire(s.slice());
             childHash = node->getHash();
             nodes[depth] = std::move(node);
         }
