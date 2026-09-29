@@ -918,7 +918,7 @@ SHAMap::writeNode(NodeObjectType t, SHAMapTreeNodePtr node) const
 
     Serializer s;
     node->serializeWithPrefix(s);
-    f_.db().store(t, std::move(s.modData()), node->getHash().asUInt256(), ledgerSeq());
+    f_.db().store(t, s.takeData(), node->getHash().asUInt256(), ledgerSeq());
     return node;
 }
 
