@@ -24,6 +24,7 @@
 #include <xrpl/protocol/Serializer.h>
 #include <xrpl/protocol/Sign.h>
 #include <xrpl/protocol/TxFormats.h>
+#include <xrpl/protocol/digest.h>
 
 #include <xrpl.pb.h>
 
@@ -150,22 +151,13 @@ public:
             Serializer single;
             single.add32(signingPrefix(SignatureRole::Transaction, false, rules));
             tx.addWithoutSigningFields(single);
-            // 53545800 STX prefix, 120003 AccountSet, 2400000001 Sequence,
-            // 68400000000000000A Fee, 7321... SigningPubKey, 8114... Account.
             BEAST_EXPECT(
-                strHex(single.peekData()) ==
-                "53545800"
-                "120003"
-                "2400000001"
-                "68400000000000000A"
-                "73210330E7FC9D56BB25D6893BA3F317AE5BCF33B3291BD63DB32654A313222F7FD020"
-                "8114B5F762798A53D543A014CAF8B297CFF8F2F937E8");
-            BEAST_EXPECT(
-                to_string(single.getSHA512Half()) ==
-                "AB7473EA8D05527A7465229447B0E9B05365C72B87E921762AD30742B253F3E6");
+                sha512Half(single) ==
+                uint256{"AB7473EA8D05527A7465229447B0E9B05365C72B87E921762AD30742B253F3E6"});
 
             auto const signer = calcAccountID(
                 generateKeyPair(KeyType::Secp256k1, generateSeed("multisigner")).first);
+
             Serializer const multi = buildMultiSigningData(
                 tx, signer, signingPrefix(SignatureRole::Transaction, true, rules));
 
@@ -175,7 +167,7 @@ public:
             expected.add32(HashPrefix::TxMultiSign);
             tx.addWithoutSigningFields(expected);
             expected.addBitString(signer);
-            BEAST_EXPECT(strHex(multi.peekData()) == strHex(expected.peekData()));
+            BEAST_EXPECT(multi.slice() == expected.slice());
         }
     }
 
@@ -342,13 +334,13 @@ public:
     {
         testcase("Malformed serialized form");
 
-        static constexpr unsigned char kPayload1[] = {
+        static auto constexpr kPayload1 = std::to_array<unsigned char>({
             0x0a, 0xff, 0xff, 0xff, 0xff, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63,
             0x1b, 0x1b, 0x1b, 0x1b, 0x1b, 0x1b, 0x1b, 0x1b, 0x1b, 0x29, 0x1b, 0x1b, 0x1b,
             0x1b, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef,
-        };
+        });
 
-        static constexpr unsigned char kPayload2[] = {
+        static auto constexpr kPayload2 = std::to_array<unsigned char>({
             0xff, 0xef, 0xff, 0xef, 0xff, 0xef, 0xff, 0xef, 0xff, 0xef, 0xff, 0xef, 0xef, 0xff,
             0xef, 0xef, 0xff, 0xef, 0xff, 0xef, 0xef, 0xff, 0xef, 0xff, 0xef, 0xef, 0xff, 0xef,
             0xff, 0xef, 0xff, 0xef, 0xef, 0xff, 0xef, 0xff, 0xef, 0xff, 0xef, 0xef, 0xff, 0xef,
@@ -1339,9 +1331,9 @@ public:
             0xef, 0xff, 0x01, 0x00, 0xfd, 0xf1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0xef, 0xff, 0xef, 0xff, 0xef, 0xff, 0xef, 0x3b, 0x3b, 0x43, 0x3b, 0x3b, 0xff, 0x3b,
             0x12, 0xf1, 0x12, 0x12, 0x12, 0xff,
-        };
+        });
 
-        static constexpr unsigned char kPayload3[] = {
+        static auto constexpr kPayload3 = std::to_array<unsigned char>({
             0x12, 0x00, 0x65, 0x24, 0x00, 0x00, 0x00, 0x00, 0x20, 0x1e, 0x00, 0x4f, 0x00, 0x00,
             0x20, 0x1f, 0x03, 0xf6, 0x00, 0x00, 0x20, 0x20, 0x00, 0x00, 0x00, 0x00, 0x35, 0x00,
             0x59, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x68, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -1360,9 +1352,9 @@ public:
             0x59, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x68, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x02, 0x00, 0x73, 0x00, 0x81, 0x14, 0x00, 0x10, 0x00, 0x73, 0x00, 0x81, 0x14, 0x00,
             0x10, 0x00, 0x00, 0x00, 0x00, 0x26, 0x00, 0x00, 0x00, 0x00, 0xe5, 0xfe,
-        };
+        });
 
-        static constexpr unsigned char kPayload4[] = {
+        static auto constexpr kPayload4 = std::to_array<unsigned char>({
             0x12, 0x00, 0x65, 0x24, 0x00, 0x00, 0x00, 0x00, 0x20, 0x1e, 0x00, 0x4f, 0x00, 0x00,
             0x20, 0x1f, 0x03, 0xf6, 0x00, 0x00, 0x20, 0x20, 0x00, 0x00, 0x00, 0x00, 0x35, 0x00,
             0x59, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x68, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -1381,7 +1373,7 @@ public:
             0x00, 0x59, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x68, 0x40, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x02, 0x00, 0x73, 0x00, 0x81, 0x14, 0x00, 0x10, 0x00, 0x73, 0x00, 0x81, 0x14,
             0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x26, 0x00, 0x00, 0x00, 0x00, 0xe5, 0xfe,
-        };
+        });
 
         // Construct an STObject with 11 levels of object nesting so the
         // maximum nesting level exception is thrown.
@@ -1519,23 +1511,22 @@ public:
                 obj.setFieldU32(sfClearFlag, 0xB01DFACE);
             });
 
-            Serializer serialized{acctSet.getSerializer()};
-            {
-                // Verify we have a valid transaction.
-                SerialIter sit{serialized.slice()};
-                auto const stx = std::make_shared<xrpl::STTx const>(sit);
-            }
+            Blob serialized = acctSet.getSerializer().takeData();
+
+            // Ensure we have a valid transaction that can be serialized
+            // and deserialized successfully.
+            BEAST_EXPECT(!serialized.empty());
+            BEAST_EXPECT(serialized[15] == sfClearFlag.fieldValue);
+            BEAST_EXPECT(acctSet == STTx{SerialIter{makeSlice(serialized)}});
 
             // Tweak the serialized data to change the ClearFlag to
             // a SetFlag.  This will leave us with two SetFlag fields
             // which we should trap as a duplicate field.
-            BEAST_EXPECT(serialized.modData()[15] == sfClearFlag.fieldValue);
-            serialized.modData()[15] = sfSetFlag.fieldValue;
+            serialized[15] = sfSetFlag.fieldValue;
 
-            SerialIter sit{serialized.slice()};
             try
             {
-                auto const stx = std::make_shared<xrpl::STTx const>(sit);
+                STTx const stx{SerialIter{makeSlice(serialized)}};
                 fail("An exception should have been thrown");
             }
             catch (std::exception const& ex)
@@ -1559,7 +1550,7 @@ public:
             // from earlier versions results in "Unknown field". Either way,
             // we expect an exception from STTx, but the specific message will
             // vary.
-            BEAST_EXPECT(!tx2.ParseFromArray(kPayload1, sizeof(kPayload1)));
+            BEAST_EXPECT(!tx2.ParseFromArray(kPayload1.data(), kPayload1.size()));
 
             xrpl::SerialIter sit(xrpl::makeSlice(tx2.rawtransaction()));
 
@@ -1573,7 +1564,7 @@ public:
 
         try
         {
-            xrpl::SerialIter sit{kPayload2};
+            xrpl::SerialIter sit{makeSlice(kPayload2)};
             auto const stx = std::make_shared<xrpl::STTx const>(sit);
             fail("An exception should have been thrown");
         }
@@ -1584,7 +1575,7 @@ public:
 
         try
         {
-            xrpl::SerialIter sit{kPayload3};
+            xrpl::SerialIter sit{makeSlice(kPayload3)};
             auto const stx = std::make_shared<xrpl::STTx const>(sit);
             fail("An exception should have been thrown");
         }
@@ -1595,7 +1586,7 @@ public:
 
         try
         {
-            xrpl::SerialIter sit{kPayload4};
+            xrpl::SerialIter sit{makeSlice(kPayload4)};
             auto const stx = std::make_shared<xrpl::STTx const>(sit);
             fail("An exception should have been thrown");
         }
