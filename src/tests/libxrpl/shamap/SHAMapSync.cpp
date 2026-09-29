@@ -5,6 +5,7 @@
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/beast/xor_shift_engine.h>
 #include <xrpl/protocol/Serializer.h>
+#include <xrpl/protocol/digest.h>
 #include <xrpl/shamap/SHAMap.h>
 #include <xrpl/shamap/SHAMapItem.h>
 #include <xrpl/shamap/SHAMapMissingNode.h>
@@ -40,7 +41,7 @@ protected:
 
         for (auto word = 0uz; word < kWordsPerState; ++word)
             s.add32(randInt<std::uint32_t>(eng_));
-        return makeShamapitem(s.getSHA512Half(), s.slice());
+        return makeShamapitem(sha512Half(s), s.slice());
     }
 
     bool
@@ -196,9 +197,9 @@ TEST_F(SHAMapSyncTest, add_known_node_reports_duplicate_once_a_map_stops_synchin
     auto const makeOffer = [] {
         Serializer s;
         s.addBitString(UInt256{1});
-        s.add8(0);
+        s.add8(static_cast<unsigned char>(0));
         s.add8(kWireTypeCompressedInner);
-        return SHAMapTreeNode::makeFromWire(makeSlice(s.peekData()));
+        return SHAMapTreeNode::makeFromWire(s.slice());
     };
     ASSERT_TRUE(makeOffer());
 

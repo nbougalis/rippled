@@ -111,16 +111,16 @@ STPathSet::STPathSet(SerialIter& sit, SField const& name) : STBase(name)
         AccountID issuer;
 
         if (hasAccount)
-            account = AccountID{sit.get160()};
+            account = sit.getBitString<AccountID>();
 
         if (hasCurrency)
-            asset = Currency{sit.get160()};
+            asset = sit.getBitString<Currency>();
 
         if (hasMPT)
-            asset = sit.get192();
+            asset = sit.getBitString<MPTID>();
 
         if (hasIssuer)
-            issuer = AccountID{sit.get160()};
+            issuer = sit.getBitString<AccountID>();
 
         path.emplace_back(account, asset, issuer, hasCurrency || hasMPT);
     } while (type != STPathElementType::None);

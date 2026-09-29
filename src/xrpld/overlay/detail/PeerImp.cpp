@@ -3287,7 +3287,7 @@ PeerImp::sendLedgerBase(
 
     Serializer s(sizeof(LedgerHeader));
     addRaw(ledger->header(), s);
-    ledgerData.add_nodes()->set_nodedata(s.getDataPtr(), s.getLength());
+    ledgerData.add_nodes()->set_nodedata(s.data(), s.size());
 
     auto const& stateMap{ledger->stateMap()};
     if (stateMap.getHash() != beast::kZero)
@@ -3296,7 +3296,7 @@ PeerImp::sendLedgerBase(
         Serializer root(768);
 
         stateMap.serializeRoot(root);
-        ledgerData.add_nodes()->set_nodedata(root.getDataPtr(), root.getLength());
+        ledgerData.add_nodes()->set_nodedata(root.data(), root.size());
 
         if (ledger->header().txHash != beast::kZero)
         {
@@ -3306,7 +3306,7 @@ PeerImp::sendLedgerBase(
                 // Return TX root node if possible
                 root.erase();
                 txMap.serializeRoot(root);
-                ledgerData.add_nodes()->set_nodedata(root.getDataPtr(), root.getLength());
+                ledgerData.add_nodes()->set_nodedata(root.data(), root.size());
             }
         }
     }
