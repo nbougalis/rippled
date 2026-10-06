@@ -917,8 +917,8 @@ public:
                 sponsor::SponseeAcc(alice),
                 Seq(1),
                 Fee(baseFee));
-            auto const pf =
-                preflight(env.app(), env.current()->rules(), *jt.stx, TapNone, env.journal);
+            auto const pf = preflight(
+                env.app(), env.current()->rules(), *jt.stx, ApplyFlags::None, env.journal);
             BEAST_EXPECT(isTesSuccess(pf.ter));
             BEAST_EXPECT(!pf.consequences.isBlocker());
             BEAST_EXPECT(pf.consequences.fee() == drops(baseFee));
@@ -933,8 +933,8 @@ public:
                 sponsor::SponseeAcc(alice),
                 Seq(1),
                 Fee(baseFee));
-            auto const pf =
-                preflight(env.app(), env.current()->rules(), *jt.stx, TapNone, env.journal);
+            auto const pf = preflight(
+                env.app(), env.current()->rules(), *jt.stx, ApplyFlags::None, env.journal);
             BEAST_EXPECT(isTesSuccess(pf.ter));
             BEAST_EXPECT(!pf.consequences.isBlocker());
             BEAST_EXPECT(pf.consequences.fee() == drops(baseFee));
@@ -948,8 +948,8 @@ public:
                 sponsor::SponseeAcc(alice),
                 Seq(1),
                 Fee(baseFee));
-            auto const pf =
-                preflight(env.app(), env.current()->rules(), *jt.stx, TapNone, env.journal);
+            auto const pf = preflight(
+                env.app(), env.current()->rules(), *jt.stx, ApplyFlags::None, env.journal);
             BEAST_EXPECT(isTesSuccess(pf.ter));
             BEAST_EXPECT(!pf.consequences.isBlocker());
             BEAST_EXPECT(pf.consequences.fee() == drops(baseFee));
@@ -2246,7 +2246,8 @@ public:
                 Seq(env.seq(alice)),
                 sponsor::As(carol, spfSponsorFee));
 
-            auto const result = xrpl::apply(env.app(), overlay, *jt.stx, TapNone, env.journal);
+            auto const result =
+                xrpl::apply(env.app(), overlay, *jt.stx, ApplyFlags::None, env.journal);
             BEAST_EXPECT(result.ter == tecINSUFF_FEE);
             BEAST_EXPECT(result.applied);
 
@@ -2299,7 +2300,8 @@ public:
                 Fee(fixFee),
                 sponsor::As(sponsor, spfSponsorFee));
 
-            auto const pf = preflight(env.app(), overlay.rules(), *jt.stx, TapNone, env.journal);
+            auto const pf =
+                preflight(env.app(), overlay.rules(), *jt.stx, ApplyFlags::None, env.journal);
             BEAST_EXPECT(isTesSuccess(pf.ter));
             auto const pc = preclaim(pf, env.app(), overlay);
             BEAST_EXPECT(isTesSuccess(pc.ter));

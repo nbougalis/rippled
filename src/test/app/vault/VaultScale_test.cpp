@@ -105,27 +105,26 @@ private:
                 MPTIssue const shares(issuanceId);
                 env.memoize(vaultAccount);
 
-                auto const peek = [keylet, &env, this](std::function<bool(SLE&, SLE&)> fn) -> bool {
-                    return env.app().getOpenLedger().modify(
-                        [&](OpenView& view, beast::Journal j) -> bool {
-                            Sandbox sb(&view, TapNone);
-                            auto const vault = sb.peek(keylet::vault(keylet.key));
-                            if (!BEAST_EXPECT(vault))
-                                return false;
-                            auto const shares =
-                                sb.peek(keylet::mptokenIssuance(vault->at(sfShareMPTID)));
-                            if (!BEAST_EXPECT(shares))
-                                return false;
-                            if (fn(*vault, *shares))
-                            {
-                                sb.update(vault);
-                                sb.update(shares);
-                                sb.apply(view);
-                                return true;
-                            }
+            auto const peek = [keylet, &env, this](std::function<bool(SLE&, SLE&)> fn) -> bool {
+                return env.app().getOpenLedger().modify(
+                    [&](OpenView& view, beast::Journal j) -> bool {
+                        Sandbox sb(&view, ApplyFlags::None);
+                        auto const vault = sb.peek(keylet::vault(keylet.key));
+                        if (!BEAST_EXPECT(vault))
                             return false;
-                        });
-                };
+                        auto const shares = sb.peek(keylet::mptokenIssuance(vault->at(sfShareMPTID)));
+                        if (!BEAST_EXPECT(shares))
+                            return false;
+                        if (fn(*vault, *shares))
+                        {
+                            sb.update(vault);
+                            sb.update(shares);
+                            sb.apply(view);
+                            return true;
+                        }
+                        return false;
+                    });
+            };
 
                 test(
                     env,
