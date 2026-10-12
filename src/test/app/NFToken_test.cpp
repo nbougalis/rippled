@@ -5033,7 +5033,7 @@ class NFTokenBaseUtil_test : public beast::unit_test::Suite
             json::Value result;
             Gate g;
             auto const job =
-                app.getJobQueue().postCoro(JtClient, "RPC-Client", [&](auto const& coro) {
+                app.getJobQueue().postCoro(JobType::Client, "RPC-Client", [&](auto const& coro) {
                     context.params = std::move(params);
                     context.coro = coro;
                     rpc::doCommand(context, result);

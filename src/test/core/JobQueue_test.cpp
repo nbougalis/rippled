@@ -5,8 +5,12 @@
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
 
+#include <algorithm>
 #include <atomic>
+#include <map>
 #include <memory>
+#include <mutex>
+#include <vector>
 
 namespace xrpl::test {
 
@@ -23,8 +27,9 @@ class JobQueue_test : public beast::unit_test::Suite
         {
             // addJob() should run the Job (and return true).
             std::atomic<bool> jobRan{false};
-            BEAST_EXPECT(
-                jQueue.addJob(JtClient, "JobAddTest1", [&jobRan]() { jobRan = true; }) == true);
+            BEAST_EXPECT(jQueue.addJob(JobType::Client, "JobAddTest1", [&jobRan]() {
+                jobRan = true;
+            }) == true);
 
             // Wait for the Job to run.
             while (!jobRan)
@@ -36,7 +41,7 @@ class JobQueue_test : public beast::unit_test::Suite
         jQueue.stop();
         BEAST_EXPECT(jQueue.isStopping());
 
-        BEAST_EXPECT(jQueue.addJob(JtClient, "JobAddTest2", []() {
+        BEAST_EXPECT(jQueue.addJob(JobType::Client, "JobAddTest2", []() {
             logicError("Unscheduled job improperly invoked!");
         }) == false);
     }
@@ -51,7 +56,7 @@ class JobQueue_test : public beast::unit_test::Suite
             // Test repeated post()s until the Coro completes.
             std::atomic<int> yieldCount{0};
             auto const coro = jQueue.postCoro(
-                JtClient,
+                JobType::Client,
                 "PostCoroTest1",
                 [&yieldCount](std::shared_ptr<JobQueue::Coro> const& coroCopy) {
                     while (++yieldCount < 4)
@@ -80,7 +85,7 @@ class JobQueue_test : public beast::unit_test::Suite
             // Test repeated resume()s until the Coro completes.
             int yieldCount{0};
             auto const coro = jQueue.postCoro(
-                JtClient,
+                JobType::Client,
                 "PostCoroTest2",
                 [&yieldCount](std::shared_ptr<JobQueue::Coro> const& coroCopy) {
                     while (++yieldCount < 4)
@@ -112,11 +117,85 @@ class JobQueue_test : public beast::unit_test::Suite
         jQueue.stop();
         BEAST_EXPECT(jQueue.isStopping());
 
-        auto const coro =
-            jQueue.postCoro(JtClient, "PostCoroTest3", [](std::shared_ptr<JobQueue::Coro> const&) {
+        auto const coro = jQueue.postCoro(
+            JobType::Client, "PostCoroTest3", [](std::shared_ptr<JobQueue::Coro> const&) {
                 logicError("Unscheduled coroutine improperly invoked!");
             });
         BEAST_EXPECT(coro == nullptr);
+    }
+
+    void
+    testJobOrdering()
+    {
+        jtx::Env env{*this};
+        JobQueue& jq = env.app().getJobQueue();
+
+        // Hold all workers while we enqueue, so jobs accumulate in the
+        // queue rather than executing as they arrive.
+        std::atomic<unsigned> gate{jq.threadCount() + 1};
+
+        auto pass = [&gate] {
+            if (gate.fetch_sub(1, std::memory_order_acq_rel) == 1)
+            {
+                gate.notify_all();
+                return;
+            }
+
+            auto v = gate.load(std::memory_order_acquire);
+
+            while (v != 0)
+            {
+                gate.wait(v, std::memory_order_acquire);
+                v = gate.load(std::memory_order_acquire);
+            }
+        };
+
+        for (unsigned i = 0; i < jq.threadCount(); ++i)
+            jq.addJob(JobType::Admin, "gate", pass);
+
+        // Sprinkle jobs across several types, interleaved, tagged with
+        // their per-type sequence number.
+        std::mutex m;
+        std::map<JobType, std::vector<int>> order;
+
+        auto record = [&](JobType t, int seq) {
+            return [&, t, seq] {
+                std::scoped_lock const lock(m);
+                order[t].push_back(seq);
+            };
+        };
+
+        constexpr JobType types[] = {
+            JobType::Pack,
+            JobType::Sweep,
+            JobType::Transaction,
+            JobType::LedgerData,
+            JobType::Accept};
+        constexpr int perType = 20;
+
+        std::map<JobType, int> seq;
+
+        for (int i = 0; i < perType; ++i)
+        {
+            for (auto const t : types)
+                jq.addJob(t, "ordered", record(t, seq[t]++));
+        }
+
+        pass();
+        jq.rendezvous();
+
+        {
+            std::scoped_lock const lock(m);
+            for (auto const t : types)
+            {
+                if (!BEAST_EXPECT(order[t].size() == perType))
+                    continue;
+                BEAST_EXPECT(std::ranges::is_sorted(order[t]));
+                // Strictly increasing 0..perType-1, i.e. exactly FIFO:
+                BEAST_EXPECT(order[t].front() == 0);
+                BEAST_EXPECT(order[t].back() == perType - 1);
+            }
+        }
     }
 
 public:
@@ -125,6 +204,7 @@ public:
     {
         testAddJob();
         testPostCoro();
+        testJobOrdering();
     }
 };
 

@@ -20,7 +20,7 @@ LegacyPathFind::LegacyPathFind(bool isAdmin, Application& app)
         return;
     }
 
-    auto const& jobCount = app.getJobQueue().getJobCountGE(JtClient);
+    auto const& jobCount = app.getJobQueue().getJobCountGE(JobType::Client);
     if (jobCount > tuning::kMaxPathfindJobCount || app.getFeeTrack().isLoadedLocal())
         return;
 

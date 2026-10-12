@@ -11,7 +11,7 @@ namespace xrpl {
 constexpr std::size_t kCoroStackSize = 1536 * 1024;
 
 template <class F>
-JobQueue::Coro::Coro(CoroCreateT, JobQueue& jq, JobType type, std::string name, F&& f)
+JobQueue::Coro::Coro(CoroCreator, JobQueue& jq, JobType type, std::string name, F&& f)
     : jq_(jq)
     , type_(type)
     , name_(std::move(name))
@@ -26,6 +26,7 @@ JobQueue::Coro::Coro(CoroCreateT, JobQueue& jq, JobType type, std::string name, 
 #endif
           })
 {
+    ++jq_.totalCoroutines_;
 }
 
 inline JobQueue::Coro::~Coro()
@@ -33,15 +34,14 @@ inline JobQueue::Coro::~Coro()
 #ifndef NDEBUG
     XRPL_ASSERT(finished_, "xrpl::JobQueue::Coro::~Coro : is finished");
 #endif
+
+    --jq_.totalCoroutines_;
 }
 
 inline void
 JobQueue::Coro::yield() const
 {
-    {
-        std::scoped_lock const lock(jq_.mutex_);
-        ++jq_.nSuspend_;
-    }
+    ++jq_.suspendedCoroutines_;
     (*yield_)();
 }
 
@@ -73,10 +73,7 @@ JobQueue::Coro::resume()
         std::scoped_lock const lk(mutexRun_);
         running_ = true;
     }
-    {
-        std::scoped_lock const lk(jq_.mutex_);
-        --jq_.nSuspend_;
-    }
+    --jq_.suspendedCoroutines_;
     auto saved = detail::getLocalValues().release();
     detail::getLocalValues().reset(&lvs_);
     std::scoped_lock const lock(mutex_);
@@ -117,9 +114,9 @@ JobQueue::Coro::expectEarlyExit()
         // and be done.
         //
         // That said, since we're outside the Coro's stack, we need to
-        // decrement the nSuspend that the Coro's call to yield caused.
-        std::scoped_lock const lock(jq_.mutex_);
-        --jq_.nSuspend_;
+        // decrement the suspended count that the Coro's call to yield caused.
+        --jq_.suspendedCoroutines_;
+
 #ifndef NDEBUG
         finished_ = true;
 #endif
