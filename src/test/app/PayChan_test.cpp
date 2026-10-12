@@ -1658,7 +1658,7 @@ struct PayChan_test : public beast::unit_test::Suite
         BEAST_EXPECT(context.loadType == resource::kFeeReferenceRpc);
         json::Value result;
         Gate g;
-        app.getJobQueue().postCoro(JtClient, "RPC-Client", [&](auto const& coro) {
+        app.getJobQueue().postCoro(JobType::Client, "RPC-Client", [&](auto const& coro) {
             context.coro = coro;
             result = doChannelVerify(context);
             g.signal();
@@ -1728,7 +1728,7 @@ struct PayChan_test : public beast::unit_test::Suite
         BEAST_EXPECT(context.loadType == resource::kFeeReferenceRpc);
         json::Value result;
         Gate g;
-        app.getJobQueue().postCoro(JtClient, "RPC-Client", [&](auto const& coro) {
+        app.getJobQueue().postCoro(JobType::Client, "RPC-Client", [&](auto const& coro) {
             context.coro = coro;
             result = doChannelAuthorize(context);
             g.signal();

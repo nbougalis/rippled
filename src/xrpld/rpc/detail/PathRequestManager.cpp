@@ -60,7 +60,7 @@ PathRequestManager::getAssetCache(std::shared_ptr<ReadView const> const& ledger,
 void
 PathRequestManager::updateAll(std::shared_ptr<ReadView const> const& inLedger)
 {
-    auto const event = app_.getJobQueue().makeLoadEvent(JtPathFind, "PathRequest::updateAll");
+    auto const event = app_.getJobQueue().createLoadEvent(JobType::PathFind, "PathRequest::updateAll");
 
     std::vector<PathRequest::Wptr> requests;
     std::shared_ptr<AssetCache> cache;

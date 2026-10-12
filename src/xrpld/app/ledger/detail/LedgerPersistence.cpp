@@ -81,7 +81,7 @@ pendSaveValidated(
     // See if we can use the JobQueue.
     if (!isSynchronous &&
         registry.getJobQueue().addJob(
-            isCurrent ? JtPubledger : JtPuboldledger,
+            isCurrent ? JobType::PublishLedger : JobType::PublishOldLedger,
             "Pub" + std::to_string(ledger->seq()),
             [&registry, ledger, isCurrent] { saveValidatedLedger(registry, ledger, isCurrent); }))
     {

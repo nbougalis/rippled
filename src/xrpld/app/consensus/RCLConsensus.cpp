@@ -159,8 +159,9 @@ RCLConsensus::Adaptor::acquireLedger(LedgerHash const& hash)
             // Tell the ledger acquire system that we need the consensus ledger
             acquiringLedger_ = hash;
 
-            app_.getJobQueue().addJob(JtAdvance, "GetConsL1", [id = hash, &app = app_, this] {
-                JLOG(j_.debug()) << "JOB advanceLedger getConsensusLedger1 started";
+            app_.getJobQueue().addJob(
+                JobType::Advance, "GetConsL1", [id = hash, &app = app_, this] {
+                    JLOG(j_.debug()) << "JOB advanceLedger getConsensusLedger1 started";
                 app.getInboundLedgers().acquireAsync(id, 0, InboundLedger::Reason::CONSENSUS);
             });
         }
@@ -436,7 +437,7 @@ RCLConsensus::Adaptor::onAccept(
     bool const validating)
 {
     app_.getJobQueue().addJob(
-        JtAccept,
+        JobType::Accept,
         "AcceptLedger",
         // NOLINTNEXTLINE(cppcoreguidelines-misleading-capture-default-by-value)
         [=, this, cj = std::move(consensusJson)] mutable {

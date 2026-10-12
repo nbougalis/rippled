@@ -17,7 +17,7 @@ NodeStoreScheduler::scheduleTask(node_store::Task& task)
     if (jobQueue_.isStopped())
         return;
 
-    if (!jobQueue_.addJob(JtWrite, "NObjStore", [&task] { task.performScheduledTask(); }))
+    if (!jobQueue_.addJob(JobType::Write, "NObjStore", [&task] { task.performScheduledTask(); }))
     {
         // Job not added, presumably because we're shutting down.
         // Recover by executing the task synchronously.
@@ -32,7 +32,8 @@ NodeStoreScheduler::onFetch(node_store::FetchReport const& report)
         return;
 
     jobQueue_.addLoadEvents(
-        report.fetchType == node_store::FetchType::Async ? JtNsAsyncRead : JtNsSyncRead,
+        report.fetchType == node_store::FetchType::Async ? JobType::NsAsyncRead
+                                                         : JobType::NsSyncRead,
         1,
         report.elapsed);
 }
@@ -43,7 +44,7 @@ NodeStoreScheduler::onBatchWrite(node_store::BatchWriteReport const& report)
     if (jobQueue_.isStopped())
         return;
 
-    jobQueue_.addLoadEvents(JtNsWrite, report.writeCount, report.elapsed);
+    jobQueue_.addLoadEvents(JobType::NsWrite, report.writeCount, report.elapsed);
 }
 
 }  // namespace xrpl

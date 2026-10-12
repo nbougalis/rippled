@@ -267,8 +267,8 @@ Pathfinder::findPaths(int searchLevel, std::function<bool()> const& continueCall
         return true;
     }
 
-    loadEvent_ = app_.getJobQueue().makeLoadEvent(JtPathFind, "FindPath");
-    auto const currencyIsXRP = isXRP(srcPathAsset_);
+    loadEvent_ = app_.getJobQueue().createLoadEvent(JobType::PathFind, "FindPath");
+    auto currencyIsXRP = isXRP(srcPathAsset_);
 
     bool const useIssuerAccount = srcIssuer_ && !currencyIsXRP && !isXRP(*srcIssuer_);
     auto const& account = useIssuerAccount ? *srcIssuer_ : srcAccount_;

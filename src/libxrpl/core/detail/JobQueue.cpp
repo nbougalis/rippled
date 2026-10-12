@@ -1,29 +1,55 @@
 #include <xrpl/core/JobQueue.h>
 
 #include <xrpl/basics/Log.h>
+#include <xrpl/basics/SlabAllocator.h>
 #include <xrpl/basics/contract.h>
+#include <xrpl/basics/scope.h>
 #include <xrpl/beast/core/CurrentThreadName.h>
 #include <xrpl/beast/insight/Collector.h>
+#include <xrpl/beast/insight/Hook.h>
+#include <xrpl/beast/utility/Journal.h>
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/core/Job.h>
-#include <xrpl/core/JobTypeInfo.h>
 #include <xrpl/core/JobTypes.h>
 #include <xrpl/core/LoadEvent.h>
 #include <xrpl/core/PerfLog.h>
 #include <xrpl/json/json_value.h>
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <exception>
-#include <memory>
 #include <mutex>
-#include <set>
+#include <new>
+#include <numeric>
 #include <string>
-#include <tuple>
+#include <thread>
 #include <utility>
 
 namespace xrpl {
+
+namespace {
+
+/**
+ * The allocator that every Job comes from.
+ *
+ * Jobs are short-lived objects of a single size: each one is allocated by
+ * addRefCountedJob() and released by processTask(), after it has executed
+ * on a different thread. A slab allocator serves that pattern from a few
+ * large, contiguous buffers instead of the general purpose heap.
+ *
+ * If no slab can provide memory, the request is served by the heap.
+ *
+ * @note This is shared by every JobQueue in the process and is deliberately
+ *       not a member: the allocator does not release buffers that may still
+ *       hold live objects when it is destroyed, so its lifetime must not be
+ *       tied to that of any one JobQueue.
+ */
+constinit slab::Allocator<Job, slab::HeapFallback, slab::Config<16384>> gJobSlab;
+
+}  // namespace
 
 JobQueue::JobQueue(
     std::size_t threadCount,
@@ -32,213 +58,208 @@ JobQueue::JobQueue(
     Logs& logs,
     perf::PerfLog& perfLog)
     : journal_(journal)
-    , invalidJobData_(JobTypes::instance().getInvalid(), collector, logs)
-    , workers_(*this, "JobQueue", threadCount)
+    , data_([&]<std::size_t... I>(std::index_sequence<I...>) {
+        return std::array<Data, sizeof...(I)>{
+            Data{kJobTypes[static_cast<JobType>(I)], collector, logs}...};
+    }(std::make_index_sequence<kJobTypes.size()>()))
     , perfLog_(perfLog)
+    , workers_(*this, "JobQueue", threadCount)
     , collector_(collector)
 {
-    JLOG(journal_.info()) << "Using " << threadCount << "  threads";
+    JLOG(journal_.info()) << "Using " << threadCount << " threads";
 
     // This is important to do before dispatching any jobs
     // so that the logger knows the number of threads.
     perfLog_.resizeJobs(threadCount);
 
-    hook_ = collector_->makeHook([this] { collect(); });
-    jobCount_ = collector_->makeGauge("job_count");
+    hook_ = collector_->makeHook([this] {
+        int jobs = 0;
 
-    {
-        std::scoped_lock const lock(mutex_);
-
-        for (auto const& x : JobTypes::instance())
         {
-            JobTypeInfo const& jt = x.second;
+            std::scoped_lock const lock(mutex_);
 
-            // And create dynamic information for all jobs
-            auto const result(jobData_.emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(jt.type()),
-                std::forward_as_tuple(jt, collector_, logs)));
-            XRPL_ASSERT(result.second == true, "xrpl::JobQueue::JobQueue : jobs added");
-            (void)result.second;
+            for (auto const& d : data_)
+                jobs += d.count;
         }
-    }
+
+        jobCountGauge_ = jobs;
+    });
+
+    jobCountGauge_ = collector_->makeGauge("job_count");
 }
 
 JobQueue::~JobQueue()
 {
+    // The owner normally calls stop() during an orderly shutdown, but that
+    // never happens if the application fails to start. Either way, no job
+    // may be queued or running past this point.
+    stop();
+
     // Must unhook before destroying
     hook_ = beast::insight::Hook();
 }
 
 void
-JobQueue::collect()
+JobQueue::addRefCountedJob(JobType type, std::string const& name, JobFunction&& func)
 {
-    std::scoped_lock const lock(mutex_);
-    jobCount_ = jobSet_.size();
-}
+    JLOG(journal_.debug()) << "Adding job '" << name << "' (" << kJobTypes[type].name << ")";
 
-bool
-JobQueue::addRefCountedJob(JobType type, std::string const& name, JobFunction const& func)
-{
-    XRPL_ASSERT(type != JtInvalid, "xrpl::JobQueue::addRefCountedJob : valid input job type");
-
-    auto const iter(jobData_.find(type));
     XRPL_ASSERT(
-        iter != jobData_.end(), "xrpl::JobQueue::addRefCountedJob : job type found in jobs");
-    if (iter == jobData_.end())
-        return false;
-
-    JLOG(journal_.debug()) << __func__ << " : Adding job : " << name << " : " << type;
-    JobTypeData& data(iter->second);
+        !kJobTypes[type].special(), "xrpl::JobQueue::addRefCountedJob : job type is dispatchable");
 
     // FIXME: Workaround incorrect client shutdown ordering
     // do not add jobs to a queue with no threads
     XRPL_ASSERT(
-        (type >= JtClient && type <= JtClientWebsocket) || workers_.count() > 0,
+        (type >= JobType::Client && type <= JobType::ClientWebsocket) || workers_.count() > 0,
         "xrpl::JobQueue::addRefCountedJob : threads available or job "
         "requires no threads");
 
+    // Every job is allocated here and released by processTask(), once it
+    // has been executed.
+    auto* const job = [&] {
+        // Copying the name is the only step that can throw, so it is done
+        // before taking memory: there is then nothing to give back on failure.
+        std::string jobName(name);
+
+        if (auto* const raw = gJobSlab.allocate()) [[likely]]
+            return std::construct_at(
+                static_cast<Job*>(raw),
+                std::move(jobName),
+                data_[type].load.sample(),
+                std::move(func));
+
+        Throw<std::bad_alloc>();
+    }();
+
+    // Counted before the job becomes visible in any queue: a quiescence
+    // waiter that reads zero is guaranteed no job is queued or
+    // executing. Safe to count here: the node is already fully
+    // constructed, and linking below cannot fail.
+    totalJobs_.fetch_add(1, std::memory_order::relaxed);
+
+    std::scoped_lock const lock(mutex_);
+
+    auto& d = data_[type];
+
+    if (d.last != nullptr)
     {
-        std::scoped_lock const lock(mutex_);
-        auto const result = jobSet_.emplace(type, name, ++lastJob_, data.load(), func);
-        auto const& job = *result.first;
-
-        JobType const type(job.getType());
-        XRPL_ASSERT(type != JtInvalid, "xrpl::JobQueue::addRefCountedJob : has valid job type");
-        XRPL_ASSERT(jobSet_.contains(job), "xrpl::JobQueue::addRefCountedJob : job found");
-        perfLog_.jobQueue(type);
-
-        JobTypeData& data(getJobTypeData(type));
-
-        if (data.waiting + data.running < getJobLimit(type))
-        {
-            workers_.addTask();
-        }
-        else
-        {
-            // defer the task until we go below the limit
-            ++data.deferred;
-        }
-        ++data.waiting;
+        d.last->chain(job);
     }
-    return true;
+    else
+    {
+        d.first = job;
+    }
+
+    d.last = job;
+    ++d.count;
+
+    if (d.count == 1)
+        jobMask_.set(type);
+
+    // The new job is now counted by outstanding(), so we use
+    // less-than-or-equal here, where a check made before the insertion
+    // would use less-than.
+    if (d.outstanding() <= kJobTypes[type].limit)
+    {
+        workers_.addTask();
+    }
+    else
+    {
+        ++d.deferred;
+    }
+
+    perfLog_.jobQueue(type);
 }
 
 int
 JobQueue::getJobCount(JobType t) const
 {
     std::scoped_lock const lock(mutex_);
-
-    auto const c = jobData_.find(t);
-
-    return (c == jobData_.end()) ? 0 : c->second.waiting;
+    return data_[t].queued();
 }
 
 int
 JobQueue::getJobCountTotal(JobType t) const
 {
     std::scoped_lock const lock(mutex_);
-
-    auto const c = jobData_.find(t);
-
-    return (c == jobData_.end()) ? 0 : (c->second.waiting + c->second.running);
+    return data_[t].outstanding();
 }
 
 int
 JobQueue::getJobCountGE(JobType t) const
 {
-    // return the number of jobs at this priority level or greater
-    int ret = 0;
-
     std::scoped_lock const lock(mutex_);
 
-    for (auto const& x : jobData_)
-    {
-        if (x.first >= t)
-            ret += x.second.waiting;
-    }
-
-    return ret;
+    return std::accumulate(
+        data_.begin() + static_cast<std::size_t>(t), data_.end(), 0, [](int sum, Data const& d) {
+            return sum + d.queued();
+        });
 }
 
-std::unique_ptr<LoadEvent>
-JobQueue::makeLoadEvent(JobType t, std::string const& name)
+LoadEvent
+JobQueue::createLoadEvent(JobType t, std::string name)
 {
-    auto const iter = jobData_.find(t);
-    XRPL_ASSERT(iter != jobData_.end(), "xrpl::JobQueue::makeLoadEvent : valid job type input");
-
-    if (iter == jobData_.end())
-        return {};
-
-    return std::make_unique<LoadEvent>(iter->second.load(), name, true);
+    return {data_[t].load.sample(), std::move(name), true};
 }
 
 void
 JobQueue::addLoadEvents(JobType t, int count, std::chrono::milliseconds elapsed)
 {
-    if (isStopped())
-        logicError("JobQueue::addLoadEvents() called after JobQueue stopped");
-
-    auto const iter = jobData_.find(t);
-    XRPL_ASSERT(iter != jobData_.end(), "xrpl::JobQueue::addLoadEvents : valid job type input");
-    iter->second.load().addSamples(count, elapsed);
+    if (!isStopped()) [[likely]]
+        data_[t].load.addSamples(count, elapsed);
 }
 
 bool
 JobQueue::isOverloaded()
 {
-    return std::ranges::any_of(jobData_, [](auto& entry) { return entry.second.load().isOver(); });
+    return std::ranges::any_of(data_, [](auto& d) { return d.load.isOver(); });
 }
 
 json::Value
-JobQueue::getJson(int c)
+JobQueue::getJson(int)
 {
     using namespace std::chrono_literals;
     json::Value ret(json::ValueType::Object);
 
     ret["threads"] = workers_.count();
+    ret["coro.suspended"] = suspendedCoroutines_.load();
+    ret["coro.total"] = totalCoroutines_.load();
 
     json::Value priorities = json::ValueType::Array;
 
     std::scoped_lock const lock(mutex_);
 
-    for (auto& x : jobData_)
+    for (auto const& info : kJobTypes)
     {
-        XRPL_ASSERT(x.first != JtInvalid, "xrpl::JobQueue::getJson : valid job type");
-
-        if (x.first == JtGeneric)
+        if (info.type == JobType::Generic)
             continue;
 
-        JobTypeData& data(x.second);
+        auto& d = data_[info.type];
 
-        LoadMonitor::Stats const stats(data.stats());
-
-        int const waiting(data.waiting);
-        int const running(data.running);
-
-        if ((stats.count != 0) || (waiting != 0) || (stats.latencyPeak != 0ms) || (running != 0))
+        if (auto const s = d.load.getStats();
+            (s.count != 0) || (d.count != 0) || (d.running != 0) || (s.peakLatency != 0ms))
         {
             json::Value& pri = priorities.append(json::ValueType::Object);
 
-            pri["job_type"] = data.name();
+            pri["job_type"] = std::string(info.name);
 
-            if (stats.isOverloaded)
+            if (s.isOverloaded)
                 pri["over_target"] = true;
 
-            if (waiting != 0)
-                pri["waiting"] = waiting;
+            if (d.count != 0)
+                pri["waiting"] = d.count;
 
-            if (stats.count != 0)
-                pri["per_second"] = static_cast<int>(stats.count);
+            if (s.count != 0)
+                pri["per_second"] = static_cast<int>(s.count);
 
-            if (stats.latencyPeak != 0ms)
-                pri["peak_time"] = static_cast<int>(stats.latencyPeak.count());
+            if (s.peakLatency != 0ms)
+                pri["peak_time"] = static_cast<int>(s.peakLatency.count());
 
-            if (stats.latencyAvg != 0ms)
-                pri["avg_time"] = static_cast<int>(stats.latencyAvg.count());
+            if (s.averageLatency != 0ms)
+                pri["avg_time"] = static_cast<int>(s.averageLatency.count());
 
-            if (running != 0)
-                pri["in_progress"] = running;
+            if (d.running != 0)
+                pri["in_progress"] = d.running;
         }
     }
 
@@ -250,119 +271,54 @@ JobQueue::getJson(int c)
 void
 JobQueue::rendezvous()
 {
-    std::unique_lock<std::mutex> lock(mutex_);
-    cv_.wait(lock, [this] { return processCount_ == 0 && jobSet_.empty(); });
-}
-
-JobTypeData&
-JobQueue::getJobTypeData(JobType type)
-{
-    auto const c = jobData_.find(type);
-    XRPL_ASSERT(c != jobData_.end(), "xrpl::JobQueue::getJobTypeData : valid job type input");
-
-    // NIKB: This is ugly and I hate it. We must remove JtInvalid completely
-    //       and use something sane.
-    if (c == jobData_.end())
-        return invalidJobData_;
-
-    return c->second;
+    std::unique_lock lock(quiesceMutex_);
+    quiesceCv_.wait(lock, [this] { return totalJobs_.load(std::memory_order_acquire) == 0; });
 }
 
 void
 JobQueue::stop()
 {
-    stopping_ = true;
-    using namespace std::chrono_literals;
-    jobCounter_.join("JobQueue", 1s, journal_);
+    if (State expected = State::Running;
+        !state_.compare_exchange_strong(expected, State::Stopping, std::memory_order_acq_rel))
     {
-        // After the JobCounter is joined, all jobs have finished executing
-        // (i.e. returned from `Job::doJob`) and no more are being accepted,
-        // but there may still be some threads between the return of
-        // `Job::doJob` and the return of `JobQueue::processTask`. That is why
-        // we must wait on the condition variable to make these assertions.
-        std::unique_lock<std::mutex> lock(mutex_);
-        cv_.wait(lock, [this] { return processCount_ == 0 && jobSet_.empty(); });
-        XRPL_ASSERT(processCount_ == 0, "xrpl::JobQueue::stop : all processes completed");
-        XRPL_ASSERT(jobSet_.empty(), "xrpl::JobQueue::stop : all jobs completed");
-        XRPL_ASSERT(nSuspend_ == 0, "xrpl::JobQueue::stop : no coros suspended");
-        stopped_ = true;
-    }
-}
+        while (state_.load(std::memory_order_acquire) != State::Stopped)
+            std::this_thread::yield();
 
-bool
-JobQueue::isStopped() const
-{
-    return stopped_;
+        return;
+    }
+
+    jobCounter_.join("JobQueue", std::chrono::seconds(1), journal_);
+
+    // Once the counter joins, all jobs have finished executing (i.e. they
+    // have returned from Job::execute) and no new jobs will be added. But
+    // a worker thread may still be inside processTask, between the return
+    // of Job::execute and the completion of the epilogue that updates the
+    // per-type counters. Wait for true quiescence before declaring the
+    // queue stopped.
+    rendezvous();
+
+    XRPL_ASSERT(suspendedCoroutines_ == 0, "xrpl::JobQueue::stop : no coros suspended");
+
+    state_.store(State::Stopped, std::memory_order_release);
 }
 
 void
-JobQueue::getNextJob(Job& job)
-{
-    XRPL_ASSERT(!jobSet_.empty(), "xrpl::JobQueue::getNextJob : non-empty jobs");
-
-    std::set<Job>::const_iterator iter;
-    for (iter = jobSet_.begin(); iter != jobSet_.end(); ++iter)
-    {
-        JobType const type = iter->getType();
-        XRPL_ASSERT(type != JtInvalid, "xrpl::JobQueue::getNextJob : valid job type");
-
-        JobTypeData& data(getJobTypeData(type));
-        XRPL_ASSERT(
-            data.running <= getJobLimit(type), "xrpl::JobQueue::getNextJob : maximum jobs running");
-
-        // Run this job if we're running below the limit.
-        if (data.running < getJobLimit(data.type()))
-        {
-            XRPL_ASSERT(data.waiting > 0, "xrpl::JobQueue::getNextJob : positive data waiting");
-            --data.waiting;
-            ++data.running;
-            break;
-        }
-    }
-
-    XRPL_ASSERT(iter != jobSet_.end(), "xrpl::JobQueue::getNextJob : found next job");
-    job = *iter;
-    jobSet_.erase(iter);
-}
-
-void
-JobQueue::finishJob(JobType type)
-{
-    XRPL_ASSERT(type != JtInvalid, "xrpl::JobQueue::finishJob : valid input job type");
-
-    JobTypeData& data = getJobTypeData(type);
-
-    // Queue a deferred task if possible
-    if (data.deferred > 0)
-    {
-        XRPL_ASSERT(
-            data.running + data.waiting >= getJobLimit(type),
-            "xrpl::JobQueue::finishJob : job limit");
-
-        --data.deferred;
-        workers_.addTask();
-    }
-
-    --data.running;
-}
-
-void
-JobQueue::uncaughtException(unsigned int instance, std::exception_ptr eptr)
+JobQueue::uncaughtException(unsigned int instance, std::exception_ptr e)
 {
     try
     {
-        if (eptr)
-            std::rethrow_exception(eptr);
+        if (e)
+            std::rethrow_exception(e);
 
         logicError(
             beast::getCurrentThreadName() +
             ": Uncaught exception handler invoked with no exception_ptr");
     }
-    catch (std::exception const& e)
+    catch (std::exception const& ex)
     {
         logicError(
             beast::getCurrentThreadName() +
-            ": Exception caught during task processing: " + e.what());
+            ": Exception caught during task processing: " + ex.what());
     }
     catch (...)
     {
@@ -374,61 +330,125 @@ JobQueue::uncaughtException(unsigned int instance, std::exception_ptr eptr)
 void
 JobQueue::processTask(unsigned int instance)
 {
-    JobType type = JtInvalid;
+    // Take the oldest waiting job from the highest-priority type
+    // that is under its concurrency limit.
+    auto const [job, type] = [this] {
+        Job* cj = nullptr;
+        JobType ct{};
 
-    {
-        using namespace std::chrono;
-        Job::ClockType::time_point const startTime(Job::ClockType::now());
-        {
-            Job job;
-            {
-                std::scoped_lock const lock(mutex_);
-                getNextJob(job);
-                ++processCount_;
-            }
-            type = job.getType();
-            JobTypeData const& data(getJobTypeData(type));
-            JLOG(journal_.trace()) << "Doing " << data.name() << "job";
-
-            // The amount of time that the job was in the queue
-            auto const qTime = ceil<microseconds>(startTime - job.queueTime());
-            perfLog_.jobStart(type, qTime, startTime, instance);
-
-            job.doJob();
-
-            // The amount of time it took to execute the job
-            auto const xTime = ceil<microseconds>(Job::ClockType::now() - startTime);
-
-            if (xTime >= 10ms || qTime >= 10ms)
-            {
-                getJobTypeData(type).dequeue.notify(qTime);
-                getJobTypeData(type).execute.notify(xTime);
-            }
-            perfLog_.jobFinish(type, xTime, instance);
-        }
-    }
-
-    {
         std::scoped_lock const lock(mutex_);
-        // Job should be destroyed before stopping
-        // otherwise destructors with side effects can access
-        // parent objects that are already destroyed.
-        finishJob(type);
-        if (--processCount_ == 0 && jobSet_.empty())
-            cv_.notify_all();
-    }
 
-    // Note that when Job::~Job is called, the last reference
-    // to the associated LoadEvent object (in the Job) may be destroyed.
-}
+        auto const found = jobMask_.scan([this, &cj, &ct](JobType t) {
+            auto& d = data_[t];
 
-int
-JobQueue::getJobLimit(JobType type)
-{
-    JobTypeInfo const& j(JobTypes::instance().get(type));
-    XRPL_ASSERT(j.type() != JtInvalid, "xrpl::JobQueue::getJobLimit : valid job type");
+            if (d.first == nullptr)
+                return false;
 
-    return j.limit();
+            XRPL_ASSERT(
+                d.running <= kJobTypes[t].limit,
+                "xrpl::JobQueue::processTask : running within limit");
+
+            // A type at its concurrency limit is skipped; its bit remains
+            // set and a completing job of this type will re-enable it via
+            // the deferred task machinery.
+            if (d.running >= kJobTypes[t].limit)
+                return false;
+
+            ++d.running;
+
+            cj = d.first;
+            ct = t;
+            d.first = cj->next;
+
+            if (d.first == nullptr)
+            {
+                d.last = nullptr;
+                jobMask_.clear(t);
+            }
+
+            --d.count;
+
+            return true;
+        });
+
+        if (found && cj != nullptr) [[likely]]
+            return std::pair{cj, ct};
+
+        logicError("Attempt to get a job when none are available");
+    }();
+
+    using namespace std::chrono;
+
+    auto const startTime = Job::ClockType::now();
+    auto const qTime = ceil<microseconds>(startTime - job->queueTime());
+    perfLog_.jobStart(type, qTime, startTime, instance);
+
+    JLOG(journal_.trace()) << "Starting: " << kJobTypes[type].name << " (q_time=" << qTime.count()
+                           << " microseconds)";
+
+    // We run the accounting epilogue on both the normal path and during an
+    // unwind, to keep the invariants of the pool intact even if when a job
+    // throws. The exception, if any, bubbles up to Workers and comes back
+    // via uncaughtException.
+    ScopeExit const epilogue([&] noexcept {
+        auto const xTime = ceil<microseconds>(Job::ClockType::now() - startTime);
+
+        JLOG(journal_.trace()) << "Finished: " << kJobTypes[type].name
+                               << " (x_time=" << xTime.count() << " microseconds)";
+
+        if (xTime >= 10ms || qTime >= 10ms)
+        {
+            data_[type].dequeue.notify(qTime);
+            data_[type].execute.notify(xTime);
+        }
+
+        perfLog_.jobFinish(type, xTime, instance);
+
+        // All jobs are released here: stop()'s rendezvous guarantees the
+        // queues drain before Workers can discard any tickets, so no job
+        // is ever stranded.
+        std::destroy_at(job);
+
+        if (!gJobSlab.deallocate(job)) [[unlikely]]
+            UNREACHABLE("xrpl::JobQueue::processTask : Job deallocation failed");
+
+        {
+            std::scoped_lock const lock(mutex_);
+
+            auto& d = data_[type];
+
+            // Queue a deferred task if possible. This doesn't mean the task
+            // will run next; only that one is now runnable.
+            if (d.deferred > 0)
+            {
+                XRPL_ASSERT(
+                    d.outstanding() >= kJobTypes[type].limit,
+                    "xrpl::JobQueue::processTask : deferral within limit");
+                --d.deferred;
+                workers_.addTask();
+            }
+
+            --d.running;
+        }
+
+        // The decrement is last: totalJobs_ reaching zero must imply that
+        // all per-type state is final and no further addTask() call will
+        // follow from this job. The acq_rel pairs with the acquire load in
+        // the quiescence waiters.
+        if (totalJobs_.fetch_sub(1, std::memory_order::acq_rel) == 1)
+        {
+            // Lock-then-notify closes the lost-wakeup race: a waiter that
+            // read a nonzero count must either be parked (and will be
+            // woken) or will re-check after we release. The empty critical
+            // section is deliberate.
+            {
+                std::scoped_lock const quiesceLock(quiesceMutex_);
+            }
+            quiesceCv_.notify_all();
+        }
+    });
+
+    job->execute();
 }
 
 }  // namespace xrpl

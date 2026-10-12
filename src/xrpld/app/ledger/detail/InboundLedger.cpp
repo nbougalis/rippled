@@ -76,7 +76,7 @@ InboundLedger::InboundLedger(
           app,
           hash,
           retryInterval,
-          {.jobType = JtLedgerData, .jobName = "InboundLedger", .jobLimit = 5},
+          {.jobType = JobType::LedgerData, .jobName = "InboundLedger", .jobLimit = 5},
           app.getJournal("InboundLedger"))
     , clock_(clock)
     , seq_(seq)
@@ -445,7 +445,7 @@ InboundLedger::done()
     }
 
     // We hold the PeerSet lock, so must dispatch
-    app_.getJobQueue().addJob(JtLedgerData, "AcqDone", [self = shared_from_this()] {
+    app_.getJobQueue().addJob(JobType::LedgerData, "AcqDone", [self = shared_from_this()] {
         if (self->complete_ && !self->failed_)
         {
             self->app_.getLedgerMaster().checkAccept(self->getLedger());

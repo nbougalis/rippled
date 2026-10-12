@@ -37,9 +37,7 @@
 
 namespace xrpl::perf {
 
-PerfLogImp::Counters::Counters(
-    std::span<NullTerminatedView const> methodNames,
-    JobTypes const& jobTypes)
+PerfLogImp::Counters::Counters(std::span<NullTerminatedView const> methodNames)
 {
     // Only a name that got a counter is kept, so labels and rpc hold the same set
     // and countersJson() reports each counter once. Keeping a repeated name would
@@ -60,10 +58,10 @@ PerfLogImp::Counters::Counters(
         labels.push_back(name);
     }
 
-    jq.reserve(jobTypes.size());
-    for (auto const& [jobType, _] : jobTypes)
+    jq.reserve(kJobTypes.size());
+    for (auto const& jobType : kJobTypes)
     {
-        auto const inserted = jq.emplace(jobType, Jq()).second;
+        auto const inserted = jq.emplace(jobType.type, Jq()).second;
         if (!inserted)
         {
             // Nothing else inserts into jq, so a job type cannot repeat.
@@ -156,7 +154,7 @@ PerfLogImp::Counters::countersJson() const
         totalJq.queuedDuration += value.queuedDuration;
         j[jss::running_duration_us] = std::to_string(value.runningDuration.count());
         totalJq.runningDuration += value.runningDuration;
-        jobQueueObj[JobTypes::name(proc.first)] = j;
+        jobQueueObj[std::string(kJobTypes[proc.first].name)] = j;
     }
 
     if (totalJq.queued != 0u)
@@ -191,12 +189,12 @@ PerfLogImp::Counters::currentJson() const
 
     for (auto const& j : jobs)
     {
-        if (j.first == JtInvalid)
+        if (!j)
             continue;
         json::Value jobj(json::ValueType::Object);
-        jobj[jss::job] = JobTypes::name(j.first);
+        jobj[jss::job] = std::string(kJobTypes[j->first].name);
         jobj[jss::duration_us] =
-            std::to_string(std::chrono::duration_cast<Microseconds>(present - j.second).count());
+            std::to_string(std::chrono::duration_cast<Microseconds>(present - j->second).count());
         jobsArray.append(jobj);
     }
 
@@ -324,7 +322,7 @@ PerfLogImp::PerfLogImp(
     , app_(app)
     , j_(journal)
     , signalStop_(std::move(signalStop))
-    , counters_(methodNames, JobTypes::instance())
+    , counters_(methodNames)
 {
     openLog();
 }
@@ -429,7 +427,7 @@ PerfLogImp::jobStart(JobType const type, Microseconds dur, SteadyTimePoint start
     }
     std::scoped_lock const lock(counters_.jobsMutex);
     if (instance >= 0 && instance < counters_.jobs.size())
-        counters_.jobs[instance] = {type, startTime};
+        counters_.jobs[instance].emplace(type, startTime);
 }
 
 void
@@ -451,7 +449,7 @@ PerfLogImp::jobFinish(JobType const type, Microseconds dur, int instance)
     }
     std::scoped_lock const lock(counters_.jobsMutex);
     if (instance >= 0 && instance < counters_.jobs.size())
-        counters_.jobs[instance] = {JtInvalid, SteadyTimePoint()};
+        counters_.jobs[instance].reset();
 }
 
 void
@@ -459,7 +457,7 @@ PerfLogImp::resizeJobs(int const resize)
 {
     std::scoped_lock const lock(counters_.jobsMutex);
     if (resize > counters_.jobs.size())
-        counters_.jobs.resize(resize, {JtInvalid, SteadyTimePoint()});
+        counters_.jobs.resize(resize);
 }
 
 void

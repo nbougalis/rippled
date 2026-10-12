@@ -148,7 +148,7 @@ GRPCServerImpl::CallData<Request, Response>::process()
     // is returned as a tag in handleRpcs(), after sending the response
     finished_ = true;
     auto const coro = app_.getJobQueue().postCoro(
-        JobType::JtRpc, "gRPC-Client", [thisShared](std::shared_ptr<JobQueue::Coro> coro) {
+        JobType::Rpc, "gRPC-Client", [thisShared](std::shared_ptr<JobQueue::Coro> coro) {
             thisShared->process(coro);
         });
 
