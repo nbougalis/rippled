@@ -296,7 +296,7 @@ findPathsRequest(
 
     json::Value result;
     Gate g;
-    app.getJobQueue().postCoro(JtClient, "RPC-Client", [&](auto const& coro) {
+    app.getJobQueue().postCoro(JobType::Client, "RPC-Client", [&](auto const& coro) {
         context.params = std::move(params);
         context.coro = coro;
         rpc::doCommand(context, result);

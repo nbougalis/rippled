@@ -1406,7 +1406,7 @@ LedgerMaster::tryAdvance()
     if (!advanceThread_ && !validLedger_.empty())
     {
         advanceThread_ = true;
-        app_.getJobQueue().addJob(JtAdvance, "AdvanceLedger", [this] {
+        app_.getJobQueue().addJob(JobType::Advance, "AdvanceLedger", [this] {
             std::unique_lock sl(mutex_);
 
             XRPL_ASSERT(
@@ -1573,7 +1573,7 @@ LedgerMaster::newPFWork(char const* name, std::unique_lock<std::recursive_mutex>
     if (!app_.isStopping() && pathFindThread_ < 2 && app_.getPathRequestManager().requestsPending())
     {
         JLOG(journal_.debug()) << "newPFWork: Creating job. path find threads: " << pathFindThread_;
-        if (app_.getJobQueue().addJob(JtUpdatePf, name, [this] { updatePaths(); }))
+        if (app_.getJobQueue().addJob(JobType::UpdatePf, name, [this] { updatePaths(); }))
         {
             ++pathFindThread_;
         }
@@ -1912,7 +1912,7 @@ LedgerMaster::fetchForHistory(
                     fillInProgress_ = seq;
                 }
                 app_.getJobQueue().addJob(
-                    JtAdvance, "TryFill", [this, ledger] { tryFill(ledger); });
+                    JobType::Advance, "TryFill", [this, ledger] { tryFill(ledger); });
             }
             progress = true;
         }
@@ -1970,7 +1970,7 @@ LedgerMaster::doAdvance(std::unique_lock<std::recursive_mutex>& sl)
         if (pubLedgers.empty())
         {
             if (!standalone_ && !app_.getFeeTrack().isLoadedLocal() &&
-                (app_.getJobQueue().getJobCount(JtPuboldledger) < 10) &&
+                (app_.getJobQueue().getJobCount(JobType::PublishOldLedger) < 10) &&
                 (validLedgerSeq_ == pubLedgerSeq_) &&
                 (getValidatedLedgerAge() < kMaxLedgerAgeAcquire) &&
                 (app_.getNodeStore().getWriteLoad() < kMaxWriteLoadAcquire))
@@ -2071,7 +2071,7 @@ LedgerMaster::gotFetchPack(bool progress, std::uint32_t seq)
 {
     if (!gotFetchPackThread_.test_and_set(std::memory_order_acquire))
     {
-        app_.getJobQueue().addJob(JtLedgerData, "GotFetchPack", [&] {
+        app_.getJobQueue().addJob(JobType::LedgerData, "GotFetchPack", [&] {
             app_.getInboundLedgers().gotFetchPack();
             gotFetchPackThread_.clear(std::memory_order_release);
         });

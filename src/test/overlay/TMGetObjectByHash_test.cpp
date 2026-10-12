@@ -33,7 +33,7 @@ using namespace jtx;
 class TMGetObjectByHash_test : public beast::unit_test::Suite
 {
     /**
-     * Calls the JtLedgerReq-dispatched processor synchronously, so the reply is
+     * Calls the JobType::LedgerReq-dispatched processor synchronously, so the reply is
      * visible through `sent()`.
      */
     class GetObjectPeer : public CapturePeer
