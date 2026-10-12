@@ -64,7 +64,7 @@ public:
 
         Gate g1, g2;
         std::shared_ptr<JobQueue::Coro> c;
-        env.app().getJobQueue().postCoro(JtClient, "CoroTest", [&](auto const& cr) {
+        env.app().getJobQueue().postCoro(JobType::Client, "CoroTest", [&](auto const& cr) {
             c = cr;
             g1.signal();
             c->yield();
@@ -90,7 +90,7 @@ public:
         }));
 
         Gate g;
-        env.app().getJobQueue().postCoro(JtClient, "CoroTest", [&](auto const& c) {
+        env.app().getJobQueue().postCoro(JobType::Client, "CoroTest", [&](auto const& c) {
             c->post();
             c->yield();
             g.signal();
@@ -109,14 +109,17 @@ public:
 
         auto& jq = env.app().getJobQueue();
 
-        static int const kN = 4;
-        std::array<std::shared_ptr<JobQueue::Coro>, kN> a;
+        // The test assumes that all the threads and coroutines it launches
+        // all run in a single thread.
+        BEAST_EXPECT(jq.threadCount() == 1);
+
+        std::array<std::shared_ptr<JobQueue::Coro>, 4> a;
 
         LocalValue<int> lv(-1);
         BEAST_EXPECT(*lv == -1);
 
         Gate g;
-        jq.addJob(JtClient, "LocalValTest", [&] {
+        jq.addJob(JobType::Client, "LocalValTest", [&] {
             this->BEAST_EXPECT(*lv == -1);
             *lv = -2;
             this->BEAST_EXPECT(*lv == -2);
@@ -125,9 +128,9 @@ public:
         BEAST_EXPECT(g.waitFor(5s));
         BEAST_EXPECT(*lv == -1);
 
-        for (int i = 0; i < kN; ++i)
+        for (int i = 0; i < a.size(); ++i)
         {
-            jq.postCoro(JtClient, "CoroTest", [&, id = i](auto const& c) {
+            jq.postCoro(JobType::Client, "CoroTest", [&, id = i](auto const& c) {
                 a[id] = c;
                 g.signal();
                 c->yield();
@@ -155,7 +158,7 @@ public:
             c->join();
         }
 
-        jq.addJob(JtClient, "LocalValTest", [&] {
+        jq.addJob(JobType::Client, "LocalValTest", [&] {
             this->BEAST_EXPECT(*lv == -2);
             g.signal();
         });

@@ -115,7 +115,7 @@ fillHandler(JsonContext& context, Handler const*& result)
     if (!isUnlimited(context.role))
     {
         // Count all jobs at jtCLIENT priority or higher.
-        int const jobCount = context.app.getJobQueue().getJobCountGE(JtClient);
+        int const jobCount = context.app.getJobQueue().getJobCountGE(JobType::Client);
         if (jobCount > tuning::kMaxJobQueueClients)
         {
             JLOG(context.j.debug()) << "Too busy for command: " << jobCount;
@@ -164,8 +164,8 @@ callMethod(JsonContext& context, Handler::Method method, std::string_view name, 
     try
     {
         perfLog.rpcStart(name, curId);
-        auto const v =
-            context.app.getJobQueue().makeLoadEvent(JtGeneric, std::string{"cmd:"}.append(name));
+        auto const v = context.app.getJobQueue().createLoadEvent(
+            JobType::Generic, std::string{"cmd:"}.append(name));
 
         auto const start = std::chrono::system_clock::now();
         auto ret = method(context, result);

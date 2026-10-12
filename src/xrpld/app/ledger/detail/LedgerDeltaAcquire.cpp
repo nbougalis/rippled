@@ -44,11 +44,9 @@ LedgerDeltaAcquire::LedgerDeltaAcquire(
           app,
           ledgerHash,
           ledger_replay_parameters::kSubTaskTimeout,
-          {
-              .jobType = JtReplayTask,
-              .jobName = "LedReplDelta",
-              .jobLimit = ledger_replay_parameters::kMaxQueuedTasks,
-          },
+          {.jobType = JobType::ReplayTask,
+           .jobName = "LedReplDelta",
+           .jobLimit = ledger_replay_parameters::kMaxQueuedTasks},
           app.getJournal("LedgerReplayDelta"))
     , inboundLedgers_(inboundLedgers)
     , ledgerSeq_(ledgerSeq)
@@ -236,8 +234,8 @@ LedgerDeltaAcquire::onLedgerBuilt(ScopedLockType& sl, std::optional<InboundLedge
         firstTime = false;
     }
     app_.getJobQueue().addJob(
-        JtReplayTask, "OnLedBuilt", [=, ledger = this->fullLedger_, &app = this->app_] {
-            for (auto const reason : reasons)
+        JobType::ReplayTask, "OnLedBuilt", [=, ledger = this->fullLedger_, &app = this->app_] {
+            for (auto reason : reasons)
             {
                 switch (reason)
                 {

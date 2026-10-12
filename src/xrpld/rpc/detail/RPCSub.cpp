@@ -96,8 +96,8 @@ public:
             // Start a sending thread.
             JLOG(j_.info()) << "rpc_call::fromNetwork start";
 
-            sending_ =
-                jobQueue_.addJob(JtClientSubscribe, "RPCSubSendThr", [this] { sendThread(); });
+            sending_ = jobQueue_.addJob(
+                JobType::ClientSubscribe, "RPCSubSendThr", [this] { sendThread(); });
         }
     }
 

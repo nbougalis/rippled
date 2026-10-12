@@ -203,7 +203,7 @@ private:
     std::optional<UInt256> domain_;
 
     std::shared_ptr<ReadView const> ledger_;
-    std::unique_ptr<LoadEvent> loadEvent_;
+    std::optional<LoadEvent> loadEvent_;
     std::shared_ptr<AssetCache> rLCache_;
 
     STPathElement source_;
