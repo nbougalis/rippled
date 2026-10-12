@@ -1,5 +1,6 @@
 #include <test/jtx/Env.h>
 
+#include <xrpl/basics/contract.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
@@ -29,21 +30,15 @@ class JobQueue_test : public beast::unit_test::Suite
             while (!jobRan)
                 ;
         }
-        {
-            // If the JobQueue is stopped, we should no
-            // longer be able to add Jobs (and calling addJob() should
-            // return false).
-            using namespace std::chrono_literals;
-            jQueue.stop();
 
-            // The Job should never run, so having the Job access this
-            // unprotected variable on the stack should be completely safe.
-            // Not recommended for the faint of heart...
-            bool unprotected = false;
-            BEAST_EXPECT(jQueue.addJob(JtClient, "JobAddTest2", [&unprotected]() {
-                unprotected = false;
-            }) == false);
-        }
+        // If the JobQueue is stopped or in the process of stopping, attempting
+        // to add a job should fail (and calling addJob() should return false).
+        jQueue.stop();
+        BEAST_EXPECT(jQueue.isStopping());
+
+        BEAST_EXPECT(jQueue.addJob(JtClient, "JobAddTest2", []() {
+            logicError("Unscheduled job improperly invoked!");
+        }) == false);
     }
 
     void
@@ -111,23 +106,17 @@ class JobQueue_test : public beast::unit_test::Suite
             }
             BEAST_EXPECT(yieldCount == 4);
         }
-        {
-            // If the JobQueue is stopped, we should no
-            // longer be able to add a Coro (and calling postCoro() should
-            // return false).
-            using namespace std::chrono_literals;
-            jQueue.stop();
 
-            // The Coro should never run, so having the Coro access this
-            // unprotected variable on the stack should be completely safe.
-            // Not recommended for the faint of heart...
-            bool unprotected = false;
-            auto const coro = jQueue.postCoro(
-                JtClient, "PostCoroTest3", [&unprotected](std::shared_ptr<JobQueue::Coro> const&) {
-                    unprotected = false;
-                });
-            BEAST_EXPECT(coro == nullptr);
-        }
+        // If the JobQueue is stopped or in the process of stopping, attempting
+        // to schedule a coroutine should fail.
+        jQueue.stop();
+        BEAST_EXPECT(jQueue.isStopping());
+
+        auto const coro =
+            jQueue.postCoro(JtClient, "PostCoroTest3", [](std::shared_ptr<JobQueue::Coro> const&) {
+                logicError("Unscheduled coroutine improperly invoked!");
+            });
+        BEAST_EXPECT(coro == nullptr);
     }
 
 public:

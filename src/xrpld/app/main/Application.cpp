@@ -331,11 +331,11 @@ public:
               logs_->journal("Collector")))
         , jobQueue_(
               std::make_unique<JobQueue>(
-                  [](std::unique_ptr<Config> const& config) {
+                  [](std::unique_ptr<Config> const& config) -> std::size_t {
                       if (config->standalone() && !config->forceMultiThread)
                           return 1;
 
-                      if (config->workers)
+                      if (config->workers != 0)
                           return config->workers;
 
                       auto count = static_cast<int>(std::thread::hardware_concurrency());
@@ -356,7 +356,7 @@ public:
                           count = 2 + std::min(count, 4);
                       }
 
-                      return count;
+                      return static_cast<std::size_t>(count);
                   }(config_),
                   collectorManager_->group("jobq"),
                   logs_->journal("JobQueue"),
