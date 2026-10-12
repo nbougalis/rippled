@@ -287,10 +287,10 @@ struct ConsensusResult
     using NodeIDT = Traits::NodeIDT;
 
     using TxT = TxSetT::Tx;
-    using ProposalT = ConsensusProposal<NodeIDT, typename LedgerT::ID, typename TxSetT::ID>;
+    using TrustedProposal = ConsensusProposal<NodeIDT, typename LedgerT::ID, typename TxSetT::ID>;
     using DisputeT = DisputedTx<TxT, NodeIDT>;
 
-    ConsensusResult(TxSetT&& s, ProposalT&& p) : txns{std::move(s)}, position{std::move(p)}
+    ConsensusResult(TxSetT&& s, TrustedProposal&& p) : txns{std::move(s)}, position{std::move(p)}
     {
         XRPL_ASSERT(txns.id() == position.position(), "xrpl::ConsensusResult : valid inputs");
     }
@@ -303,7 +303,7 @@ struct ConsensusResult
     /**
      * Our proposed position on transactions/close time
      */
-    ProposalT position;
+    TrustedProposal position;
 
     /**
      * Transactions which are under dispute with our peers

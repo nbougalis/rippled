@@ -1048,7 +1048,7 @@ PeerImp::onMessageBegin(
     bool isCompressed)
 {
     auto const name = protocolMessageName(type);
-    loadEvent_ = app_.getJobQueue().makeLoadEvent(JtPeer, name);
+    loadEvent_ = app_.getJobQueue().createLoadEvent(JobType::Peer, name);
     fee_ = {.fee = resource::kFeeTrivialPeer, .context = name};
 
     auto const category = TrafficCount::attribute(
@@ -1104,9 +1104,10 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMManifests> const& m)
     // OverlayImpl::onManifests bounds the untrusted work and charges the fee
     // if the untrusted count exceeds the per-message cap; trusted manifests
     // are always processed and not counted against it.
-    app_.getJobQueue().addJob(JtManifest, "RcvManifests", [this, that = shared_from_this(), m] {
-        overlay_.onManifests(m, that);
-    });
+    app_.getJobQueue().addJob(
+        JobType::Manifest, "RcvManifests", [this, that = shared_from_this(), m] {
+            overlay_.onManifests(m, that);
+        });
 }
 
 void
@@ -1388,7 +1389,8 @@ PeerImp::handleTransaction(
         {
             JLOG(pJournal_.trace()) << "No new transactions until synchronized";
         }
-        else if (app_.getJobQueue().getJobCount(JtTransaction) > app_.config().maxTransactions)
+        else if (
+            app_.getJobQueue().getJobCount(JobType::Transaction) > app_.config().maxTransactions)
         {
             overlay_.incJqTransOverflow();
             JLOG(pJournal_.info()) << "Transaction queue is full";
@@ -1396,7 +1398,7 @@ PeerImp::handleTransaction(
         else
         {
             app_.getJobQueue().addJob(
-                JtTransaction,
+                JobType::Transaction,
                 "RcvCheckTx",
                 [weak = std::weak_ptr<PeerImp>(shared_from_this()),
                  flags,
@@ -1522,58 +1524,59 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMGetLedger> const& m)
     }
 
     // Queue a job to process the request.
-    app_.getJobQueue().addJob(JtLedgerReq, "RcvGetLedger", [weak = weak_from_this(), m, itype]() {
-        auto peer = weak.lock();
-        if (!peer)
-            return;
+    app_.getJobQueue().addJob(
+        JobType::LedgerReq, "RcvGetLedger", [weak = weak_from_this(), m, itype]() {
+            auto peer = weak.lock();
+            if (!peer)
+                return;
 
-        std::vector<SHAMapNodeID> nodeIDs;
-        bool tooManyNodeIds = false;
-        if (itype != protocol::liBASE)
-        {
-            nodeIDs.reserve(std::min(m->nodeids_size(), tuning::kSoftMaxReplyNodes));
-            for (auto const& nodeId : m->nodeids())
+            std::vector<SHAMapNodeID> nodeIDs;
+            bool tooManyNodeIds = false;
+            if (itype != protocol::liBASE)
             {
-                if (nodeIDs.size() >= tuning::kSoftMaxReplyNodes)
+                nodeIDs.reserve(std::min(m->nodeids_size(), tuning::kSoftMaxReplyNodes));
+                for (auto const& nodeId : m->nodeids())
                 {
-                    // The peer requested too many node IDs. Continue processing the received
-                    // node IDs up to the limit. If the request is legitimate then at least they
-                    // will get a response and won't have to resend these nodes in their next
-                    // request.
-                    tooManyNodeIds = true;
-                    break;
+                    if (nodeIDs.size() >= tuning::kSoftMaxReplyNodes)
+                    {
+                        // The peer requested too many node IDs. Continue processing the received
+                        // node IDs up to the limit. If the request is legitimate then at least they
+                        // will get a response and won't have to resend these nodes in their next
+                        // request.
+                        tooManyNodeIds = true;
+                        break;
+                    }
+                    auto parsed = deserializeSHAMapNodeID(nodeId);
+                    if (!parsed)
+                    {
+                        peer->charge(resource::kFeeInvalidData, "TMGetLedger: Invalid node ID");
+                        return;
+                    }
+                    nodeIDs.push_back(std::move(*parsed));
                 }
-                auto parsed = deserializeSHAMapNodeID(nodeId);
-                if (!parsed)
-                {
-                    peer->charge(resource::kFeeInvalidData, "TMGetLedger: Invalid node ID");
-                    return;
-                }
-                nodeIDs.push_back(std::move(*parsed));
             }
-        }
 
-        // These are two distinct infractions and are charged independently: requesting too many
-        // node IDs is charged even for a relay response, while the base "get ledger request"
-        // charge below is skipped for relay responses.
-        if (tooManyNodeIds)
-        {
-            peer->charge(resource::kFeeModerateBurdenPeer, "TMGetLedger: too many node IDs");
+            // These are two distinct infractions and are charged independently: requesting too many
+            // node IDs is charged even for a relay response, while the base "get ledger request"
+            // charge below is skipped for relay responses.
+            if (tooManyNodeIds)
+            {
+                peer->charge(resource::kFeeModerateBurdenPeer, "TMGetLedger: too many node IDs");
 
-            // Truncate the request to what was actually parsed and charged for, so that if this
-            // request ends up being relayed to another peer, we don't forward the oversized
-            // list.
-            m->mutable_nodeids()->DeleteSubrange(
-                static_cast<int>(nodeIDs.size()),
-                m->nodeids_size() - static_cast<int>(nodeIDs.size()));
-        }
-        if (!m->has_requestcookie())
-        {
-            peer->charge(resource::kFeeModerateBurdenPeer, "TMGetLedger: get ledger request");
-        }
+                // Truncate the request to what was actually parsed and charged for, so that if this
+                // request ends up being relayed to another peer, we don't forward the oversized
+                // list.
+                m->mutable_nodeids()->DeleteSubrange(
+                    static_cast<int>(nodeIDs.size()),
+                    m->nodeids_size() - static_cast<int>(nodeIDs.size()));
+            }
+            if (!m->has_requestcookie())
+            {
+                peer->charge(resource::kFeeModerateBurdenPeer, "TMGetLedger: get ledger request");
+            }
 
-        peer->processLedgerRequest(m, std::move(nodeIDs));
-    });
+            peer->processLedgerRequest(m, std::move(nodeIDs));
+        });
 }
 
 void
@@ -1588,8 +1591,8 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMProofPathRequest> const& m)
 
     fee_.update(resource::kFeeModerateBurdenPeer, "received a proof path request");
     std::weak_ptr<PeerImp> const weak = shared_from_this();
-    app_.getJobQueue().addJob(JtReplayReq, "RcvProofPReq", [weak, m] {
-        if (auto const peer = weak.lock())
+    app_.getJobQueue().addJob(JobType::ReplayReq, "RcvProofPReq", [weak, m] {
+        if (auto peer = weak.lock())
         {
             auto const reply = peer->ledgerReplayMsgHandler_.processProofPathRequest(m);
             if (reply.has_error())
@@ -1645,8 +1648,8 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMReplayDeltaRequest> const& m)
 
     fee_.fee = resource::kFeeModerateBurdenPeer;
     std::weak_ptr<PeerImp> const weak = shared_from_this();
-    app_.getJobQueue().addJob(JtReplayReq, "RcvReplDReq", [weak, m] {
-        if (auto const peer = weak.lock())
+    app_.getJobQueue().addJob(JobType::ReplayReq, "RcvReplDReq", [weak, m] {
+        if (auto peer = weak.lock())
         {
             auto const reply = peer->ledgerReplayMsgHandler_.processReplayDeltaRequest(m);
             if (reply.has_error())
@@ -1867,8 +1870,8 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMLedgerData> const& m)
     if (m->type() == protocol::liTS_CANDIDATE)
     {
         app_.getJobQueue().addJob(
-            JtTxnData, "RcvPeerData", [weak = weak_from_this(), hash = *ledgerHash, m]() {
-                if (auto const peer = weak.lock())
+            JobType::TxnData, "RcvPeerData", [weak = weak_from_this(), hash = *ledgerHash, m] {
+                if (auto peer = weak.lock())
                     peer->app_.getInboundTransactions().gotData(hash, peer, m);
             });
         return;
@@ -1976,7 +1979,7 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMProposeSet> const& m)
             calcNodeID(app_.getValidatorManifests().getMasterKey(publicKey))});
 
     app_.getJobQueue().addJob(
-        isTrusted ? JtProposalT : JtProposalUt,
+        isTrusted ? JobType::TrustedProposal : JobType::UntrustedProposal,
         "checkPropose",
         [weak = weak_from_this(), isTrusted, m, proposal]() {
             if (auto const peer = weak.lock())
@@ -2531,8 +2534,10 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMValidation> const& m)
 
             std::weak_ptr<PeerImp> const weak = shared_from_this();
             app_.getJobQueue().addJob(
-                isTrusted ? JtValidationT : JtValidationUt, name, [weak, val, m, key] {
-                    if (auto const peer = weak.lock())
+                isTrusted ? JobType::TrustedValidation : JobType::UntrustedValidation,
+                name,
+                [weak, val, m, key] {
+                    if (auto peer = weak.lock())
                         peer->checkValidation(val, key, m);
                 });
         }
@@ -2582,8 +2587,8 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMGetObjectByHash> const& m)
             }
 
             std::weak_ptr<PeerImp> const weak = shared_from_this();
-            app_.getJobQueue().addJob(JtRequestedTxn, "DoTxs", [weak, m] {
-                if (auto const peer = weak.lock())
+            app_.getJobQueue().addJob(JobType::RequestedTxn, "DoTxs", [weak, m] {
+                if (auto peer = weak.lock())
                     peer->doTransactions(m);
             });
             return;
@@ -2615,23 +2620,24 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMGetObjectByHash> const& m)
         // I/O strand and onto the bounded job queue, mirroring the pattern
         // used by processLedgerRequest.
         std::weak_ptr<PeerImp> const weak = shared_from_this();
-        bool const queued = app_.getJobQueue().addJob(JtLedgerReq, "RcvGetObjByHash", [weak, m] {
-            auto const peer = weak.lock();
-            if (!peer)
-                return;
-            try
-            {
-                peer->processGetObjectByHash(m);
-            }
-            catch (std::exception const& e)
-            {
-                // Surface backend failures (NodeStore I/O, allocation)
-                // back through the resource model so a misbehaving peer
-                // is still accountable rather than silently dropped.
-                JLOG(peer->pJournal_.warn()) << "GetObj: handler threw: " << e.what();
-                peer->charge(resource::kFeeRequestNoReply, "get object handler exception");
-            }
-        });
+        bool const queued =
+            app_.getJobQueue().addJob(JobType::LedgerReq, "RcvGetObjByHash", [weak, m] {
+                auto peer = weak.lock();
+                if (!peer)
+                    return;
+                try
+                {
+                    peer->processGetObjectByHash(m);
+                }
+                catch (std::exception const& e)
+                {
+                    // Surface backend failures (NodeStore I/O, allocation)
+                    // back through the resource model so a misbehaving peer
+                    // is still accountable rather than silently dropped.
+                    JLOG(peer->pJournal_.warn()) << "GetObj: handler threw: " << e.what();
+                    peer->charge(resource::kFeeRequestNoReply, "get object handler exception");
+                }
+            });
         if (!queued)
         {
             // The JobQueue is no longer accepting new work (typically
@@ -2772,8 +2778,8 @@ PeerImp::onMessage(std::shared_ptr<protocol::TMHaveTransactions> const& m)
     }
 
     std::weak_ptr<PeerImp> const weak = shared_from_this();
-    app_.getJobQueue().addJob(JtMissingTxn, "HandleHaveTxs", [weak, m] {
-        if (auto const peer = weak.lock())
+    app_.getJobQueue().addJob(JobType::MissingTxn, "HandleHaveTxs", [weak, m] {
+        if (auto peer = weak.lock())
             peer->handleHaveTransactions(m);
     });
 }
@@ -2920,7 +2926,7 @@ PeerImp::doFetchPack(std::shared_ptr<protocol::TMGetObjectByHash> const& packet)
     // have some queued.
     if (app_.getFeeTrack().isLoadedLocal() ||
         (app_.getLedgerMaster().getValidatedLedgerAge() > 40s) ||
-        (app_.getJobQueue().getJobCount(JtPack) > 10))
+        (app_.getJobQueue().getJobCount(JobType::Pack) > 10))
     {
         JLOG(pJournal_.info()) << "Too busy to make fetch pack";
         return;
@@ -2938,7 +2944,7 @@ PeerImp::doFetchPack(std::shared_ptr<protocol::TMGetObjectByHash> const& packet)
     fee_.fee = resource::kFeeHeavyBurdenPeer;
 
     app_.getJobQueue().addJob(
-        JtPack,
+        JobType::Pack,
         "MakeFetchPack",
         [weak = weak_from_this(), app = &app_, packet, hash = *hash, elapsed = UptimeClock::now()] {
             app->getLedgerMaster().makeFetchPack(weak, packet, hash, elapsed);

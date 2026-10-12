@@ -1212,7 +1212,10 @@ NetworkOPsImp::setHeartbeatTimer()
     setTimer(
         heartbeatTimer_,
         consensus_.parms().ledgerGRANULARITY,
-        [this] { jobQueue_.addJob(JtNetopTimer, "NetHeart", [this] { processHeartbeatTimer(); }); },
+        [this] {
+            jobQueue_.addJob(
+                JobType::NetopTimer, "NetHeart", [this]() { processHeartbeatTimer(); });
+        },
         [this] { setHeartbeatTimer(); });
 }
 
@@ -1225,7 +1228,8 @@ NetworkOPsImp::setClusterTimer()
         clusterTimer_,
         10s,
         [this] {
-            jobQueue_.addJob(JtNetopCluster, "NetCluster", [this] { processClusterTimer(); });
+            jobQueue_.addJob(
+                JobType::NetopCluster, "NetCluster", [this]() { processClusterTimer(); });
         },
         [this] { setClusterTimer(); });
 }
@@ -1442,7 +1446,7 @@ NetworkOPsImp::submitTransaction(std::shared_ptr<STTx const> const& iTrans)
 
     auto const tx = std::make_shared<Transaction>(trans, reason, registry_.get().getApp());
 
-    jobQueue_.addJob(JtTransaction, "SubmitTxn", [this, tx] {
+    jobQueue_.addJob(JobType::Transaction, "SubmitTxn", [this, tx] {
         auto t = tx;
         processTransaction(t, false, false, FailHard::No);
     });
@@ -1521,7 +1525,7 @@ NetworkOPsImp::processTransaction(
     bool bLocal,
     FailHard failType)
 {
-    auto const ev = jobQueue_.makeLoadEvent(JtTxnProc, "ProcessTXN");
+    auto const ev = jobQueue_.createLoadEvent(JobType::TxnProc, "ProcessTXN");
 
     // preProcessTransaction can change our pointer
     if (!preProcessTransaction(transaction))
@@ -1553,7 +1557,7 @@ NetworkOPsImp::doTransactionAsync(
 
     if (dispatchState_ == DispatchState::None)
     {
-        if (jobQueue_.addJob(JtBatch, "TxBatchAsync", [this] { transactionBatch(); }))
+        if (jobQueue_.addJob(JobType::Batch, "TxBatchAsync", [this] { transactionBatch(); }))
         {
             dispatchState_ = DispatchState::Scheduled;
         }
@@ -1598,7 +1602,7 @@ NetworkOPsImp::doTransactionSyncBatch(
             if (!transactions_.empty())
             {
                 // More transactions need to be applied, but by another job.
-                if (jobQueue_.addJob(JtBatch, "TxBatchSync", [this] { transactionBatch(); }))
+                if (jobQueue_.addJob(JobType::Batch, "TxBatchSync", [this] { transactionBatch(); }))
                 {
                     dispatchState_ = DispatchState::Scheduled;
                 }
@@ -1610,7 +1614,7 @@ NetworkOPsImp::doTransactionSyncBatch(
 void
 NetworkOPsImp::processTransactionSet(CanonicalTXSet const& set)
 {
-    auto const ev = jobQueue_.makeLoadEvent(JtTxnProc, "ProcessTXNSet");
+    auto const ev = jobQueue_.createLoadEvent(JobType::TxnProc, "ProcessTXNSet");
     std::vector<std::shared_ptr<Transaction>> candidates;
     candidates.reserve(set.size());
     for (auto const& [_, tx] : set)
@@ -3487,14 +3491,14 @@ NetworkOPsImp::reportFeeChange()
     // only schedule the job if something has changed
     if (f != lastFeeSummary_)
     {
-        jobQueue_.addJob(JtClientFeeChange, "PubFee", [this] { pubServer(); });
+        jobQueue_.addJob(JobType::ClientFeeChange, "PubFee", [this] { pubServer(); });
     }
 }
 
 void
 NetworkOPsImp::reportConsensusStateChange(ConsensusPhase phase)
 {
-    jobQueue_.addJob(JtClientConsensus, "PubCons", [this, phase] { pubConsensus(phase); });
+    jobQueue_.addJob(JobType::ClientConsensus, "PubCons", [this, phase] { pubConsensus(phase); });
 }
 
 inline void
@@ -4157,7 +4161,7 @@ NetworkOPsImp::scheduleAccountCleanup(
     // destroyed wholesale and no publish path can run, so dropping the cleanup
     // is harmless; no inline fallback is needed.
     jobQueue_.addJob(
-        JtClientAcctHist,
+        JobType::ClientAcctHist,
         "SubCleanup",
         [this,
          seq,
@@ -4306,7 +4310,7 @@ NetworkOPsImp::unsubMPTInternal(std::uint64_t uSeq, MPTID const& mptID)
 void
 NetworkOPsImp::addAccountHistoryJob(SubAccountHistoryInfoWeak subInfo)
 {
-    registry_.get().getJobQueue().addJob(JtClientAcctHist, "HistTxStream", [this, subInfo] {
+    registry_.get().getJobQueue().addJob(JobType::ClientAcctHist, "HistTxStream", [this, subInfo] {
         auto const& accountId = subInfo.index->accountId;
         auto& lastLedgerSeq = subInfo.index->historyLastLedgerSeq;
         auto& txHistoryIndex = subInfo.index->historyTxIndex;

@@ -144,7 +144,7 @@ public:
         numSrc.reserve(rpc::tuning::kMaxSrcCur);
         for (std::uint8_t i = 0; i < rpc::tuning::kMaxSrcCur; ++i)
             numSrc.push_back(makeMptID(i, bob));
-        app.getJobQueue().postCoro(JtClient, "RPC-Client", [&](auto const& coro) {
+        app.getJobQueue().postCoro(JobType::Client, "RPC-Client", [&](auto const& coro) {
             context.params = xrpl::test::detail::rpf(alice, bob, usd, numSrc);
             context.coro = coro;
             rpc::doCommand(context, result);
@@ -155,7 +155,7 @@ public:
 
         // Test more than rpc::tuning::max_src_cur source currencies.
         numSrc.push_back(makeMptID(rpc::tuning::kMaxSrcCur, bob));
-        app.getJobQueue().postCoro(JtClient, "RPC-Client", [&](auto const& coro) {
+        app.getJobQueue().postCoro(JobType::Client, "RPC-Client", [&](auto const& coro) {
             context.params = xrpl::test::detail::rpf(alice, bob, usd, numSrc);
             context.coro = coro;
             rpc::doCommand(context, result);
@@ -171,7 +171,7 @@ public:
             auto const curm = MPTTester({.env = env, .issuer = alice, .holders = {bob}});
             numSrc.push_back(curm.issuanceID());
         }
-        app.getJobQueue().postCoro(JtClient, "RPC-Client", [&](auto const& coro) {
+        app.getJobQueue().postCoro(JobType::Client, "RPC-Client", [&](auto const& coro) {
             context.params = xrpl::test::detail::rpf(alice, bob, usd, {});
             context.coro = coro;
             rpc::doCommand(context, result);
@@ -182,7 +182,7 @@ public:
 
         // Test more than rpc::tuning::max_auto_src_cur source currencies.
         auto const curm = MPTTester({.env = env, .issuer = alice, .holders = {bob}});
-        app.getJobQueue().postCoro(JtClient, "RPC-Client", [&](auto const& coro) {
+        app.getJobQueue().postCoro(JobType::Client, "RPC-Client", [&](auto const& coro) {
             context.params = xrpl::test::detail::rpf(alice, bob, usd, {});
             context.coro = coro;
             rpc::doCommand(context, result);

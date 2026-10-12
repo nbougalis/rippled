@@ -54,7 +54,7 @@ ConsensusTransSetSF::gotNode(
             XRPL_ASSERT(
                 stx->getTransactionID() == nodeHash.asUInt256(),
                 "xrpl::ConsensusTransSetSF::gotNode : transaction hash match");
-            app_.getJobQueue().addJob(JtTransaction, "TxsToTxn", [pap = &app_, stx]() {
+            app_.getJobQueue().addJob(JobType::Transaction, "TxsToTxn", [pap = &app_, stx]() {
                 pap->getOPs().submitTransaction(stx);
             });
         }
