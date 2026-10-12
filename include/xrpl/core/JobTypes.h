@@ -1,170 +1,149 @@
 #pragma once
 
-#include <xrpl/beast/utility/instrumentation.h>
+#include <xrpl/basics/EnumArray.h>
 #include <xrpl/core/Job.h>
-#include <xrpl/core/JobTypeInfo.h>
 
+#include <array>
+#include <chrono>
+#include <cstddef>
 #include <limits>
-#include <map>
-#include <string>
-#include <tuple>
+#include <optional>
+#include <string_view>
+#include <type_traits>
 #include <utility>
 
 namespace xrpl {
 
-class JobTypes
+/**
+ * Defines the fixed attributes of a particular type of job.
+ *
+ * These attributes are defined at compile time and never change. They
+ * include things like the name of the job, the limit of concurrent jobs
+ * of this type, etc.
+ */
+struct JobTypeInfo
 {
-public:
-    using Map = std::map<JobType, JobTypeInfo>;
-    using const_iterator = Map::const_iterator;
+    JobType const type;
 
-private:
-    JobTypes()
-        : unknown(
-              JtInvalid,
-              "invalid",
-              0,
-              std::chrono::milliseconds{0},
-              std::chrono::milliseconds{0})
+    /**
+     * The job's display name
+     */
+    std::string_view const name;
+
+    /**
+     * The limit on the number of running jobs for this job type.
+     *
+     * A limit of 0 marks this as a "special job" which is not
+     * dispatched via the job queue.
+     */
+    int const limit;
+
+    /**
+     * Average and peak latencies for this job type, if relevant.
+     */
+    /** @{ */
+    std::optional<std::chrono::milliseconds> const averageLatency;
+    std::optional<std::chrono::milliseconds> const peakLatency;
+    /** @} */
+
+    // Not default constructible
+    JobTypeInfo() = delete;
+
+    constexpr JobTypeInfo(
+        JobType type,
+        std::string_view name,
+        int limit,
+        std::optional<std::chrono::milliseconds> averageLatency = {},
+        std::optional<std::chrono::milliseconds> peakLatency = {})
+        : type(type)
+        , name(name)
+        , limit(limit)
+        , averageLatency(averageLatency)
+        , peakLatency(peakLatency)
     {
-        using namespace std::chrono_literals;
-        int const maxLimit = std::numeric_limits<int>::max();
-
-        auto const add = [this](
-                             JobType jt,
-                             std::string name,
-                             int limit,
-                             std::chrono::milliseconds avgLatency,
-                             std::chrono::milliseconds peakLatency) {
-            XRPL_ASSERT(!map.contains(jt), "xrpl::JobTypes::JobTypes::add : unique job type input");
-
-            [[maybe_unused]] auto const inserted =
-                map.emplace(
-                       std::piecewise_construct,
-                       std::forward_as_tuple(jt),
-                       std::forward_as_tuple(jt, name, limit, avgLatency, peakLatency))
-                    .second;
-
-            XRPL_ASSERT(inserted == true, "xrpl::JobTypes::JobTypes::add : input is inserted");
-        };
-
-        // clang-format off
-        //                                                           avg     peak
-        //  JobType               name                    limit    latency  latency
-        add(JtPack,              "makeFetchPack",               1,     0ms,     0ms);
-        add(JtPuboldledger,      "publishAcqLedger",            2, 10000ms, 15000ms);
-        add(JtValidationUt,     "untrustedValidation",  maxLimit,  2000ms,  5000ms);
-        add(JtManifest,          "manifest",             maxLimit,  2000ms,  5000ms);
-        add(JtTransactionL,     "localTransaction",     maxLimit,   100ms,   500ms);
-        add(JtReplayReq,        "ledgerReplayRequest",        10,   250ms,  1000ms);
-        add(JtLedgerReq,        "ledgerRequest",               3,     0ms,     0ms);
-        add(JtProposalUt,       "untrustedProposal",    maxLimit,   500ms,  1250ms);
-        add(JtReplayTask,       "ledgerReplayTask",     maxLimit,     0ms,     0ms);
-        add(JtLedgerData,       "ledgerData",                  3,     0ms,     0ms);
-        add(JtClient,            "clientCommand",        maxLimit,  2000ms,  5000ms);
-        add(JtClientSubscribe,  "clientSubscribe",      maxLimit,  2000ms,  5000ms);
-        add(JtClientFeeChange, "clientFeeChange",      maxLimit,  2000ms,  5000ms);
-        add(JtClientConsensus,  "clientConsensus",      maxLimit,  2000ms,  5000ms);
-        add(JtClientAcctHist,  "clientAccountHistory", maxLimit,  2000ms,  5000ms);
-        add(JtClientRpc,        "clientRPC",            maxLimit,  2000ms,  5000ms);
-        add(JtClientWebsocket,  "clientWebsocket",      maxLimit,  2000ms,  5000ms);
-        add(JtRpc,               "RPC",                  maxLimit,     0ms,     0ms);
-        add(JtUpdatePf,         "updatePaths",                 1,     0ms,     0ms);
-        add(JtTransaction,       "transaction",          maxLimit,   250ms,  1000ms);
-        add(JtBatch,             "batch",                maxLimit,   250ms,  1000ms);
-        add(JtAdvance,           "advanceLedger",        maxLimit,     0ms,     0ms);
-        add(JtPubledger,         "publishNewLedger",     maxLimit,  3000ms,  4500ms);
-        add(JtTxnData,          "fetchTxnData",                5,     0ms,     0ms);
-        add(JtWal,               "writeAhead",           maxLimit,  1000ms,  2500ms);
-        add(JtValidationT,      "trustedValidation",    maxLimit,   500ms,  1500ms);
-        add(JtWrite,             "writeObjects",         maxLimit,  1750ms,  2500ms);
-        add(JtAccept,            "acceptLedger",         maxLimit,     0ms,     0ms);
-        add(JtProposalT,        "trustedProposal",      maxLimit,   100ms,   500ms);
-        add(JtSweep,             "sweep",                       1,     0ms,     0ms);
-        add(JtNetopCluster,     "clusterReport",               1,  9999ms,  9999ms);
-        add(JtNetopTimer,       "heartbeat",                   1,   999ms,   999ms);
-        add(JtAdmin,             "administration",       maxLimit,     0ms,     0ms);
-        add(JtMissingTxn,       "handleHaveTransactions",   1200,     0ms,     0ms);
-        add(JtRequestedTxn,     "doTransactions",           1200,     0ms,     0ms);
-
-        add(JtPeer,              "peerCommand",                 0,   200ms,  2500ms);
-        add(JtDisk,              "diskAccess",                  0,   500ms,  1000ms);
-        add(JtTxnProc,          "processTransaction",          0,     0ms,     0ms);
-        add(JtObSetup,          "orderBookSetup",              0,     0ms,     0ms);
-        add(JtPathFind,         "pathFind",                    0,     0ms,     0ms);
-        add(JtHoRead,           "nodeRead",                    0,     0ms,     0ms);
-        add(JtHoWrite,          "nodeWrite",                   0,     0ms,     0ms);
-        add(JtGeneric,           "generic",                     0,     0ms,     0ms);
-        add(JtNsSyncRead,      "SyncReadNode",                0,     0ms,     0ms);
-        add(JtNsAsyncRead,     "AsyncReadNode",               0,     0ms,     0ms);
-        add(JtNsWrite,          "WriteNode",                   0,     0ms,     0ms);
-        // clang-format on
     }
 
-public:
-    static JobTypes const&
-    instance()
+    [[nodiscard]] constexpr bool
+    special() const
     {
-        static JobTypes const kTypes;
-        return kTypes;
+        return limit == 0;
     }
-
-    static std::string const&
-    name(JobType jt)
-    {
-        return instance().get(jt).name();
-    }
-
-    [[nodiscard]] JobTypeInfo const&
-    get(JobType jt) const
-    {
-        auto const iter = map.find(jt);
-        XRPL_ASSERT(iter != map.end(), "xrpl::JobTypes::get : valid input");
-
-        if (iter != map.end())
-            return iter->second;
-
-        return unknown;
-    }
-
-    [[nodiscard]] JobTypeInfo const&
-    getInvalid() const
-    {
-        return unknown;
-    }
-
-    [[nodiscard]] Map::size_type
-    size() const
-    {
-        return map.size();
-    }
-
-    [[nodiscard]] const_iterator
-    begin() const
-    {
-        return map.cbegin();
-    }
-
-    [[nodiscard]] const_iterator
-    cbegin() const
-    {
-        return map.cbegin();
-    }
-
-    [[nodiscard]] const_iterator
-    end() const
-    {
-        return map.cend();
-    }
-
-    [[nodiscard]] const_iterator
-    cend() const
-    {
-        return map.cend();
-    }
-
-    JobTypeInfo unknown;
-    Map map;
 };
+
+/**
+ * The attributes of every job type, indexed by JobType.
+ */
+inline constexpr auto kJobTypes = [] consteval {
+    using namespace std::chrono_literals;
+
+    constexpr int maxLimit = std::numeric_limits<int>::max();
+
+    constexpr JobTypeInfo jobs[] = {
+        // clang-format off
+        //                                                                   avg     peak
+        // JobType          name                                    limit  latency  latency
+        {JobType::Pack,                "makeFetchPack",                 1                  },
+        {JobType::PublishOldLedger,    "publishAcqLedger",              2, 10000ms, 15000ms},
+        {JobType::Client,              "clientCommand",          maxLimit,  2000ms,  5000ms},
+        {JobType::ClientSubscribe,     "clientSubscribe",        maxLimit,  2000ms,  5000ms},
+        {JobType::ClientFeeChange,     "clientFeeChange",        maxLimit,  2000ms,  5000ms},
+        {JobType::ClientConsensus,     "clientConsensus",        maxLimit,  2000ms,  5000ms},
+        {JobType::ClientAcctHist,      "clientAccountHistory",   maxLimit,  2000ms,  5000ms},
+        {JobType::ClientRpc,           "clientRPC",              maxLimit,  2000ms,  5000ms},
+        {JobType::ClientWebsocket,     "clientWebsocket",        maxLimit,  2000ms,  5000ms},
+        {JobType::Rpc,                 "RPC",                    maxLimit                  },
+        {JobType::Sweep,               "sweep",                         1                  },
+        {JobType::UntrustedValidation, "untrustedValidation",    maxLimit,  2000ms,  5000ms},
+        {JobType::Manifest,            "manifest",               maxLimit,  2000ms,  5000ms},
+        {JobType::UpdatePf,            "updatePaths",                   1                  },
+        {JobType::TransactionL,        "localTransaction",       maxLimit,   100ms,   500ms},
+        {JobType::ReplayReq,           "ledgerReplayRequest",          10,   250ms,  1000ms},
+        {JobType::LedgerReq,           "ledgerRequest",                 3                  },
+        {JobType::UntrustedProposal,   "untrustedProposal",      maxLimit,   500ms,  1250ms},
+        {JobType::ReplayTask,          "ledgerReplayTask",       maxLimit                  },
+        {JobType::Transaction,         "transaction",            maxLimit,   250ms,  1000ms},
+        {JobType::MissingTxn,          "handleHaveTransactions",     1200                  },
+        {JobType::RequestedTxn,        "doTransactions",             1200                  },
+        {JobType::Batch,               "batch",                  maxLimit,   250ms,  1000ms},
+        {JobType::LedgerData,          "ledgerData",                    3                  },
+        {JobType::Advance,             "advanceLedger",          maxLimit                  },
+        {JobType::PublishLedger,       "publishNewLedger",       maxLimit,  3000ms,  4500ms},
+        {JobType::TxnData,             "fetchTxnData",                  5                  },
+        {JobType::WriteAheadLog,       "writeAhead",             maxLimit,  1000ms,  2500ms},
+        {JobType::TrustedValidation,   "trustedValidation",      maxLimit,   500ms,  1500ms},
+        {JobType::Write,               "writeObjects",           maxLimit,  1750ms,  2500ms},
+        {JobType::Accept,              "acceptLedger",           maxLimit                  },
+        {JobType::TrustedProposal,     "trustedProposal",        maxLimit,   100ms,   500ms},
+        {JobType::NetopCluster,        "clusterReport",                 1,  9999ms,  9999ms},
+        {JobType::NetopTimer,          "heartbeat",                     1,   999ms,   999ms},
+        {JobType::Admin,               "administration",         maxLimit                  },
+        {JobType::Peer,                "peerCommand",                   0,   200ms,  2500ms},
+        {JobType::Disk,                "diskAccess",                    0,   500ms,  1000ms},
+        {JobType::TxnProc,             "processTransaction",            0                  },
+        {JobType::ObSetup,             "orderBookSetup",                0                  },
+        {JobType::PathFind,            "pathFind",                      0                  },
+        {JobType::HoRead,              "nodeRead",                      0                  },
+        {JobType::HoWrite,             "nodeWrite",                     0                  },
+        {JobType::Generic,             "generic",                       0                  },
+        {JobType::NsSyncRead,          "SyncReadNode",                  0                  },
+        {JobType::NsAsyncRead,         "AsyncReadNode",                 0                  },
+        {JobType::NsWrite,             "WriteNode",                     0                  },
+        // clang-format on
+    };
+
+    // Ensure that the order of entries in the table corresponds to the
+    // order of entries in the enum:
+    std::underlying_type_t<JobType> idx = 0;
+
+    for (auto const& jt : jobs)
+    {
+        if (static_cast<std::underlying_type_t<JobType>>(jt.type) != idx)
+            throw "The JobTypes array is improperly ordered";
+
+        ++idx;
+    }
+
+    return EnumArray<JobTypeInfo, std::size(jobs), JobType>{std::to_array(jobs)};
+}();
 
 }  // namespace xrpl

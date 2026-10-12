@@ -241,17 +241,18 @@ class ClosureCounter_test : public beast::unit_test::Suite
                 auto wrapped2(wrapped1);
                 BEAST_EXPECT(voidCounter.count() == 2);
                 {
-                    // Move should increase reference count.
-                    auto const wrapped3(std::move(wrapped2));
-                    BEAST_EXPECT(voidCounter.count() == 3);
+                    // Move should transfer the reference count, leaving
+                    // the moved-from substitute without one.
+                    auto wrapped3(std::move(wrapped2));
+                    BEAST_EXPECT(voidCounter.count() == 2);
                     {
                         // An additional closure also increases count.
-                        auto const wrapped4 = voidCounter.wrap([] {});
-                        BEAST_EXPECT(voidCounter.count() == 4);
+                        auto wrapped4 = voidCounter.wrap([]() {});
+                        BEAST_EXPECT(voidCounter.count() == 3);
                     }
-                    BEAST_EXPECT(voidCounter.count() == 3);
+                    BEAST_EXPECT(voidCounter.count() == 2);
                 }
-                BEAST_EXPECT(voidCounter.count() == 2);
+                BEAST_EXPECT(voidCounter.count() == 1);
             }
             BEAST_EXPECT(voidCounter.count() == 1);
         }

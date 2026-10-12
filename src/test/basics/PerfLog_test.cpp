@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -24,7 +25,6 @@
 #include <limits>
 #include <memory>
 #include <ostream>
-#include <random>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -534,18 +534,17 @@ public:
             JobType type;
             std::string typeName;
 
-            JobName(JobType t, std::string name) : type(t), typeName(std::move(name))
+            JobName(JobType t, std::string_view name) : type(t), typeName(name)
             {
             }
         };
 
         std::vector<JobName> jobs;
         {
-            auto const& jobTypes = JobTypes::instance();
-            jobs.reserve(jobTypes.size());
-            for (auto const& job : jobTypes)
+            jobs.reserve(kJobTypes.size());
+            for (auto const& job : kJobTypes)
             {
-                jobs.emplace_back(job.first, job.second.name());
+                jobs.emplace_back(job.type, job.name);
             }
         }
         std::shuffle(jobs.begin(), jobs.end(), defaultPrng());
@@ -851,18 +850,9 @@ public:
         perfLog->start();
 
         // Randomly select a job type and its name.
-        JobType jobType = JtInvalid;
-        std::string jobTypeName;
-        {
-            auto const& jobTypes = JobTypes::instance();
-
-            std::uniform_int_distribution<> dis(0, jobTypes.size() - 1);
-            auto iter{jobTypes.begin()};
-            std::advance(iter, dis(defaultPrng()));
-
-            jobType = iter->second.type();
-            jobTypeName = iter->second.name();
-        }
+        auto const& jobTypeInfo = kJobTypes.values[randInt<std::size_t>(0, kJobTypes.size() - 1)];
+        JobType const jobType = jobTypeInfo.type;
+        std::string const jobTypeName{jobTypeInfo.name};
 
         // Say there's one worker thread.
         perfLog->resizeJobs(1);

@@ -14,6 +14,7 @@
 #include <fstream>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -105,14 +106,14 @@ class PerfLogImp : public PerfLog
         // have to outlive this object, not the container that carried them.
         std::vector<NullTerminatedView> labels;
         std::unordered_map<JobType, Locked<Jq>> jq;
-        std::vector<std::pair<JobType, SteadyTimePoint>> jobs;
+        std::vector<std::optional<std::pair<JobType, SteadyTimePoint>>> jobs;
         mutable std::mutex jobsMutex;
         // Each view is a key of rpc above, not the argument rpcStart() received, so
         // currentJson() may read it as a C string.
         std::unordered_map<std::uint64_t, MethodStart> methods;
         mutable std::mutex methodsMutex;
 
-        Counters(std::span<NullTerminatedView const> methodNames, JobTypes const& jobTypes);
+        explicit Counters(std::span<NullTerminatedView const> methodNames);
         json::Value
         countersJson() const;
         json::Value

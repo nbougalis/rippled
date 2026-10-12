@@ -1,8 +1,11 @@
 #pragma once
 
+#include <xrpl/basics/CountedObject.h>
+#include <xrpl/basics/EnumArray.h>
 #include <xrpl/basics/LocalValue.h>
+#include <xrpl/basics/Log.h>
 #include <xrpl/core/ClosureCounter.h>
-#include <xrpl/core/JobTypeData.h>
+#include <xrpl/core/JobTypes.h>
 #include <xrpl/core/detail/Workers.h>
 #include <xrpl/json/json_value.h>
 
@@ -12,40 +15,38 @@
 // member calls on `boost::pool` collide with MSVC's `_CRTDBG_MAP_ALLOC` macros
 // in Debug builds (see cmake/XrplCompiler.cmake).
 #include <xrpl/beast/insight/Collector.h>
+#include <xrpl/beast/insight/Event.h>
 #include <xrpl/beast/insight/Gauge.h>
 #include <xrpl/beast/insight/Hook.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/LoadEvent.h>
+#include <xrpl/core/LoadMonitor.h>
 
 #include <boost/context/protected_fixedsize_stack.hpp>
 #include <boost/coroutine2/coroutine.hpp>
 
+#include <array>
 #include <atomic>
+#include <bit>
 #include <chrono>
+#include <concepts>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <functional>
-#include <map>
 #include <memory>
 #include <mutex>
-#include <set>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 namespace xrpl {
 
 namespace perf {
 class PerfLog;
 }  // namespace perf
-
-class Logs;
-struct CoroCreateT
-{
-    explicit CoroCreateT() = default;
-};
 
 /**
  * A pool of threads to perform work.
@@ -60,17 +61,24 @@ struct CoroCreateT
  */
 class JobQueue : private Workers::Callback
 {
+    // A small class used to prevent construction of coroutines without
+    // going through the JobQueue APIs.
+    struct CoroCreator
+    {
+        explicit constexpr CoroCreator() = default;
+    };
+
 public:
     /**
      * Coroutines must run to completion.
      */
-    class Coro : public std::enable_shared_from_this<Coro>
+    class Coro : public std::enable_shared_from_this<Coro>, public CountedObject<Coro>
     {
     private:
         detail::LocalValues lvs_;
         JobQueue& jq_;
-        JobType type_;
-        std::string name_;
+        JobType const type_;
+        std::string const name_;
         bool running_{false};
         std::mutex mutex_;
         std::mutex mutexRun_;
@@ -83,12 +91,16 @@ public:
 
     public:
         template <class F>
-        Coro(CoroCreateT, JobQueue&, JobType, std::string, F&&);
+        Coro(CoroCreator, JobQueue&, JobType, std::string, F&&);
 
-        // Not copy-constructible or assignable
+        // Not copyable or movable
         Coro(Coro const&) = delete;
         Coro&
         operator=(Coro const&) = delete;
+
+        Coro(Coro&&) = delete;
+        Coro&
+        operator=(Coro&&) = delete;
 
         ~Coro();
 
@@ -154,8 +166,6 @@ public:
         join();
     };
 
-    using JobFunction = std::function<void()>;
-
     JobQueue(
         std::size_t threadCount,
         beast::insight::Collector::Ptr const& collector,
@@ -172,16 +182,28 @@ public:
      * @param jobHandler Callable with signature void(). Called when the job is executed.
      *
      * @return true if jobHandler added to queue.
+     *
+     * @note The handler must be copy constructible, even though it is only
+     *       ever moved: JobFunction is std::function on standard libraries
+     *       that do not implement std::move_only_function, which means the
+     *       target must be copyable. By enforcing the requirement here, we
+     *       cause a move-only handler to fail to compile on every platform
+     *       instead of only on those that use the fallback. The constraint
+     *       can be removed when the std::function fallback is removed.
      */
     template <typename JobHandler>
     bool
     addJob(JobType type, std::string const& name, JobHandler&& jobHandler)
-        requires(std::is_void_v<std::invoke_result_t<JobHandler>>)
+        requires(
+            std::is_void_v<std::invoke_result_t<JobHandler>> &&
+            std::copy_constructible<std::decay_t<JobHandler>>)
     {
         if (auto optionalCountedJob = jobCounter_.wrap(std::forward<JobHandler>(jobHandler)))
         {
-            return addRefCountedJob(type, name, std::move(*optionalCountedJob));
+            addRefCountedJob(type, name, std::move(*optionalCountedJob));
+            return true;
         }
+
         return false;
     }
 
@@ -218,10 +240,10 @@ public:
     getJobCountGE(JobType t) const;
 
     /**
-     * Return a scoped LoadEvent.
+     * Returns a new load event for the particular job.
      */
-    std::unique_ptr<LoadEvent>
-    makeLoadEvent(JobType t, std::string const& name);
+    LoadEvent
+    createLoadEvent(JobType t, std::string name);
 
     /**
      * Add multiple load events.
@@ -246,99 +268,313 @@ public:
     void
     stop();
 
-    bool
-    isStopping() const
+    [[nodiscard]] bool
+    isStopping() const noexcept
     {
-        return stopping_;
+        return state_.load(std::memory_order_acquire) >= State::Stopping;
     }
 
-    // We may be able to move away from this, but we can keep it during the
-    // transition.
-    bool
-    isStopped() const;
+    [[nodiscard]] bool
+    isStopped() const noexcept
+    {
+        return state_.load(std::memory_order_acquire) == State::Stopped;
+    }
+
+    /**
+     * Returns the number of threads that this job queue is configured with.
+     */
+    [[nodiscard]] unsigned int
+    threadCount() const noexcept
+    {
+        return workers_.count();
+    }
 
 private:
     friend class Coro;
 
-    using JobDataMap = std::map<JobType, JobTypeData>;
+    /**
+     * Helper class to track which job types have at least one waiting job.
+     *
+     * One bit per JobType: set while the type's queue is non-empty. A
+     * type at its concurrency limit with jobs still queued keeps its
+     * bit set; dispatch discovers the saturation and moves on. Bits
+     * for special (limit 0) types are never set.
+     */
+    class TypeMask
+    {
+        std::atomic<std::uint64_t> mask_ = 0;
+
+        static_assert(kJobTypes.size() <= 64, "TypeMask must be able to represent every job type");
+
+        [[nodiscard]] static constexpr std::uint64_t
+        bit(JobType t) noexcept
+        {
+            return std::uint64_t{1} << static_cast<int>(t);
+        }
+
+    public:
+        /**
+         * Mark a type as having waiting jobs.
+         */
+        void
+        set(JobType t) noexcept
+        {
+            mask_.fetch_or(bit(t), std::memory_order::relaxed);
+        }
+
+        /**
+         * Mark a type as having no waiting jobs.
+         */
+        void
+        clear(JobType t) noexcept
+        {
+            mask_.fetch_and(~bit(t), std::memory_order::relaxed);
+        }
+
+        /**
+         * Visit marked types in priority order, invoking a callback.
+         *
+         * This will iterate from the highest priority (greatest enum
+         * value) downward, until the callback either returns true or
+         * the candidates are exhausted.
+         *
+         * The callback is invoked with each candidate JobType, and
+         * should return true to accept a type (ending the scan) or
+         * false to reject it and continue.
+         *
+         * The candidate set is fixed when the scan begins; types
+         * marked or cleared during the scan (including by the
+         * callback) do not affect which types are visited.
+         *
+         * @return true if the callback accepted a type.
+         */
+        template <std::invocable<JobType> F>
+        [[nodiscard]] bool
+        scan(F&& f) const
+        {
+            auto bits = mask_.load(std::memory_order::relaxed);
+
+            while (bits != 0)
+            {
+                auto const shift = std::bit_width(bits) - 1;
+
+                if (f(static_cast<JobType>(shift)))
+                    return true;
+
+                bits &= ~(std::uint64_t{1} << shift);
+            }
+
+            return false;
+        }
+    };
+
+    /**
+     * Per-type state for jobs managed by the JobQueue.
+     *
+     * Each JobType corresponds to exactly one Data instance, which gathers
+     * everything scoped to that type: the queue of the pending jobs, event
+     * reporting, accounting counters and load tracking.
+     *
+     * @note All members are currently protected by JobQueue::mutex_.
+     *       A later stage of this refactor will give each Data its
+     *       own lock, at which point this class becomes an
+     *       independent locking domain. When that happens, add the
+     *       mutex here and align instances to
+     *       std::hardware_destructive_interference_size to prevent
+     *       false sharing between adjacent array elements.
+     *
+     * @note Instances are not movable by design: LoadEvent objects hold
+     *       references into `load`, so a constructed instance cannot be
+     *       relocated after construction.
+     */
+    struct alignas(64) Data
+    {
+        /**
+         * The first job of this type awaiting execution, or nullptr.
+         *
+         * Jobs form an intrusive singly-linked FIFO through Job::next:
+         * they are appended at `last` and dispatched from here, oldest
+         * first. Priority across types is established by the position
+         * of the type in the JobType enum (higher value runs first);
+         * within a type, jobs run in insertion order.
+         *
+         * Always nullptr for "special" (limit 0) types, which are
+         * never dispatched.
+         */
+        Job* first = nullptr;
+
+        /**
+         * The last job of this type awaiting execution, or nullptr.
+         *
+         * New jobs are appended here. Meaningful only for appending;
+         * nullptr exactly when `first` is nullptr.
+         */
+        Job* last = nullptr;
+
+        /**
+         * The number of jobs awaiting execution.
+         *
+         * Cached because the intrusive list cannot report its length
+         * in constant time; maintained at the same two sites that
+         * link and unlink jobs. Equals the length of the first/last
+         * list at all times.
+         */
+        int count = 0;
+
+        /**
+         * The number of jobs of this type currently executing.
+         *
+         * Jobs of this type are dispatchable if and only if this
+         * value is below the type's configured concurrency limit;
+         * queued jobs at a type that is at its limit simply wait,
+         * and need no other bookkeeping.
+         */
+        int running = 0;
+
+        /**
+         * Worker wakeups withheld because the type was at its limit.
+         *
+         * The thread pool requires that every wakeup finds a job to
+         * run, so a job enqueued while its type is at its concurrency
+         * limit must not generate one. This count records each such
+         * withheld wakeup; when a job of this type completes (freeing
+         * a slot), one deferred count is converted into a
+         * Workers::addTask() call, making a queued job runnable.
+         */
+        int deferred = 0;
+
+        /**
+         * Insight event tracking time jobs spend queued.
+         */
+        beast::insight::Event dequeue;
+
+        /**
+         * Insight event tracking time jobs spend executing.
+         */
+        beast::insight::Event execute;
+
+        /**
+         * Latency tracking and overload detection for this type.
+         */
+        LoadMonitor load;
+
+        /**
+         * Construct the state for a single job type.
+         *
+         * @param info The compile-time attributes of the job type.
+         * @param collector The insight collector used to create the
+         *                  reporting events. No events are created
+         *                  for special (limit 0) types.
+         * @param logs Used to acquire the journal for `load`.
+         */
+        Data(JobTypeInfo const& info, beast::insight::Collector::Ptr const& collector, Logs& logs)
+            : load(info.averageLatency, info.peakLatency, logs.journal("LoadMonitor"))
+        {
+            if (!info.special())
+            {
+                dequeue = collector->makeEvent(std::string(info.name) + "_q");
+                execute = collector->makeEvent(std::string(info.name));
+            }
+        }
+
+        Data(Data const&) = delete;
+
+        Data&
+        operator=(Data const&) = delete;
+
+        Data(Data&&) = delete;
+
+        Data&
+        operator=(Data&&) = delete;
+
+        /**
+         * The number of jobs queued or executing for this type.
+         */
+        [[nodiscard]] int
+        outstanding() const noexcept
+        {
+            return running + count;
+        }
+
+        /**
+         * The number of jobs of this type awaiting execution.
+         */
+        [[nodiscard]] int
+        queued() const noexcept
+        {
+            return count;
+        }
+    };
 
     beast::Journal journal_;
-    mutable std::mutex mutex_;
-    std::uint64_t lastJob_{0};
-    std::set<Job> jobSet_;
-    JobCounter jobCounter_;
-    std::atomic_bool stopping_{false};
-    std::atomic_bool stopped_{false};
-    JobDataMap jobData_;
-    JobTypeData invalidJobData_;
 
-    // The number of jobs currently in processTask()
-    int processCount_{0};
+    mutable std::mutex mutex_;
+
+    ClosureCounter<void> jobCounter_;
+
+    enum class State : std::uint8_t { Running = 0, Stopping = 1, Stopped = 2 };
+
+    std::atomic<State> state_ = State::Running;
+
+    /**
+     * Per-type job state, indexed by JobType.
+     *
+     * Holds one Data instance for every entry in the kJobTypes table,
+     * including "special" (limit 0) types, whose queues are always
+     * empty but whose load monitors are still used via
+     * createLoadEvent() and addLoadEvents().
+     *
+     * Job scheduling is defined entirely by this array: dispatch walks
+     * it from the highest index downward, executing the oldest waiting
+     * job of the first type below its concurrency limit.
+     *
+     * All access is protected by mutex_. Constructed in place via an
+     * index-sequence expansion in the JobQueue constructor, relying
+     * on guaranteed copy elision since Data is immovable.
+     */
+    EnumArray<Data, kJobTypes.size(), JobType> data_;
+
+    // The number of coroutines (active or suspended)
+    std::atomic<int> totalCoroutines_ = 0;
 
     // The number of suspended coroutines
-    int nSuspend_ = 0;
+    std::atomic<int> suspendedCoroutines_ = 0;
 
+    // The number of jobs that are queued or executing
+    std::atomic<std::size_t> totalJobs_{0};
+
+    perf::PerfLog& perfLog_;
+
+    /**
+     * Bitmask of job types with at least one waiting job.
+     *
+     * Bit i is set iff data_[i] has at least one queued job. The bit
+     * reflects waiting jobs only: a type at its concurrency limit with
+     * jobs still queued keeps its bit set; dispatch discovers the
+     * saturation and moves on. Bits for special (limit 0) types are
+     * never set.
+     */
+    TypeMask jobMask_;
+
+    std::mutex quiesceMutex_;
+    std::condition_variable quiesceCv_;
+
+    // The worker threads use every member declared above, including on
+    // their way out of processTask(). This must be declared after all of
+    // them, so that the threads are joined before any of them is destroyed.
     Workers workers_;
 
-    // Statistics tracking
-    perf::PerfLog& perfLog_;
     beast::insight::Collector::Ptr collector_;
-    beast::insight::Gauge jobCount_;
+    beast::insight::Gauge jobCountGauge_;
     beast::insight::Hook hook_;
-
-    std::condition_variable cv_;
-
-    void
-    collect();
-    JobTypeData&
-    getJobTypeData(JobType type);
 
     // Adds a reference counted job to the JobQueue.
     //
     //    param type The type of job.
-    //    param name Name of the job.
-    //    param func std::function with signature void (Job&).  Called when the
-    //    job is executed.
-    //
-    //    return true if func added to queue.
-    bool
-    addRefCountedJob(JobType type, std::string const& name, JobFunction const& func);
-
-    // Returns the next Job we should run now.
-    //
-    // RunnableJob:
-    //  A Job in the JobSet whose slots count for its type is greater than zero.
-    //
-    // Pre-conditions:
-    //  jobSet_ must not be empty.
-    //  jobSet_ holds at least one RunnableJob
-    //
-    // Post-conditions:
-    //  job is a valid Job object.
-    //  job is removed from jobQueue_.
-    //  Waiting job count of its type is decremented
-    //  Running job count of its type is incremented
-    //
-    // Invariants:
-    //  The calling thread owns the JobLock
+    //    param name The name of the job.
+    //    param func The work to perform when the job is executed.
     void
-    getNextJob(Job& job);
-
-    // Indicates that a running Job has completed its task.
-    //
-    // Pre-conditions:
-    //  Job must not exist in jobSet_.
-    //  The JobType must not be invalid.
-    //
-    // Post-conditions:
-    //  The running count of that JobType is decremented
-    //  A new task is signaled if there are more waiting Jobs than the limit, if
-    //  any.
-    //
-    // Invariants:
-    //  <none>
-    void
-    finishJob(JobType type);
+    addRefCountedJob(JobType type, std::string const& name, JobFunction&& func);
 
     // Runs the next appropriate waiting Job.
     //
@@ -346,7 +582,7 @@ private:
     //  A RunnableJob must exist in the JobSet
     //
     // Post-conditions:
-    //  The chosen RunnableJob will have Job::doJob() called.
+    //  The chosen RunnableJob will have Job::execute() called.
     //
     // Invariants:
     //  <none>
@@ -358,13 +594,7 @@ private:
     // Invariants:
     //  <none>
     void
-    uncaughtException(unsigned int instance, std::exception_ptr eptr) override;
-
-    // Returns the limit of running jobs for the given job type.
-    // For jobs with no limit, we return the largest int. Hopefully that
-    // will be enough.
-    static int
-    getJobLimit(JobType type);
+    uncaughtException(unsigned int instance, std::exception_ptr e) override;
 };
 
 /*
@@ -436,13 +666,14 @@ template <class F>
 std::shared_ptr<JobQueue::Coro>
 JobQueue::postCoro(JobType t, std::string const& name, F&& f)
 {
-    if (stopping_ || stopped_)
+    if (state_.load(std::memory_order_acquire) != State::Running)
         return nullptr;
 
     // The first parameter is a detail type to make construction private and
     // the last is the function the coroutine runs, which has a signature of
     //    void(std::shared_ptr<Coro>)
-    auto coro = std::make_shared<Coro>(CoroCreateT{}, *this, t, name, std::forward<F>(f));
+    auto coro = std::make_shared<Coro>(CoroCreator{}, *this, t, name, std::forward<F>(f));
+
     if (!coro->post())
     {
         // The Coro was not successfully posted.  Disable it so it's destructor
@@ -450,6 +681,7 @@ JobQueue::postCoro(JobType t, std::string const& name, F&& f)
         coro->expectEarlyExit();
         coro.reset();
     }
+
     return coro;
 }
 

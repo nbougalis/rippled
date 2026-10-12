@@ -293,7 +293,7 @@ class Consensus
     using NodeIDT = Adaptor::NodeIDT;
     using TxT = TxSetT::Tx;
     using PeerPositionT = Adaptor::PeerPositionT;
-    using ProposalT = ConsensusProposal<NodeIDT, typename LedgerT::ID, typename TxSetT::ID>;
+    using TrustedProposal = ConsensusProposal<NodeIDT, typename LedgerT::ID, typename TxSetT::ID>;
 
     using Result = ConsensusResult<Adaptor>;
 
@@ -1491,7 +1491,7 @@ Consensus<Adaptor>::updateOurPositions(std::unique_ptr<std::stringstream> const&
         auto it = currPeerPositions_.begin();
         while (it != currPeerPositions_.end())
         {
-            ProposalT const& peerProp = it->second.proposal();
+            TrustedProposal const& peerProp = it->second.proposal();
             if (peerProp.isStale(peerCutoff))
             {
                 // peer's proposal is stale, so remove it
@@ -1645,7 +1645,7 @@ Consensus<Adaptor>::updateOurPositions(std::unique_ptr<std::stringstream> const&
 
             for (auto const& [nodeId, peerPos] : currPeerPositions_)
             {
-                ProposalT const& p = peerPos.proposal();
+                TrustedProposal const& p = peerPos.proposal();
                 if (p.position() == newID)
                     updateDisputes(nodeId, result_->txns);
             }
@@ -1674,7 +1674,7 @@ Consensus<Adaptor>::haveConsensus(std::unique_ptr<std::stringstream> const& clog
     // Count number of agreements/disagreements with our position
     for (auto const& [nodeId, peerPos] : currPeerPositions_)
     {
-        ProposalT const& peerProp = peerPos.proposal();
+        TrustedProposal const& peerProp = peerPos.proposal();
         if (peerProp.position() == ourPosition)
         {
             ++agree;
@@ -1843,7 +1843,7 @@ Consensus<Adaptor>::createDisputes(TxSetT const& o, std::unique_ptr<std::strings
         // Update all of the available peer's votes on the disputed transaction
         for (auto const& [nodeId, peerPos] : currPeerPositions_)
         {
-            ProposalT const& peerProp = peerPos.proposal();
+            TrustedProposal const& peerProp = peerPos.proposal();
             auto const cit = acquired_.find(peerProp.position());
             if (cit != acquired_.end() && dtx.setVote(nodeId, cit->second.exists(txID)))
                 peerUnchangedCounter_ = 0;

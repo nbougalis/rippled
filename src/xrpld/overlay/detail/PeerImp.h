@@ -196,7 +196,7 @@ private:
     std::queue<std::shared_ptr<Message>> sendQueue_;
     bool gracefulClose_ = false;
     int largeSendq_ = 0;
-    std::unique_ptr<LoadEvent> loadEvent_;
+    std::optional<LoadEvent> loadEvent_;
     // The highest sequence of each PublisherList that has
     // been sent to or received from this peer.
     HashMap<PublicKey, std::size_t> publisherListSequences_;
@@ -706,7 +706,7 @@ protected:
      * Process a generic-query TMGetObjectByHash message.
      *
      * Dispatched from `onMessage(TMGetObjectByHash)` to the JobQueue
-     * (`JtLedgerReq`) so synchronous NodeStore lookups do not block the
+     * (`JobType::LedgerReq`) so synchronous NodeStore lookups do not block the
      * peer's I/O strand. Caps iteration at `tuning::kHardMaxReplyNodes`
      * regardless of hit/miss outcome and applies differential pricing
      * via `computeGetObjectByHashFee()` after the fetch loop completes.

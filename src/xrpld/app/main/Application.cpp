@@ -913,7 +913,7 @@ public:
                 waitHandlerCounter_.wrap([this](boost::system::error_code const& e) {
                     if (e.value() == boost::system::errc::success)
                     {
-                        jobQueue_->addJob(JtSweep, "sweep", [this] { doSweep(); });
+                        jobQueue_->addJob(JobType::Sweep, "sweep", [this] { doSweep(); });
                     }
                     // Recover as best we can if an unexpected error occurs.
                     if (e.value() != boost::system::errc::success &&
