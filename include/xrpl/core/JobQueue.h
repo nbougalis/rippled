@@ -24,7 +24,9 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <map>
 #include <memory>
@@ -155,7 +157,7 @@ public:
     using JobFunction = std::function<void()>;
 
     JobQueue(
-        int threadCount,
+        std::size_t threadCount,
         beast::insight::Collector::Ptr const& collector,
         beast::Journal journal,
         Logs& logs,
@@ -349,7 +351,14 @@ private:
     // Invariants:
     //  <none>
     void
-    processTask(int instance) override;
+    processTask(unsigned int instance) override;
+
+    // Called when an uncaught exception occurs while processing a task
+    //
+    // Invariants:
+    //  <none>
+    void
+    uncaughtException(unsigned int instance, std::exception_ptr eptr) override;
 
     // Returns the limit of running jobs for the given job type.
     // For jobs with no limit, we return the largest int. Hopefully that
@@ -427,10 +436,12 @@ template <class F>
 std::shared_ptr<JobQueue::Coro>
 JobQueue::postCoro(JobType t, std::string const& name, F&& f)
 {
-    /*  First param is a detail type to make construction private.
-        Last param is the function the coroutine runs. Signature of
-        void(std::shared_ptr<Coro>).
-    */
+    if (stopping_ || stopped_)
+        return nullptr;
+
+    // The first parameter is a detail type to make construction private and
+    // the last is the function the coroutine runs, which has a signature of
+    //    void(std::shared_ptr<Coro>)
     auto coro = std::make_shared<Coro>(CoroCreateT{}, *this, t, name, std::forward<F>(f));
     if (!coro->post())
     {

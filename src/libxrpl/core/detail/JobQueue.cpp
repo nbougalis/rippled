@@ -2,6 +2,7 @@
 
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/contract.h>
+#include <xrpl/beast/core/CurrentThreadName.h>
 #include <xrpl/beast/insight/Collector.h>
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/core/Job.h>
@@ -13,27 +14,34 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <exception>
 #include <memory>
 #include <mutex>
 #include <set>
+#include <string>
 #include <tuple>
 #include <utility>
 
 namespace xrpl {
 
 JobQueue::JobQueue(
-    int threadCount,
+    std::size_t threadCount,
     beast::insight::Collector::Ptr const& collector,
     beast::Journal journal,
     Logs& logs,
     perf::PerfLog& perfLog)
     : journal_(journal)
     , invalidJobData_(JobTypes::instance().getInvalid(), collector, logs)
-    , workers_(*this, &perfLog, "JobQueue", threadCount)
+    , workers_(*this, "JobQueue", threadCount, Workers::WakePolicy::Eager)
     , perfLog_(perfLog)
     , collector_(collector)
 {
     JLOG(journal_.info()) << "Using " << threadCount << "  threads";
+
+    // This is important to do before dispatching any jobs
+    // so that the logger knows the number of threads.
+    perfLog_.resizeJobs(threadCount);
 
     hook_ = collector_->makeHook([this] { collect(); });
     jobCount_ = collector_->makeGauge("job_count");
@@ -86,7 +94,7 @@ JobQueue::addRefCountedJob(JobType type, std::string const& name, JobFunction co
     // FIXME: Workaround incorrect client shutdown ordering
     // do not add jobs to a queue with no threads
     XRPL_ASSERT(
-        (type >= JtClient && type <= JtClientWebsocket) || workers_.getNumberOfThreads() > 0,
+        (type >= JtClient && type <= JtClientWebsocket) || workers_.count() > 0,
         "xrpl::JobQueue::addRefCountedJob : threads available or job "
         "requires no threads");
 
@@ -188,7 +196,7 @@ JobQueue::getJson(int c)
     using namespace std::chrono_literals;
     json::Value ret(json::ValueType::Object);
 
-    ret["threads"] = workers_.getNumberOfThreads();
+    ret["threads"] = workers_.count();
 
     json::Value priorities = json::ValueType::Array;
 
@@ -339,7 +347,32 @@ JobQueue::finishJob(JobType type)
 }
 
 void
-JobQueue::processTask(int instance)
+JobQueue::uncaughtException(unsigned int instance, std::exception_ptr eptr)
+{
+    try
+    {
+        if (eptr)
+            std::rethrow_exception(eptr);
+
+        logicError(
+            beast::getCurrentThreadName() +
+            ": Uncaught exception handler invoked with no exception_ptr");
+    }
+    catch (std::exception const& e)
+    {
+        logicError(
+            beast::getCurrentThreadName() +
+            ": Exception caught during task processing: " + e.what());
+    }
+    catch (...)
+    {
+        logicError(
+            beast::getCurrentThreadName() + ": Unknown exception caught during task processing");
+    }
+}
+
+void
+JobQueue::processTask(unsigned int instance)
 {
     JobType type = JtInvalid;
 
