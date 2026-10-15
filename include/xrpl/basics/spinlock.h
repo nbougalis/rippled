@@ -11,12 +11,15 @@
 #include <cstddef>
 #include <limits>
 #include <type_traits>
+#include <utility>
 
 #if BOOST_ARCH_X86
 #include <immintrin.h>
 #endif
 
 namespace xrpl {
+
+namespace detail {
 
 /**
  * An unsigned integral type suitable for use as a spinlock.
@@ -25,19 +28,17 @@ namespace xrpl {
  * operations cannot themselves take a (library-level) lock.
  */
 template <typename T>
-concept SpinlockValueType = std::is_unsigned_v<T> && std::atomic<T>::is_always_lock_free;
+concept SomeSpinlockValue = std::is_unsigned_v<T> && std::atomic<T>::is_always_lock_free;
 
 /**
  * A spinlock value type that additionally supports the atomic bitwise
  * operations required to pack multiple locks into a single integer.
  */
 template <typename T>
-concept PackedSpinlockValueType = SpinlockValueType<T> && requires(std::atomic<T>& a, T v) {
+concept SomePackedSpinlockValue = SomeSpinlockValue<T> && requires(std::atomic<T>& a, T v) {
     { a.fetch_or(v) } -> std::same_as<T>;
     { a.fetch_and(v) } -> std::same_as<T>;
 };
-
-namespace detail {
 
 /**
  * Inform the processor that we are in a tight spin-wait loop.
@@ -102,7 +103,7 @@ constexpr std::size_t spinLockBareSpins = 200;
  * @param lock The atomic variable used as the lock.
  * @return true if the lock was acquired, false if it was already held.
  */
-template <SpinlockValueType T>
+template <detail::SomeSpinlockValue T>
 [[nodiscard]] bool
 spinTryLock(std::atomic<T>& lock) noexcept
 {
@@ -152,7 +153,7 @@ spinTryLock(std::atomic<T>& lock) noexcept
  * @tparam T An unsigned integral type.
  * @param lock The atomic variable used as the lock.
  */
-template <SpinlockValueType T>
+template <detail::SomeSpinlockValue T>
 void
 spinLock(std::atomic<T>& lock) noexcept
 {
@@ -186,7 +187,7 @@ spinLock(std::atomic<T>& lock) noexcept
  * @tparam T An unsigned integral type.
  * @param lock The atomic variable used as the lock.
  */
-template <SpinlockValueType T>
+template <detail::SomeSpinlockValue T>
 void
 spinUnlock(std::atomic<T>& lock) noexcept
 {
@@ -214,7 +215,7 @@ spinUnlock(std::atomic<T>& lock) noexcept
  *
  * @tparam T An unsigned integral type.
  */
-template <SpinlockValueType T>
+template <detail::SomeSpinlockValue T>
 class Spinlock
 {
     std::atomic<T>& lock_;
@@ -304,7 +305,7 @@ public:
  *
  * @tparam T An unsigned integral type (e.g. std::uint16_t)
  */
-template <PackedSpinlockValueType T>
+template <detail::SomePackedSpinlockValue T>
 class PackedSpinlock
 {
     std::atomic<T>& bits_;
@@ -324,10 +325,12 @@ public:
      * @note For performance reasons, you should strive to have `lock` be
      *       on a cacheline by itself.
      */
-    PackedSpinlock(std::atomic<T>& lock, int index) noexcept
-        : bits_(lock), mask_([index]() {
+    template <std::unsigned_integral U>
+        requires(!std::same_as<U, bool>)
+    PackedSpinlock(std::atomic<T>& lock, U index) noexcept
+        : bits_(lock), mask_([index] {
             XRPL_ASSERT(
-                index >= 0 && index < std::numeric_limits<T>::digits,
+                std::cmp_less(index, std::numeric_limits<T>::digits),
                 "xrpl::PackedSpinlock::PackedSpinlock : valid index");
             return static_cast<T>(T{1} << index);
         }())
