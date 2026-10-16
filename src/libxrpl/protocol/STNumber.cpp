@@ -8,7 +8,6 @@
 #include <xrpl/protocol/Rules.h>  // IWYU pragma: keep
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STAmount.h>
-#include <xrpl/protocol/STBase.h>
 #include <xrpl/protocol/STTakesAsset.h>
 #include <xrpl/protocol/Serializer.h>
 
@@ -17,14 +16,12 @@
 #include <boost/regex/v5/regex.hpp>
 #include <boost/regex/v5/regex_match.hpp>
 
-#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <limits>
 #include <ostream>
 #include <stdexcept>
 #include <string>
-#include <utility>
 
 namespace xrpl {
 
@@ -41,12 +38,6 @@ STNumber::STNumber(SerialIter& sit, SField const& field) : STTakesAsset(field)
     value_ = Number{mantissa, exponent};
 }
 
-SerializedTypeID
-STNumber::getSType() const noexcept
-{
-    return STI_NUMBER;
-}
-
 std::string
 STNumber::getText() const
 {
@@ -56,12 +47,11 @@ STNumber::getText() const
 void
 STNumber::associateAsset(Asset const& a)
 {
-    STTakesAsset::associateAsset(a);
-
-    XRPL_ASSERT_PARTS(
+    XRPL_ASSERT(
         getFName().shouldMeta(SField::kSmdNeedsAsset),
-        "STNumber::associateAsset",
-        "field needs asset");
+        "xrpl::STNumber::associateAsset : field needs asset");
+
+    assign(a);
 
     roundToAsset(a, value_);
 }
@@ -79,12 +69,11 @@ STNumber::add(Serializer& s) const
     SField const& field = getFName();
     if (field.shouldMeta(SField::kSmdNeedsAsset))
     {
-        // asset is defined in the STTakesAsset base class
-        if (asset_)
+        if (auto const* a = asset())
         {
             // The number should be rounded to the asset's precision, but round
             // it here if it has an asset assigned.
-            roundToAsset(*asset_, value);
+            roundToAsset(*a, value);
             XRPL_ASSERT_PARTS(value_ == value, "xrpl::STNumber::add", "value is already rounded");
         }
         else
@@ -121,27 +110,6 @@ void
 STNumber::setValue(Number const& v)
 {
     value_ = v;
-}
-
-STBase*
-STNumber::copy(std::size_t n, void* buf) const
-{
-    return emplace(n, buf, *this);
-}
-
-STBase*
-STNumber::move(std::size_t n, void* buf)
-{
-    return emplace(n, buf, std::move(*this));
-}
-
-bool
-STNumber::isEquivalent(STBase const& t) const
-{
-    XRPL_ASSERT(
-        t.getSType() == this->getSType(), "xrpl::STNumber::isEquivalent : field type match");
-    auto const& v = dynamic_cast<STNumber const&>(t);
-    return value_ == v;
 }
 
 bool
