@@ -6,6 +6,7 @@
 #include <xrpl/basics/safe_cast.h>
 #include <xrpl/beast/core/LexicalCast.h>
 #include <xrpl/beast/utility/Zero.h>
+#include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/json/json_forwards.h>
 #include <xrpl/json/json_value.h>
 #include <xrpl/protocol/AccountID.h>
@@ -359,6 +360,35 @@ parseUInt32(
     return ret;
 }
 
+template <class STResult>
+static std::optional<detail::STVar>
+parseBitString(
+    SField const& field,
+    std::string const& jsonName,
+    std::string const& fieldName,
+    json::Value const& value,
+    json::Value& error)
+{
+    XRPL_ASSERT(
+        field.fieldType == STResult::kTypeId,
+        "xrpl::parseBitString : field type matches template parameter");
+
+    if (!value.isString())
+    {
+        error = badType(jsonName, fieldName);
+        return std::nullopt;
+    }
+
+    auto const s = value.asString();
+
+    // An empty string is accepted, and yields a zero value.
+    if (typename STResult::value_type num; s.empty() || num.parseHex(s))
+        return detail::makeStvar<STResult>(field, num);
+
+    error = invalidData(jsonName, fieldName);
+    return std::nullopt;
+}
+
 // This function is used by parseObject to parse any JSON type that doesn't
 // recurse.  Everything represented here is a leaf-type.
 static std::optional<detail::STVar>
@@ -513,101 +543,33 @@ parseLeaf(
 
             break;
 
-        case STI_UINT128: {
-            if (!value.isString())
-            {
-                error = badType(jsonName, fieldName);
+        case STI_UINT128:
+            ret = parseBitString<STUInt128>(field, jsonName, fieldName, value, error);
+            if (!ret)
                 return ret;
-            }
 
-            UInt128 num;
-
-            if (auto const s = value.asString(); !num.parseHex(s))
-            {
-                if (!s.empty())
-                {
-                    error = invalidData(jsonName, fieldName);
-                    return ret;
-                }
-
-                num.zero();
-            }
-
-            ret = detail::makeStvar<STUInt128>(field, num);
             break;
-        }
 
-        case STI_UINT160: {
-            if (!value.isString())
-            {
-                error = badType(jsonName, fieldName);
+        case STI_UINT160:
+            ret = parseBitString<STUInt160>(field, jsonName, fieldName, value, error);
+            if (!ret)
                 return ret;
-            }
 
-            UInt160 num;
-
-            if (auto const s = value.asString(); !num.parseHex(s))
-            {
-                if (!s.empty())
-                {
-                    error = invalidData(jsonName, fieldName);
-                    return ret;
-                }
-
-                num.zero();
-            }
-
-            ret = detail::makeStvar<STUInt160>(field, num);
             break;
-        }
 
-        case STI_UINT192: {
-            if (!value.isString())
-            {
-                error = badType(jsonName, fieldName);
+        case STI_UINT192:
+            ret = parseBitString<STUInt192>(field, jsonName, fieldName, value, error);
+            if (!ret)
                 return ret;
-            }
 
-            UInt192 num;
-
-            if (auto const s = value.asString(); !num.parseHex(s))
-            {
-                if (!s.empty())
-                {
-                    error = invalidData(jsonName, fieldName);
-                    return ret;
-                }
-
-                num.zero();
-            }
-
-            ret = detail::makeStvar<STUInt192>(field, num);
             break;
-        }
 
-        case STI_UINT256: {
-            if (!value.isString())
-            {
-                error = badType(jsonName, fieldName);
+        case STI_UINT256:
+            ret = parseBitString<STUInt256>(field, jsonName, fieldName, value, error);
+            if (!ret)
                 return ret;
-            }
 
-            UInt256 num;
-
-            if (auto const s = value.asString(); !num.parseHex(s))
-            {
-                if (!s.empty())
-                {
-                    error = invalidData(jsonName, fieldName);
-                    return ret;
-                }
-
-                num.zero();
-            }
-
-            ret = detail::makeStvar<STUInt256>(field, num);
             break;
-        }
 
         case STI_INT32:
             try
