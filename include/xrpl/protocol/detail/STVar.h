@@ -60,12 +60,11 @@ public:
      *
      * This value was 72 previously, apparently carefully selected to ensure
      * that all types could be constructed in the internal buffer. As of the
-     * time of this writing, the four largest types are:
+     * time of this writing, the three largest types are:
      *
      *     1. STXChainBridge at 224 bytes;
-     *     2. STNumber at 96 bytes;
-     *     3. STAmount at 80 bytes (more than doubled as a result of MPT!);
-     *     4. STIssue at 64 bytes.
+     *     2. STAmount at 80 bytes (more than doubled as a result of MPT!);
+     *     3. STIssue at 64 bytes.
      *
      * Since all other types fit in 48 bytes or fewer, shrinking the size of
      * the internal buffer to that size and accepting that STIssue will also

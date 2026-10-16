@@ -5,11 +5,9 @@
 #include <xrpl/json/json_value.h>
 #include <xrpl/protocol/Asset.h>
 #include <xrpl/protocol/SField.h>
-#include <xrpl/protocol/STBase.h>
 #include <xrpl/protocol/STTakesAsset.h>
 #include <xrpl/protocol/Serializer.h>
 
-#include <cstddef>
 #include <cstdint>
 #include <ostream>
 #include <string>
@@ -22,10 +20,9 @@ namespace xrpl {
  * This type is-a `Number`, and can be used everywhere that is accepted.
  * This type simply integrates `Number` with the serialization framework,
  * letting it be used for fields in ledger entries and transactions.
- * It is effectively an `STAmount` sans `Asset`:
- * it can represent a value of any token type (XRP, IOU, or MPT)
- * without paying the storage cost of duplicating asset information
- * that may be deduced from the context.
+ * It is effectively an `STAmount` sans `Asset`: it can represent a value
+ * of any token type (XRP, IOU, or MPT) without paying the storage cost of
+ * duplicating asset information that may be deduced from the context.
  *
  * STNumber derives from STTakesAsset, so that it can be associated with the
  * related Asset during transaction processing. Which asset is relevant depends
@@ -38,9 +35,8 @@ namespace xrpl {
  *     associateAsset(*brokerSle, asset);
  *     associateAsset(*vaultSle, asset);
  */
-class STNumber : public STTakesAsset, public CountedObject<STNumber>
+class STNumber final : public STTakesAsset<STI_NUMBER, STNumber>, public CountedObject<STNumber>
 {
-private:
     Number value_;
 
 public:
@@ -50,8 +46,6 @@ public:
     explicit STNumber(SField const& field, Number const& value = Number());
     STNumber(SerialIter& sit, SField const& field);
 
-    [[nodiscard]] SerializedTypeID
-    getSType() const noexcept override;
     [[nodiscard]] std::string
     getText() const override;
     void
@@ -70,10 +64,11 @@ public:
     }
 
     [[nodiscard]] bool
-    isEquivalent(STBase const& t) const override;
-    [[nodiscard]] bool
     isDefault() const override;
 
+    /**
+     * Associate an asset, rounding the value to the precision of the asset.
+     */
     void
     associateAsset(Asset const& a) override;
 
@@ -82,11 +77,11 @@ public:
         return value_;
     }
 
-private:
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
+    friend bool
+    operator==(STNumber const& lhs, STNumber const& rhs) noexcept
+    {
+        return lhs.value_ == rhs.value_;
+    }
 };
 
 std::ostream&
