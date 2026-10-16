@@ -1,24 +1,27 @@
 #pragma once
 
 #include <xrpl/basics/CountedObject.h>
+#include <xrpl/basics/StringUtilities.h>
+#include <xrpl/basics/contract.h>
 #include <xrpl/json/json_value.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STBase.h>
 #include <xrpl/protocol/STObject.h>
 #include <xrpl/protocol/Serializer.h>
 
+#include <algorithm>
+#include <concepts>
 #include <cstddef>
 #include <iterator>
+#include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
 namespace xrpl {
 
-class STArray final : public STBase, public CountedObject<STArray>
+class STArray final : public STTypedBase<STI_ARRAY, STArray>, public CountedObject<STArray>
 {
-private:
     using ListType = std::vector<STObject>;
 
     ListType v_;
@@ -32,276 +35,262 @@ public:
     STArray() = default;
     STArray(STArray const&) = default;
 
-    template <class Iter>
-    explicit STArray(Iter first, Iter last)
-        requires(std::is_convertible_v<typename std::iterator_traits<Iter>::reference, STObject>);
+    template <std::input_iterator Iter>
+        requires std::convertible_to<std::iter_reference_t<Iter>, STObject>
+    explicit STArray(Iter first, Iter last) : v_(first, last)
+    {
+    }
 
-    template <class Iter>
-    STArray(SField const& f, Iter first, Iter last)
-        requires(std::is_convertible_v<typename std::iterator_traits<Iter>::reference, STObject>);
+    template <std::input_iterator Iter>
+        requires std::convertible_to<std::iter_reference_t<Iter>, STObject>
+    STArray(SField const& f, Iter first, Iter last) : STTypedBase(f), v_(first, last)
+    {
+    }
 
     STArray&
     operator=(STArray const&) = default;
-    STArray(STArray&&);
+
+    STArray(STArray&& other) noexcept : STTypedBase(other), v_(std::move(other.v_))
+    {
+    }
+
     STArray&
-    operator=(STArray&&);
+    operator=(STArray&& other) noexcept
+    {
+        if (this != &other)
+        {
+            setFName(other.getFName());
+            v_ = std::move(other.v_);
+        }
 
-    STArray(SField const& f, std::size_t n);
-    STArray(SerialIter& sit, SField const& f, int depth = 0);
-    explicit STArray(int n);
-    explicit STArray(SField const& f);
+        return *this;
+    }
 
-    STObject&
-    operator[](std::size_t j);
+    STArray(SField const& f, std::size_t n) : STTypedBase(f)
+    {
+        v_.reserve(n);
+    }
 
-    STObject const&
-    operator[](std::size_t j) const;
+    STArray(SerialIter& sit, SField const& f, int depth = 0) : STTypedBase(f)
+    {
+        while (!sit.empty())
+        {
+            int type = 0, field = 0;
+            sit.getFieldID(type, field);
 
-    STObject&
-    back();
+            if ((type == STI_ARRAY) && (field == 1))
+                break;
 
-    [[nodiscard]] STObject const&
-    back() const;
+            if ((type == STI_OBJECT) && (field == 1))
+                Throw<std::runtime_error>("Illegal terminator in array");
+
+            auto const& fn = SField::getField(type, field);
+
+            if (fn.isInvalid())
+                Throw<std::runtime_error>("Unknown field");
+
+            if (fn.fieldType != STI_OBJECT)
+                Throw<std::runtime_error>("Non-object in array");
+
+            v_.emplace_back(sit, fn, depth + 1);
+
+            v_.back().applyTemplateFromSField(fn);  // May throw
+        }
+    }
+
+    explicit STArray(std::size_t n)
+    {
+        v_.reserve(n);
+    }
+
+    explicit STArray(SField const& f) : STTypedBase(f)
+    {
+    }
+
+    [[nodiscard]] auto&
+    operator[](this auto&& self, std::size_t j)
+    {
+        return self.v_[j];
+    }
+
+    [[nodiscard]] auto&
+    back(this auto&& self)
+    {
+        return self.v_.back();
+    }
 
     template <class... Args>
+        requires std::constructible_from<STObject, Args&&...>
     void
-    emplaceBack(Args&&... args);
-
-    void
-    pushBack(STObject const& object);
-
-    void
-    pushBack(STObject&& object);
-
-    // STL-compatible alias required by std::back_insert_iterator
-    void
-    // NOLINTNEXTLINE(readability-identifier-naming)
-    push_back(STObject const& object)
+    emplaceBack(Args&&... args)
     {
-        pushBack(object);
+        v_.emplace_back(std::forward<Args>(args)...);
     }
 
+    template <std::convertible_to<STObject> T>
     void
-    // NOLINTNEXTLINE(readability-identifier-naming)
-    push_back(STObject&& object)
+    pushBack(T&& object)
     {
-        pushBack(std::move(object));
+        v_.emplace_back(std::forward<T>(object));
     }
 
-    iterator
-    begin();
+    /**
+     * STL-compatible alias for @ref pushBack, required by
+     * @c std::back_insert_iterator.
+     */
+    template <std::convertible_to<STObject> T>
+    void
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    push_back(T&& object)
+    {
+        pushBack(std::forward<T>(object));
+    }
 
-    iterator
-    end();
+    /**
+     * Iteration.
+     *
+     * The iterator type follows the constness of the array: @ref iterator
+     * for `STArray&` and @ref const_iterator for `STArray const&`.
+     *
+     */
+    /** @{ */
+    [[nodiscard]] auto
+    begin(this auto&& self)
+    {
+        return self.v_.begin();
+    }
 
-    [[nodiscard]] const_iterator
-    begin() const;
-
-    [[nodiscard]] const_iterator
-    end() const;
+    [[nodiscard]] auto
+    end(this auto&& self)
+    {
+        return self.v_.end();
+    }
+    /** @} */
 
     [[nodiscard]] size_type
-    size() const;
+    size() const noexcept
+    {
+        return v_.size();
+    }
 
     [[nodiscard]] bool
-    empty() const;
+    empty() const noexcept
+    {
+        return v_.empty();
+    }
 
     void
-    clear();
+    clear()
+    {
+        v_.clear();
+    }
 
     void
-    reserve(std::size_t n);
+    reserve(std::size_t n)
+    {
+        v_.reserve(n);
+    }
 
     void
-    swap(STArray& a) noexcept;
+    swap(STArray& a) noexcept
+    {
+        v_.swap(a.v_);
+    }
 
     [[nodiscard]] std::string
-    getFullText() const override;
+    getFullText() const override
+    {
+        return "[" + rangeToString(v_, [](STObject const& o) { return o.getFullText(); }) + "]";
+    }
 
     [[nodiscard]] std::string
-    getText() const override;
+    getText() const override
+    {
+        return "[" + rangeToString(v_, [](STObject const& o) { return o.getText(); }) + "]";
+    }
 
     [[nodiscard]] json::Value
-    getJson(JsonOptions index) const override;
+    getJson(JsonOptions options) const override
+    {
+        json::Value v = json::ValueType::Array;
+
+        for (auto const& object : v_)
+        {
+            if (object.getSType() != STI_NOTPRESENT)
+            {
+                json::Value& inner = v.append(json::ValueType::Object);
+                inner[object.getFName().getJsonName()] = object.getJson(options);
+            }
+        }
+
+        return v;
+    }
 
     void
-    add(Serializer& s) const override;
+    add(Serializer& s) const override
+    {
+        for (STObject const& object : v_)
+        {
+            object.addFieldID(s);
+            object.add(s);
+            s.addFieldID(STI_OBJECT, 1);
+        }
+    }
 
+    /**
+     * Sort the elements of the array in place.
+     *
+     * @tparam Compare A callable that imposes a strict weak ordering on
+     *                 @ref STObject instances. The callable must satisfy
+     *                 `std::strict_weak_order<Compare, STObject const&,
+     *                 STObject const&>`.
+     *
+     * @param compare The comparison function object to use for sorting.
+     */
+    template <std::strict_weak_order<STObject const&, STObject const&> Compare>
     void
-    sort(bool (*compare)(STObject const& o1, STObject const& o2));
-
-    bool
-    operator==(STArray const& s) const;
-
-    iterator
-    erase(iterator pos);
+    sort(Compare compare)
+    {
+        std::ranges::sort(v_, std::move(compare));
+    }
 
     iterator
-    erase(const_iterator pos);
+    erase(iterator pos)
+    {
+        return v_.erase(pos);
+    }
 
     iterator
-    erase(iterator first, iterator last);
+    erase(const_iterator pos)
+    {
+        return v_.erase(pos);
+    }
 
     iterator
-    erase(const_iterator first, const_iterator last);
+    erase(iterator first, iterator last)
+    {
+        return v_.erase(first, last);
+    }
 
-    [[nodiscard]] SerializedTypeID
-    getSType() const override;
+    iterator
+    erase(const_iterator first, const_iterator last)
+    {
+        return v_.erase(first, last);
+    }
 
     [[nodiscard]] bool
-    isEquivalent(STBase const& t) const override;
+    isDefault() const override
+    {
+        return v_.empty();
+    }
 
-    [[nodiscard]] bool
-    isDefault() const override;
-
-private:
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
+    friend bool
+    operator==(STArray const& lhs, STArray const& rhs)
+    {
+        return lhs.v_ == rhs.v_;
+    }
 
     friend class detail::STVar;
 };
-
-template <class Iter>
-STArray::STArray(Iter first, Iter last)
-    requires(std::is_convertible_v<typename std::iterator_traits<Iter>::reference, STObject>)
-    : v_(first, last)
-{
-}
-
-template <class Iter>
-STArray::STArray(SField const& f, Iter first, Iter last)
-    requires(std::is_convertible_v<typename std::iterator_traits<Iter>::reference, STObject>)
-    : STBase(f), v_(first, last)
-{
-}
-
-inline STObject&
-STArray::operator[](std::size_t j)
-{
-    return v_[j];
-}
-
-inline STObject const&
-STArray::operator[](std::size_t j) const
-{
-    return v_[j];
-}
-
-inline STObject&
-STArray::back()
-{
-    return v_.back();
-}
-
-inline STObject const&
-STArray::back() const
-{
-    return v_.back();
-}
-
-template <class... Args>
-inline void
-STArray::emplaceBack(Args&&... args)
-{
-    v_.emplace_back(std::forward<Args>(args)...);
-}
-
-inline void
-STArray::pushBack(STObject const& object)
-{
-    v_.push_back(object);
-}
-
-inline void
-STArray::pushBack(STObject&& object)
-{
-    v_.push_back(std::move(object));
-}
-
-inline STArray::iterator
-STArray::begin()
-{
-    return v_.begin();
-}
-
-inline STArray::iterator
-STArray::end()
-{
-    return v_.end();
-}
-
-inline STArray::const_iterator
-STArray::begin() const
-{
-    return v_.begin();
-}
-
-inline STArray::const_iterator
-STArray::end() const
-{
-    return v_.end();
-}
-
-inline STArray::size_type
-STArray::size() const
-{
-    return v_.size();
-}
-
-inline bool
-STArray::empty() const
-{
-    return v_.empty();
-}
-
-inline void
-STArray::clear()
-{
-    v_.clear();
-}
-
-inline void
-STArray::reserve(std::size_t n)
-{
-    v_.reserve(n);
-}
-
-inline void
-STArray::swap(STArray& a) noexcept
-{
-    v_.swap(a.v_);
-}
-
-inline bool
-STArray::operator==(STArray const& s) const
-{
-    return v_ == s.v_;
-}
-
-inline STArray::iterator
-STArray::erase(iterator pos)
-{
-    return v_.erase(pos);
-}
-
-inline STArray::iterator
-STArray::erase(const_iterator pos)
-{
-    return v_.erase(pos);
-}
-
-inline STArray::iterator
-STArray::erase(iterator first, iterator last)
-{
-    return v_.erase(first, last);
-}
-
-inline STArray::iterator
-STArray::erase(const_iterator first, const_iterator last)
-{
-    return v_.erase(first, last);
-}
 
 }  // namespace xrpl

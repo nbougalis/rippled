@@ -45,7 +45,6 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <utility>
 #include <variant>
 #include <vector>
 
@@ -111,7 +110,7 @@ areComparable(STAmount const& v1, STAmount const& v2)
 
 static_assert(kInitialXrp.drops() == STAmount::kMaxNativeN);
 
-STAmount::STAmount(SerialIter& sit, SField const& name) : STBase(name)
+STAmount::STAmount(SerialIter& sit, SField const& name) : STTypedBase(name)
 {
     std::uint64_t value = sit.get64();
 
@@ -193,13 +192,13 @@ STAmount::STAmount(SerialIter& sit, SField const& name) : STBase(name)
 }
 
 STAmount::STAmount(SField const& name, std::int64_t mantissa)
-    : STBase(name), asset_(xrpIssue()), offset_(0)
+    : STTypedBase(name), asset_(xrpIssue()), offset_(0)
 {
     set(mantissa);
 }
 
 STAmount::STAmount(SField const& name, std::uint64_t mantissa, bool negative)
-    : STBase(name), asset_(xrpIssue()), value_(mantissa), offset_(0), isNegative_(negative)
+    : STTypedBase(name), asset_(xrpIssue()), value_(mantissa), offset_(0), isNegative_(negative)
 {
     XRPL_ASSERT(
         value_ <= std::numeric_limits<std::int64_t>::max(),
@@ -208,7 +207,7 @@ STAmount::STAmount(SField const& name, std::uint64_t mantissa, bool negative)
 }
 
 STAmount::STAmount(SField const& name, STAmount const& from)
-    : STBase(name)
+    : STTypedBase(name)
     , asset_(from.asset_)
     , value_(from.value_)
     , offset_(from.offset_)
@@ -250,18 +249,6 @@ std::unique_ptr<STAmount>
 STAmount::construct(SerialIter& sit, SField const& name)
 {
     return std::make_unique<STAmount>(sit, name);
-}
-
-STBase*
-STAmount::copy(std::size_t n, void* buf) const
-{
-    return emplace(n, buf, *this);
-}
-
-STBase*
-STAmount::move(std::size_t n, void* buf)
-{
-    return emplace(n, buf, std::move(*this));
 }
 
 //------------------------------------------------------------------------------
@@ -621,12 +608,6 @@ STAmount::setJson(json::Value& elem) const
 //
 //------------------------------------------------------------------------------
 
-SerializedTypeID
-STAmount::getSType() const
-{
-    return STI_AMOUNT;
-}
-
 std::string
 STAmount::getFullText() const
 {
@@ -779,13 +760,6 @@ STAmount::add(Serializer& s) const
                 s.addBitString(issue.account);
             }
         });
-}
-
-bool
-STAmount::isEquivalent(STBase const& t) const
-{
-    auto const* v = dynamic_cast<STAmount const*>(&t);
-    return (v != nullptr) && (*v == *this);
 }
 
 bool

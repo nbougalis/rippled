@@ -552,7 +552,7 @@ public:
         static_assert(!std::is_convertible_v<STAmount*, Number*>);
 
         {
-            STAmount const stnum{sfNumber};
+            STAmount const stnum{sfAmount};
             BEAST_EXPECT(stnum.getSType() == STI_AMOUNT);
             BEAST_EXPECT(stnum.getText() == "0");
             BEAST_EXPECT(stnum.isDefault() == true);
@@ -560,38 +560,38 @@ public:
         }
 
         {
-            BEAST_EXPECT(amountFromJson(sfNumber, json::Value(42)) == XRPAmount(42));
-            BEAST_EXPECT(amountFromJson(sfNumber, json::Value(-42)) == XRPAmount(-42));
+            BEAST_EXPECT(amountFromJson(sfAmount, json::Value(42)) == XRPAmount(42));
+            BEAST_EXPECT(amountFromJson(sfAmount, json::Value(-42)) == XRPAmount(-42));
 
-            BEAST_EXPECT(amountFromJson(sfNumber, json::UInt(42)) == XRPAmount(42));
+            BEAST_EXPECT(amountFromJson(sfAmount, json::UInt(42)) == XRPAmount(42));
 
-            BEAST_EXPECT(amountFromJson(sfNumber, "-123") == XRPAmount(-123));
+            BEAST_EXPECT(amountFromJson(sfAmount, "-123") == XRPAmount(-123));
 
-            BEAST_EXPECT(amountFromJson(sfNumber, "123") == XRPAmount(123));
-            BEAST_EXPECT(amountFromJson(sfNumber, "-123") == XRPAmount(-123));
+            BEAST_EXPECT(amountFromJson(sfAmount, "123") == XRPAmount(123));
+            BEAST_EXPECT(amountFromJson(sfAmount, "-123") == XRPAmount(-123));
 
-            BEAST_EXPECT(amountFromJson(sfNumber, "3.14e2") == XRPAmount(314));
-            BEAST_EXPECT(amountFromJson(sfNumber, "-3.14e2") == XRPAmount(-314));
+            BEAST_EXPECT(amountFromJson(sfAmount, "3.14e2") == XRPAmount(314));
+            BEAST_EXPECT(amountFromJson(sfAmount, "-3.14e2") == XRPAmount(-314));
 
-            BEAST_EXPECT(amountFromJson(sfNumber, "0") == XRPAmount(0));
-            BEAST_EXPECT(amountFromJson(sfNumber, "-0") == XRPAmount(0));
+            BEAST_EXPECT(amountFromJson(sfAmount, "0") == XRPAmount(0));
+            BEAST_EXPECT(amountFromJson(sfAmount, "-0") == XRPAmount(0));
 
             constexpr auto kIMin = std::numeric_limits<int>::min();
-            BEAST_EXPECT(amountFromJson(sfNumber, kIMin) == XRPAmount(kIMin));
-            BEAST_EXPECT(amountFromJson(sfNumber, std::to_string(kIMin)) == XRPAmount(kIMin));
+            BEAST_EXPECT(amountFromJson(sfAmount, kIMin) == XRPAmount(kIMin));
+            BEAST_EXPECT(amountFromJson(sfAmount, std::to_string(kIMin)) == XRPAmount(kIMin));
 
             constexpr auto kIMax = std::numeric_limits<int>::max();
-            BEAST_EXPECT(amountFromJson(sfNumber, kIMax) == XRPAmount(kIMax));
-            BEAST_EXPECT(amountFromJson(sfNumber, std::to_string(kIMax)) == XRPAmount(kIMax));
+            BEAST_EXPECT(amountFromJson(sfAmount, kIMax) == XRPAmount(kIMax));
+            BEAST_EXPECT(amountFromJson(sfAmount, std::to_string(kIMax)) == XRPAmount(kIMax));
 
             constexpr auto kUMax = std::numeric_limits<unsigned int>::max();
-            BEAST_EXPECT(amountFromJson(sfNumber, kUMax) == XRPAmount(kUMax));
-            BEAST_EXPECT(amountFromJson(sfNumber, std::to_string(kUMax)) == XRPAmount(kUMax));
+            BEAST_EXPECT(amountFromJson(sfAmount, kUMax) == XRPAmount(kUMax));
+            BEAST_EXPECT(amountFromJson(sfAmount, std::to_string(kUMax)) == XRPAmount(kUMax));
 
             // XRP does not handle fractional part
             try
             {
-                auto const _ = amountFromJson(sfNumber, "0.0");
+                auto const _ = amountFromJson(sfAmount, "0.0");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -603,7 +603,7 @@ public:
             // XRP does not handle fractional part
             try
             {
-                auto const _ = amountFromJson(sfNumber, "1000e-2");
+                auto const _ = amountFromJson(sfAmount, "1000e-2");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -615,7 +615,7 @@ public:
             // Obvious non-numbers tested here
             try
             {
-                auto const _ = amountFromJson(sfNumber, "");
+                auto const _ = amountFromJson(sfAmount, "");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -626,7 +626,7 @@ public:
 
             try
             {
-                auto const _ = amountFromJson(sfNumber, "e");
+                auto const _ = amountFromJson(sfAmount, "e");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -637,7 +637,7 @@ public:
 
             try
             {
-                auto const _ = amountFromJson(sfNumber, "1e");
+                auto const _ = amountFromJson(sfAmount, "1e");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -648,7 +648,7 @@ public:
 
             try
             {
-                auto const _ = amountFromJson(sfNumber, "e2");
+                auto const _ = amountFromJson(sfAmount, "e2");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -659,7 +659,7 @@ public:
 
             try
             {
-                auto const _ = amountFromJson(sfNumber, json::Value());
+                auto const _ = amountFromJson(sfAmount, json::Value());
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -671,7 +671,7 @@ public:
             try
             {
                 auto const _ = amountFromJson(
-                    sfNumber,
+                    sfAmount,
                     "123456789012345678901234567890123456789012345678901234"
                     "5678"
                     "901234567890123456789012345678901234567890123456789012"
@@ -687,7 +687,7 @@ public:
             // We do not handle leading zeros
             try
             {
-                auto const _ = amountFromJson(sfNumber, "001");
+                auto const _ = amountFromJson(sfAmount, "001");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -698,7 +698,7 @@ public:
 
             try
             {
-                auto const _ = amountFromJson(sfNumber, "000.0");
+                auto const _ = amountFromJson(sfAmount, "000.0");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -710,7 +710,7 @@ public:
             // We do not handle dangling dot
             try
             {
-                auto const _ = amountFromJson(sfNumber, ".1");
+                auto const _ = amountFromJson(sfAmount, ".1");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -721,7 +721,7 @@ public:
 
             try
             {
-                auto const _ = amountFromJson(sfNumber, "1.");
+                auto const _ = amountFromJson(sfAmount, "1.");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)
@@ -732,7 +732,7 @@ public:
 
             try
             {
-                auto const _ = amountFromJson(sfNumber, "1.e3");
+                auto const _ = amountFromJson(sfAmount, "1.e3");
                 BEAST_EXPECT(false);
             }
             catch (std::runtime_error const& e)

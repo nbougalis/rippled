@@ -1,20 +1,22 @@
 #pragma once
 
+#include <xrpl/basics/CountedObject.h>
+#include <xrpl/basics/contract.h>
 #include <xrpl/json/json_value.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STBase.h>
 #include <xrpl/protocol/Serializer.h>
 #include <xrpl/protocol/UintTypes.h>
 
-#include <cstddef>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 namespace xrpl {
 
-class STCurrency final : public STBase
+class STCurrency final : public STTypedBase<STI_CURRENCY, STCurrency>,
+                         public CountedObject<STCurrency>
 {
-private:
     Currency currency_;
 
 public:
@@ -22,93 +24,93 @@ public:
 
     STCurrency() = default;
 
-    explicit STCurrency(SerialIter& sit, SField const& name);
+    explicit STCurrency(SField const& name, Currency const& currency)
+        : STTypedBase(name), currency_(currency)
+    {
+    }
 
-    explicit STCurrency(SField const& name, Currency const& currency);
+    explicit STCurrency(SerialIter& sit, SField const& name)
+        : STCurrency(name, Currency{sit.get160()})
+    {
+    }
 
-    explicit STCurrency(SField const& name);
+    explicit STCurrency(SField const& name) : STTypedBase(name)
+    {
+    }
 
     [[nodiscard]] Currency const&
-    currency() const;
-
-    [[nodiscard]] Currency const&
-    value() const noexcept;
-
-    void
-    setCurrency(Currency const& currency);
-
-    [[nodiscard]] SerializedTypeID
-    getSType() const override;
+    value() const noexcept
+    {
+        return currency_;
+    }
 
     [[nodiscard]] std::string
-    getText() const override;
-
-    [[nodiscard]] json::Value getJson(JsonOptions) const override;
+    getText() const override
+    {
+        return to_string(currency_);
+    }
 
     void
-    add(Serializer& s) const override;
+    add(Serializer& s) const override
+    {
+        s.addBitString(currency_);
+    }
 
     [[nodiscard]] bool
-    isEquivalent(STBase const& t) const override;
-
-    [[nodiscard]] bool
-    isDefault() const override;
+    isDefault() const override
+    {
+        return isXRP(currency_);
+    }
 
 private:
     static std::unique_ptr<STCurrency>
-    construct(SerialIter&, SField const& name);
+    construct(SerialIter& sit, SField const& name)
+    {
+        return std::make_unique<STCurrency>(sit, name);
+    }
 
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
+    friend bool
+    operator==(STCurrency const& lhs, STCurrency const& rhs) noexcept
+    {
+        return lhs.currency_ == rhs.currency_;
+    }
+
+    friend auto
+    operator<=>(STCurrency const& lhs, STCurrency const& rhs) noexcept
+    {
+        return lhs.currency_ <=> rhs.currency_;
+    }
+
+    friend bool
+    operator==(STCurrency const& lhs, Currency const& rhs) noexcept
+    {
+        return lhs.currency_ == rhs;
+    }
+
+    friend auto
+    operator<=>(STCurrency const& lhs, Currency const& rhs) noexcept
+    {
+        return lhs.currency_ <=> rhs;
+    }
 
     friend class detail::STVar;
 };
 
-STCurrency
-currencyFromJson(SField const& name, json::Value const& v);
-
-inline Currency const&
-STCurrency::currency() const
+inline STCurrency
+currencyFromJson(SField const& name, json::Value const& v)
 {
-    return currency_;
-}
+    if (!v.isString())
+    {
+        Throw<std::runtime_error>("currencyFromJson currency must be a string Json value");
+    }
 
-inline Currency const&
-STCurrency::value() const noexcept
-{
-    return currency_;
-}
+    auto const currency = toCurrency(v.asString());
+    if (currency == badCurrency() || currency == noCurrency())
+    {
+        Throw<std::runtime_error>("currencyFromJson currency must be a valid currency");
+    }
 
-inline void
-STCurrency::setCurrency(Currency const& currency)
-{
-    currency_ = currency;
-}
-
-inline bool
-operator==(STCurrency const& lhs, STCurrency const& rhs)
-{
-    return lhs.currency() == rhs.currency();
-}
-
-inline bool
-operator<(STCurrency const& lhs, STCurrency const& rhs)
-{
-    return lhs.currency() < rhs.currency();
-}
-
-inline bool
-operator==(STCurrency const& lhs, Currency const& rhs)
-{
-    return lhs.currency() == rhs;
-}
-
-inline bool
-operator<(STCurrency const& lhs, Currency const& rhs)
-{
-    return lhs.currency() < rhs;
+    return STCurrency{name, currency};
 }
 
 }  // namespace xrpl
