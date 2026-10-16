@@ -214,7 +214,7 @@ class STPathSet final : public STBase, public CountedObject<STPathSet>
      * The use of a std::unique_ptr is intentional as it
      * only requires 8 additional bytes of storage for the pointer
      * as opposed to 64 bytes with an optional.  This keeps the size
-     * of the STPathSet to within the `STVar::kMaxSize` limit of 72 bytes.
+     * of the STPathSet to within the `STVar::kMaxSize` limit of 48 bytes.
      */
     std::unique_ptr<HardenedHashSet<STPath>> seen_;
 
