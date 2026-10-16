@@ -25,74 +25,6 @@
 
 namespace xrpl::detail {
 
-DefaultObjectT gDefaultObject;
-NonPresentObjectT gNonPresentObject;
-
-//------------------------------------------------------------------------------
-
-STVar::~STVar()
-{
-    destroy();
-}
-
-STVar::STVar(STVar const& other)
-{
-    if (other.p_ != nullptr)
-        p_ = other.p_->copy(kMaxSize, &d_);
-}
-
-STVar::STVar(STVar&& other)
-{
-    if (other.onHeap())
-    {
-        p_ = other.p_;
-        other.p_ = nullptr;
-    }
-    else
-    {
-        p_ = other.p_->move(kMaxSize, &d_);
-    }
-}
-
-STVar&
-STVar::operator=(STVar const& rhs)
-{
-    if (&rhs != this)
-    {
-        destroy();
-        if (rhs.p_ != nullptr)
-        {
-            p_ = rhs.p_->copy(kMaxSize, &d_);
-        }
-        else
-        {
-            p_ = nullptr;
-        }
-    }
-
-    return *this;
-}
-
-STVar&
-STVar::operator=(STVar&& rhs)
-{
-    if (&rhs != this)
-    {
-        destroy();
-        if (rhs.onHeap())
-        {
-            p_ = rhs.p_;
-            rhs.p_ = nullptr;
-        }
-        else
-        {
-            p_ = rhs.p_->move(kMaxSize, &d_);
-        }
-    }
-
-    return *this;
-}
-
 STVar::STVar(DefaultObjectT, SField const& name) : STVar(name.fieldType, name)
 {
 }
@@ -114,21 +46,6 @@ STVar::STVar(SerializedTypeID id, SField const& name)
         (id == STI_NOTPRESENT) || (id == name.fieldType),
         "xrpl::detail::STVar::STVar(SerializedTypeID) : valid type input");
     constructST(id, 0, name);
-}
-
-void
-STVar::destroy()
-{
-    if (onHeap())
-    {
-        delete p_;
-    }
-    else
-    {
-        p_->~STBase();
-    }
-
-    p_ = nullptr;
 }
 
 template <typename... Args>
