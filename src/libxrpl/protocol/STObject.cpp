@@ -144,11 +144,11 @@ STObject::set(SOTemplate const& type)
     {
         if (elem.style() != SoeRequired)
         {
-            v_.emplace_back(detail::gNonPresentObject, elem.sField());
+            v_.emplace_back(detail::kNonPresentObject, elem.sField());
         }
         else
         {
-            v_.emplace_back(detail::gDefaultObject, elem.sField());
+            v_.emplace_back(detail::kDefaultObject, elem.sField());
         }
     }
 }
@@ -186,7 +186,7 @@ STObject::applyTemplate(SOTemplate const& type)
             {
                 throwFieldErr(e.sField().fieldName, "is required but missing.");
             }
-            v.emplace_back(detail::gNonPresentObject, e.sField());
+            v.emplace_back(detail::kNonPresentObject, e.sField());
         }
     }
     for (auto const& e : v_)
@@ -451,7 +451,7 @@ STObject::getPField(SField const& field, bool createOkay)
     if (index == -1)
     {
         if (createOkay && isFree())
-            return getPIndex(emplaceBack(detail::gDefaultObject, field));
+            return getPIndex(emplaceBack(detail::kDefaultObject, field));
 
         return nullptr;
     }
@@ -533,7 +533,7 @@ STObject::makeFieldPresent(SField const& field)
         if (!isFree())
             throwFieldNotFound(field);
 
-        return getPIndex(emplaceBack(detail::gNonPresentObject, field));
+        return getPIndex(emplaceBack(detail::kNonPresentObject, field));
     }
 
     STBase* f = getPIndex(index);  // NOLINT(misc-const-correctness)
@@ -541,7 +541,7 @@ STObject::makeFieldPresent(SField const& field)
     if (f->getSType() != STI_NOTPRESENT)
         return f;
 
-    v_[index] = detail::STVar(detail::gDefaultObject, f->getFName());
+    v_[index] = detail::STVar(detail::kDefaultObject, f->getFName());
     return getPIndex(index);
 }
 
@@ -557,7 +557,7 @@ STObject::makeFieldAbsent(SField const& field)
 
     if (f.getSType() == STI_NOTPRESENT)
         return;
-    v_[index] = detail::STVar(detail::gNonPresentObject, f.getFName());
+    v_[index] = detail::STVar(detail::kNonPresentObject, f.getFName());
 }
 
 bool
