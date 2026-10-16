@@ -798,7 +798,7 @@ class STParsedJSON_test : public beast::unit_test::Suite
             BEAST_EXPECT(obj.object->isFieldPresent(sfBaseAsset));
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             auto const& curr = obj.object->getFieldCurrency(sfBaseAsset);
-            BEAST_EXPECT(curr.currency().size() == 20);
+            BEAST_EXPECT(curr.value().size() == 20);
         }
 
         // Valid ISO code
@@ -811,7 +811,7 @@ class STParsedJSON_test : public beast::unit_test::Suite
             BEAST_EXPECT(obj.object->isFieldPresent(sfBaseAsset));
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             auto const& curr = obj.object->getFieldCurrency(sfBaseAsset);
-            BEAST_EXPECT(curr.currency().size() == 20);
+            BEAST_EXPECT(curr.value().size() == 20);
         }
 
         // Valid hex string for currency
@@ -823,7 +823,7 @@ class STParsedJSON_test : public beast::unit_test::Suite
             {
                 BEAST_EXPECT(obj.object->isFieldPresent(sfBaseAsset));
                 auto const& curr = obj.object->getFieldCurrency(sfBaseAsset);
-                BEAST_EXPECT(curr.currency().size() == 20);
+                BEAST_EXPECT(curr.value().size() == 20);
             }
         }
 
@@ -845,7 +845,7 @@ class STParsedJSON_test : public beast::unit_test::Suite
             BEAST_EXPECT(obj.object->isFieldPresent(sfBaseAsset));
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             auto const& curr = obj.object->getFieldCurrency(sfBaseAsset);
-            BEAST_EXPECT(curr.currency().size() == 20);
+            BEAST_EXPECT(curr.value().size() == 20);
         }
 
         // Invalid hex string (too short)
@@ -874,7 +874,7 @@ class STParsedJSON_test : public beast::unit_test::Suite
             BEAST_EXPECT(obj.object->isFieldPresent(sfBaseAsset));
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             auto const& curr = obj.object->getFieldCurrency(sfBaseAsset);
-            BEAST_EXPECT(curr.currency().size() == 20);
+            BEAST_EXPECT(curr.value().size() == 20);
         }
 
         // Array value for currency (should fail)

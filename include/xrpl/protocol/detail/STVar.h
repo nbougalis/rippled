@@ -1,5 +1,6 @@
 #pragma once
 
+#include <xrpl/basics/CountedObject.h>
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STBase.h>
@@ -48,7 +49,7 @@ concept ValidConstructSTArgs =
  *
  * @see STBase::copy, STBase::move, STObject
  */
-class STVar
+class STVar : public CountedObject<STVar>
 {
 public:
     /**
@@ -102,7 +103,7 @@ public:
         destroy();
     }
 
-    STVar(STVar const& other)
+    STVar(STVar const& other) : CountedObject(other)
     {
         if (other.p_ != nullptr)
             p_ = other.p_->copy(kMaxSize, d_);

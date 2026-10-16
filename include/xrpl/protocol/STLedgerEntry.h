@@ -46,7 +46,10 @@ public:
     STLedgerEntry(STObject const& object, UInt256 const& index);
 
     [[nodiscard]] SerializedTypeID
-    getSType() const override;
+    getSType() const noexcept override
+    {
+        return STI_LEDGERENTRY;
+    }
 
     [[nodiscard]] std::string
     getFullText() const override;

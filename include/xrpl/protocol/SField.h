@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 
 namespace xrpl {
@@ -20,19 +21,6 @@ Some fields have a different meaning for their
 */
 
 //------------------------------------------------------------------------------
-
-// Forwards
-class STAccount;
-class STAmount;
-class STIssue;
-class STBlob;
-template <int>
-class STBitString;
-template <class>
-class STInteger;
-class STNumber;
-class STVector256;
-class STCurrency;
 
 // NOLINTBEGIN(readability-identifier-naming)
 #pragma push_macro("XMACRO")
@@ -333,25 +321,65 @@ operator~(TypedField<T> const& f)
 
 //------------------------------------------------------------------------------
 
+// Required forward references and (unfortunately) using declarations:
+class STAccount;
+class STAmount;
+class STIssue;
+class STBlob;
+class STNumber;
+class STVector256;
+class STCurrency;
+
+namespace detail {
+
+template <int, SerializedTypeID>
+class STBitString;
+
+// std::int64_t is accepted here only so that SF_INT64 can be named: there is
+// no serialized type with that representation yet. See STInteger.
+template <typename Integer, SerializedTypeID>
+    requires(
+        std::is_same_v<Integer, std::uint8_t> || std::is_same_v<Integer, std::uint16_t> ||
+        std::is_same_v<Integer, std::uint32_t> || std::is_same_v<Integer, std::uint64_t> ||
+        std::is_same_v<Integer, std::int32_t> || std::is_same_v<Integer, std::int64_t>)
+class STInteger;
+
+}  // namespace detail
+
+using STUInt8 = detail::STInteger<std::uint8_t, STI_UINT8>;
+using STUInt16 = detail::STInteger<std::uint16_t, STI_UINT16>;
+using STUInt32 = detail::STInteger<std::uint32_t, STI_UINT32>;
+using STUInt64 = detail::STInteger<std::uint64_t, STI_UINT64>;
+
+using STInt32 = detail::STInteger<std::int32_t, STI_INT32>;
+
+using STUInt96 = detail::STBitString<96, STI_UINT96>;
+using STUInt128 = detail::STBitString<128, STI_UINT128>;
+using STUInt160 = detail::STBitString<160, STI_UINT160>;
+using STUInt192 = detail::STBitString<192, STI_UINT192>;
+using STUInt256 = detail::STBitString<256, STI_UINT256>;
+using STUInt384 = detail::STBitString<384, STI_UINT384>;
+using STUInt512 = detail::STBitString<512, STI_UINT512>;
+
 //------------------------------------------------------------------------------
 
 // TYPED_SFIELD below pastes these names together as SF_##stiSuffix, so the
 // spelling is fixed by the macro and cannot be CamelCase.
 // NOLINTBEGIN(readability-identifier-naming)
-using SF_UINT8 = TypedField<STInteger<std::uint8_t>>;
-using SF_UINT16 = TypedField<STInteger<std::uint16_t>>;
-using SF_UINT32 = TypedField<STInteger<std::uint32_t>>;
-using SF_UINT64 = TypedField<STInteger<std::uint64_t>>;
-using SF_UINT96 = TypedField<STBitString<96>>;
-using SF_UINT128 = TypedField<STBitString<128>>;
-using SF_UINT160 = TypedField<STBitString<160>>;
-using SF_UINT192 = TypedField<STBitString<192>>;
-using SF_UINT256 = TypedField<STBitString<256>>;
-using SF_UINT384 = TypedField<STBitString<384>>;
-using SF_UINT512 = TypedField<STBitString<512>>;
+using SF_UINT8 = TypedField<STUInt8>;
+using SF_UINT16 = TypedField<STUInt16>;
+using SF_UINT32 = TypedField<STUInt32>;
+using SF_UINT64 = TypedField<STUInt64>;
+using SF_UINT96 = TypedField<STUInt96>;
+using SF_UINT128 = TypedField<STUInt128>;
+using SF_UINT160 = TypedField<STUInt160>;
+using SF_UINT192 = TypedField<STUInt192>;
+using SF_UINT256 = TypedField<STUInt256>;
+using SF_UINT384 = TypedField<STUInt384>;
+using SF_UINT512 = TypedField<STUInt512>;
 
-using SF_INT32 = TypedField<STInteger<std::int32_t>>;
-using SF_INT64 = TypedField<STInteger<std::int64_t>>;
+using SF_INT32 = TypedField<STInt32>;
+using SF_INT64 = TypedField<detail::STInteger<std::int64_t, STI_INT64>>;
 
 using SF_ACCOUNT = TypedField<STAccount>;
 using SF_AMOUNT = TypedField<STAmount>;

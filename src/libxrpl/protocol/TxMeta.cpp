@@ -132,7 +132,7 @@ TxMeta::getAffectedAccounts() const
                     }
                     else if (field.getFName() == sfMPTokenIssuanceID)
                     {
-                        auto mptID = dynamic_cast<STBitString<192> const*>(&field);
+                        auto mptID = dynamic_cast<STUInt192 const*>(&field);
                         if (mptID != nullptr)
                         {
                             auto const issuer = MPTIssue(mptID->value()).getIssuer();
@@ -176,7 +176,7 @@ TxMeta::getAffectedMPTs() const
 
                 for (auto const& field : *inner)
                 {
-                    if (auto mptID = dynamic_cast<STBitString<192> const*>(&field);
+                    if (auto mptID = dynamic_cast<STUInt192 const*>(&field);
                         field.getFName() == sfMPTokenIssuanceID && (mptID != nullptr))
                     {
                         list.insert(mptID->value());
