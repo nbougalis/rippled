@@ -334,17 +334,22 @@ private:
  *       layout or size of derived classes, beyond the overhead which
  *       is imposed by STBase itself.
  *
- * @tparam ID      The @ref SerializedTypeID that identifies this type in
- *                 the binary serialization protocol.
- * @tparam Derived The class deriving from this one (CRTP); it must be
- *                 `final`.
+ * @tparam ID        The @ref SerializedTypeID that identifies this type in
+ *                   the binary serialization protocol.
+ * @tparam Derived   The most derived class (CRTP); it must be `final`.
+ * @tparam Immediate The class that directly derives from this one. This
+ *                   is @p Derived for a leaf type, or an intermediate base
+ *                   (e.g. @ref STTakesAsset) that sits between the two.
  */
-template <SerializedTypeID ID, typename Derived>
+template <SerializedTypeID ID, typename Derived, typename Immediate = Derived>
+// The constructors are private and the immediate subclass is befriended, so
+// that the CRTP parameters must name the classes actually deriving from this
+// one. clang-tidy only recognizes the pattern when the friend is the first
+// template parameter, but the same guarantee holds for Immediate.
+// NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility)
 class STTypedBase : public STBase
 {
-    // The constructors are private and Derived is befriended, so that the
-    // CRTP parameter must be the deriving class itself.
-    friend Derived;
+    friend Immediate;
 
     STTypedBase() = default;
 
@@ -370,6 +375,7 @@ class STTypedBase : public STBase
 
 public:
     using DerivedType = Derived;
+    using TypedBase = STTypedBase;
 
     static constexpr SerializedTypeID kTypeId = ID;
 
@@ -401,9 +407,13 @@ public:
             std::is_final_v<Derived>, "STTypedBase requires the Derived class to be 'final'");
 
         static_assert(
-            std::is_base_of_v<STTypedBase, Derived>,
-            "STTypedBase requires CRTP: Derived must inherit from "
-            "STTypedBase<ID, Derived>");
+            std::is_base_of_v<STTypedBase, Immediate>,
+            "STTypedBase requires CRTP: Immediate must inherit from "
+            "STTypedBase<ID, Derived, Immediate>");
+
+        static_assert(
+            std::is_base_of_v<Immediate, Derived>,
+            "STTypedBase requires CRTP: Derived must inherit from Immediate");
     }
 
     [[nodiscard]] SerializedTypeID
@@ -451,10 +461,9 @@ private:
  * Concept that identifies a concrete serialized type with a compile-time
  * type identifier.
  *
- * A type satisfies @c STTyped if it:
- * - Exposes a @c static @c constexpr @c SerializedTypeID member named
- *   @c kTypeId, and
- * - Derives from @ref STTypedBase<T::kTypeId, T>.
+ * A type satisfies @c STTyped if it derives from an @ref STTypedBase
+ * whose @c Derived parameter is the type itself, directly or through an
+ * intermediate base such as @ref STTakesAsset.
  *
  * This concept is used to enable optimized dispatch in generic code:
  * for example, @ref STBase::downcast can use a cheaper @c static_cast
@@ -464,9 +473,12 @@ private:
  * @see STTypedBase
  */
 template <typename T>
-concept STTyped = requires {
-    { T::kTypeId } -> std::convertible_to<SerializedTypeID>;
-} && std::is_base_of_v<STTypedBase<T::kTypeId, T>, T>;
+concept STTyped =
+    requires {
+        { T::kTypeId } -> std::convertible_to<SerializedTypeID>;
+        typename T::TypedBase;
+    } && std::derived_from<T, typename T::TypedBase> &&
+    std::same_as<typename T::TypedBase::DerivedType, T>;
 
 //------------------------------------------------------------------------------
 
