@@ -10,7 +10,6 @@
 #include <xrpl/protocol/STIssue.h>
 #include <xrpl/protocol/Serializer.h>
 
-#include <cstddef>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -20,7 +19,8 @@ namespace xrpl {
 class Serializer;
 class STObject;
 
-class STXChainBridge final : public STBase, public CountedObject<STXChainBridge>
+class STXChainBridge final : public STTypedBase<STI_XCHAIN_BRIDGE, STXChainBridge>,
+                             public CountedObject<STXChainBridge>
 {
     STAccount lockingChainDoor_{sfLockingChainDoor};
     STIssue lockingChainIssue_{sfLockingChainIssue};
@@ -88,16 +88,10 @@ public:
     [[nodiscard]] Issue const&
     issue(ChainType ct) const;
 
-    [[nodiscard]] SerializedTypeID
-    getSType() const override;
-
     [[nodiscard]] json::Value getJson(JsonOptions) const override;
 
     void
     add(Serializer& s) const override;
-
-    [[nodiscard]] bool
-    isEquivalent(STBase const& t) const override;
 
     [[nodiscard]] bool
     isDefault() const override;
@@ -108,11 +102,6 @@ public:
 private:
     static std::unique_ptr<STXChainBridge>
     construct(SerialIter&, SField const& name);
-
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
 
     friend bool
     operator==(STXChainBridge const& lhs, STXChainBridge const& rhs);

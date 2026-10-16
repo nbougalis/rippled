@@ -9,7 +9,9 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -101,6 +103,50 @@ inline std::optional<Blob>
 strUnHex(std::string_view strSrc)
 {
     return strUnHex(strSrc.size(), strSrc.cbegin(), strSrc.cend());
+}
+
+/**
+ * Join elements of a range into a string using a separator.
+ *
+ * Applies @p accessor to each element in @p range and concatenates
+ * the non-empty results, separated by @p sep.
+ *
+ * @tparam Range    An iterable range type.
+ * @tparam Accessor A callable that takes an element of @p range and returns
+ *                  a type convertible to @c std::string.
+ *
+ * @param range    The range of elements to join.
+ * @param accessor A callable used to convert each element to a string.
+ * @param sep      The separator to insert between non-empty results.
+ *                 Defaults to @c ", ".
+ *
+ * @return A string containing the non-empty results of @p accessor applied
+ *         to each element of @p range, separated by @p sep. Elements for
+ *         which @p accessor returns an empty string are skipped.
+ */
+template <typename Range, typename Accessor>
+    requires(
+        std::ranges::input_range<Range const&> &&
+        std::convertible_to<
+            std::invoke_result_t<Accessor&, std::ranges::range_reference_t<Range const&>>,
+            std::string>)
+std::string
+rangeToString(Range const& range, Accessor&& accessor, std::string_view sep = ", ")
+{
+    std::string ret;
+
+    for (auto const& elem : range)
+    {
+        if (std::string const text = std::invoke(accessor, elem); !text.empty())
+        {
+            if (!ret.empty())
+                ret += sep;
+
+            ret += text;
+        }
+    }
+
+    return ret;
 }
 
 struct ParsedUrl

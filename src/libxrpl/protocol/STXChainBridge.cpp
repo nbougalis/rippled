@@ -11,20 +11,18 @@
 #include <xrpl/protocol/Serializer.h>
 #include <xrpl/protocol/jss.h>
 
-#include <cstddef>
 #include <format>
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <utility>
 
 namespace xrpl {
 
-STXChainBridge::STXChainBridge() : STBase{sfXChainBridge}
+STXChainBridge::STXChainBridge() : STTypedBase{sfXChainBridge}
 {
 }
 
-STXChainBridge::STXChainBridge(SField const& name) : STBase{name}
+STXChainBridge::STXChainBridge(SField const& name) : STTypedBase{name}
 {
 }
 
@@ -33,7 +31,7 @@ STXChainBridge::STXChainBridge(
     Issue const& srcChainIssue,
     AccountID const& dstChainDoor,
     Issue const& dstChainIssue)
-    : STBase{sfXChainBridge}
+    : STTypedBase{sfXChainBridge}
     , lockingChainDoor_{sfLockingChainDoor, srcChainDoor}
     , lockingChainIssue_{sfLockingChainIssue, srcChainIssue}
     , issuingChainDoor_{sfIssuingChainDoor, dstChainDoor}
@@ -42,7 +40,7 @@ STXChainBridge::STXChainBridge(
 }
 
 STXChainBridge::STXChainBridge(STObject const& o)
-    : STBase{sfXChainBridge}
+    : STTypedBase{sfXChainBridge}
     , lockingChainDoor_{sfLockingChainDoor, o[sfLockingChainDoor]}
     , lockingChainIssue_{sfLockingChainIssue, o[sfLockingChainIssue]}
     , issuingChainDoor_{sfIssuingChainDoor, o[sfIssuingChainDoor]}
@@ -54,7 +52,7 @@ STXChainBridge::STXChainBridge(json::Value const& v) : STXChainBridge{sfXChainBr
 {
 }
 
-STXChainBridge::STXChainBridge(SField const& name, json::Value const& v) : STBase{name}
+STXChainBridge::STXChainBridge(SField const& name, json::Value const& v) : STTypedBase{name}
 {
     if (!v.isObject())
     {
@@ -110,7 +108,7 @@ STXChainBridge::STXChainBridge(SField const& name, json::Value const& v) : STBas
 }
 
 STXChainBridge::STXChainBridge(SerialIter& sit, SField const& name)
-    : STBase{name}
+    : STTypedBase{name}
     , lockingChainDoor_{sit, sfLockingChainDoor}
     , lockingChainIssue_{sit, sfLockingChainIssue}
     , issuingChainDoor_{sit, sfIssuingChainDoor}
@@ -164,19 +162,6 @@ STXChainBridge::toSTObject() const
     return o;
 }
 
-SerializedTypeID
-STXChainBridge::getSType() const
-{
-    return STI_XCHAIN_BRIDGE;
-}
-
-bool
-STXChainBridge::isEquivalent(STBase const& t) const
-{
-    auto const* v = dynamic_cast<STXChainBridge const*>(&t);
-    return (v != nullptr) && (*v == *this);
-}
-
 bool
 STXChainBridge::isDefault() const
 {
@@ -188,17 +173,5 @@ std::unique_ptr<STXChainBridge>
 STXChainBridge::construct(SerialIter& sit, SField const& name)
 {
     return std::make_unique<STXChainBridge>(sit, name);
-}
-
-STBase*
-STXChainBridge::copy(std::size_t n, void* buf) const
-{
-    return emplace(n, buf, *this);
-}
-
-STBase*
-STXChainBridge::move(std::size_t n, void* buf)
-{
-    return emplace(n, buf, std::move(*this));
 }
 }  // namespace xrpl

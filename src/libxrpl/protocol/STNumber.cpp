@@ -42,7 +42,7 @@ STNumber::STNumber(SerialIter& sit, SField const& field) : STTakesAsset(field)
 }
 
 SerializedTypeID
-STNumber::getSType() const
+STNumber::getSType() const noexcept
 {
     return STI_NUMBER;
 }

@@ -205,7 +205,7 @@ hash_append(Hasher& h, STPath const& p) noexcept
 //------------------------------------------------------------------------------
 
 // A set of zero or more payment paths
-class STPathSet final : public STBase, public CountedObject<STPathSet>
+class STPathSet final : public STTypedBase<STI_PATHSET, STPathSet>, public CountedObject<STPathSet>
 {
     std::vector<STPath> value_;
 
@@ -248,9 +248,6 @@ public:
 
     [[nodiscard]] json::Value getJson(JsonOptions) const override;
 
-    [[nodiscard]] SerializedTypeID
-    getSType() const override;
-
     /**
      * @brief assembleAdd adds a path to the set by combining a base path and a tail element.
      *
@@ -263,9 +260,6 @@ public:
      */
     bool
     assembleAdd(STPath const& base, STPathElement const& tail);
-
-    [[nodiscard]] bool
-    isEquivalent(STBase const& t) const override;
 
     [[nodiscard]] bool
     isDefault() const override;
@@ -319,12 +313,13 @@ public:
     bool
     emplaceBack(Args&&... args);
 
-private:
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
+    friend bool
+    operator==(STPathSet const& lhs, STPathSet const& rhs) noexcept
+    {
+        return lhs.value_ == rhs.value_;
+    }
 
+private:
     /**
      * @brief Append a path via `append`, then register it in the deduplication index.
      *
@@ -570,7 +565,7 @@ STPath::reserve(size_t s)
 
 // ------------ STPathSet ------------
 
-inline STPathSet::STPathSet(SField const& n) : STBase(n)
+inline STPathSet::STPathSet(SField const& n) : STTypedBase(n)
 {
 }
 

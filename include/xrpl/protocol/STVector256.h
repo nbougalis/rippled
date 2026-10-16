@@ -1,19 +1,25 @@
 #pragma once
 
 #include <xrpl/basics/CountedObject.h>
+#include <xrpl/basics/Slice.h>
 #include <xrpl/basics/base_uint.h>
+#include <xrpl/basics/contract.h>
+#include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/json/json_value.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STBase.h>
 #include <xrpl/protocol/Serializer.h>
 
 #include <cstddef>
+#include <format>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
 namespace xrpl {
 
-class STVector256 : public STBase, public CountedObject<STVector256>
+class STVector256 final : public STTypedBase<STI_VECTOR256, STVector256>,
+                          public CountedObject<STVector256>
 {
     std::vector<UInt256> value_;
 
@@ -22,215 +28,187 @@ public:
 
     STVector256() = default;
 
-    explicit STVector256(SField const& n);
-    explicit STVector256(std::vector<UInt256> vector);
-    STVector256(SField const& n, std::vector<UInt256> vector);
-    STVector256(SerialIter& sit, SField const& name);
+    explicit STVector256(SField const& n) : STTypedBase(n)
+    {
+    }
 
-    [[nodiscard]] SerializedTypeID
-    getSType() const override;
+    explicit STVector256(std::vector<UInt256> vector) : value_(std::move(vector))
+    {
+    }
+
+    STVector256(SField const& n, std::vector<UInt256> vector)
+        : STTypedBase(n), value_(std::move(vector))
+    {
+    }
+
+    STVector256(SerialIter& sit, SField const& name) : STTypedBase(name)
+    {
+        auto const slice = sit.getVL();
+
+        if (slice.size() % UInt256::size() != 0)
+        {
+            Throw<std::runtime_error>(
+                std::format("Bad serialization for STVector256: {}", slice.size()));
+        }
+
+        value_.reserve(slice.size() / UInt256::kBytes);
+
+        SerialIter inner{slice};
+
+        while (!inner.empty())
+            value_.push_back(inner.get256());
+    }
 
     void
-    add(Serializer& s) const override;
+    add(Serializer& s) const override
+    {
+        XRPL_ASSERT(getFName().isBinary(), "xrpl::STVector256::add : field is binary");
+        XRPL_ASSERT(
+            getFName().fieldType == STI_VECTOR256, "xrpl::STVector256::add : valid field type");
 
-    [[nodiscard]] json::Value getJson(JsonOptions) const override;
+        // Because uint256 has no padding and the container stores the values
+        // contiguously, they are already in wire layout, so we can serialize
+        // them in one go:
+        s.addVL(Slice{value_.data(), value_.size() * UInt256::size()});
+    }
+
+    [[nodiscard]] json::Value
+    getJson(JsonOptions) const override
+    {
+        json::Value ret(json::ValueType::Array);
+
+        for (auto const& vEntry : value_)
+            ret.append(to_string(vEntry));
+
+        return ret;
+    }
 
     [[nodiscard]] bool
-    isEquivalent(STBase const& t) const override;
-
-    [[nodiscard]] bool
-    isDefault() const override;
-
-    STVector256&
-    operator=(std::vector<UInt256> const& v);
+    isDefault() const override
+    {
+        return value_.empty();
+    }
 
     STVector256&
-    operator=(std::vector<UInt256>&& v);
+    operator=(std::vector<UInt256> const& v)
+    {
+        value_ = v;
+        return *this;
+    }
+
+    STVector256&
+    operator=(std::vector<UInt256>&& v)
+    {
+        value_ = std::move(v);
+        return *this;
+    }
 
     void
-    setValue(STVector256 const& v);
+    setValue(STVector256 const& v)
+    {
+        value_ = v.value_;
+    }
 
     /**
      * Retrieve a copy of the vector we contain
      */
     explicit
-    operator std::vector<UInt256>() const;
+    operator std::vector<UInt256>() const
+    {
+        return value_;
+    }
 
     [[nodiscard]] std::size_t
-    size() const;
+    size() const
+    {
+        return value_.size();
+    }
 
     void
-    resize(std::size_t n);
+    resize(std::size_t n)
+    {
+        value_.resize(n);
+    }
 
     [[nodiscard]] bool
-    empty() const;
+    empty() const
+    {
+        return value_.empty();
+    }
 
-    std::vector<UInt256>::reference
-    operator[](std::vector<UInt256>::size_type n);
+    [[nodiscard]] std::vector<UInt256>::reference
+    operator[](std::vector<UInt256>::size_type n)
+    {
+        return value_[n];
+    }
 
-    std::vector<UInt256>::const_reference
-    operator[](std::vector<UInt256>::size_type n) const;
+    [[nodiscard]] std::vector<UInt256>::const_reference
+    operator[](std::vector<UInt256>::size_type n) const
+    {
+        return value_[n];
+    }
 
     [[nodiscard]] std::vector<UInt256> const&
-    value() const;
+    value() const
+    {
+        return value_;
+    }
 
     std::vector<UInt256>::iterator
-    insert(std::vector<UInt256>::const_iterator pos, UInt256 const& value);
+    insert(std::vector<UInt256>::const_iterator pos, UInt256 const& value)
+    {
+        return value_.insert(pos, value);
+    }
 
     void
-    pushBack(UInt256 const& v);
+    pushBack(UInt256 const& v)
+    {
+        value_.push_back(v);
+    }
 
-    std::vector<UInt256>::iterator
-    begin();
+    [[nodiscard]] std::vector<UInt256>::iterator
+    begin()
+    {
+        return value_.begin();
+    }
 
     [[nodiscard]] std::vector<UInt256>::const_iterator
-    begin() const;
+    begin() const
+    {
+        return value_.begin();
+    }
 
-    std::vector<UInt256>::iterator
-    end();
+    [[nodiscard]] std::vector<UInt256>::iterator
+    end()
+    {
+        return value_.end();
+    }
 
     [[nodiscard]] std::vector<UInt256>::const_iterator
-    end() const;
+    end() const
+    {
+        return value_.end();
+    }
 
     std::vector<UInt256>::iterator
-    erase(std::vector<UInt256>::iterator position);
+    erase(std::vector<UInt256>::iterator position)
+    {
+        return value_.erase(position);
+    }
 
     void
-    clear() noexcept;
+    clear() noexcept
+    {
+        value_.clear();
+    }
 
-private:
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
+    friend bool
+    operator==(STVector256 const& lhs, STVector256 const& rhs) noexcept
+    {
+        return lhs.value_ == rhs.value_;
+    }
 
     friend class detail::STVar;
 };
-
-inline STVector256::STVector256(SField const& n) : STBase(n)
-{
-}
-
-inline STVector256::STVector256(std::vector<UInt256> vector) : value_(std::move(vector))
-{
-}
-
-inline STVector256::STVector256(SField const& n, std::vector<UInt256> vector)
-    : STBase(n), value_(std::move(vector))
-{
-}
-
-inline STVector256&
-STVector256::operator=(std::vector<UInt256> const& v)
-{
-    value_ = v;
-    return *this;
-}
-
-inline STVector256&
-STVector256::operator=(std::vector<UInt256>&& v)
-{
-    value_ = std::move(v);
-    return *this;
-}
-
-inline void
-STVector256::setValue(STVector256 const& v)
-{
-    value_ = v.value_;
-}
-
-/**
- * Retrieve a copy of the vector we contain
- */
-inline STVector256::
-operator std::vector<UInt256>() const
-{
-    return value_;
-}
-
-inline std::size_t
-STVector256::size() const
-{
-    return value_.size();
-}
-
-inline void
-STVector256::resize(std::size_t n)
-{
-    value_.resize(n);
-}
-
-inline bool
-STVector256::empty() const
-{
-    return value_.empty();
-}
-
-inline std::vector<UInt256>::reference
-STVector256::operator[](std::vector<UInt256>::size_type n)
-{
-    return value_[n];
-}
-
-inline std::vector<UInt256>::const_reference
-STVector256::operator[](std::vector<UInt256>::size_type n) const
-{
-    return value_[n];
-}
-
-inline std::vector<UInt256> const&
-STVector256::value() const
-{
-    return value_;
-}
-
-inline std::vector<UInt256>::iterator
-STVector256::insert(std::vector<UInt256>::const_iterator pos, UInt256 const& value)
-{
-    return value_.insert(pos, value);
-}
-
-inline void
-STVector256::pushBack(UInt256 const& v)
-{
-    value_.push_back(v);
-}
-
-inline std::vector<UInt256>::iterator
-STVector256::begin()
-{
-    return value_.begin();
-}
-
-inline std::vector<UInt256>::const_iterator
-STVector256::begin() const
-{
-    return value_.begin();
-}
-
-inline std::vector<UInt256>::iterator
-STVector256::end()
-{
-    return value_.end();
-}
-
-inline std::vector<UInt256>::const_iterator
-STVector256::end() const
-{
-    return value_.end();
-}
-
-inline std::vector<UInt256>::iterator
-STVector256::erase(std::vector<UInt256>::iterator position)
-{
-    return value_.erase(position);
-}
-
-inline void
-STVector256::clear() noexcept
-{
-    value_.clear();
-}
 
 }  // namespace xrpl

@@ -45,7 +45,7 @@ STPathSet::STPathSet(DeduplicationTag) : seen_{std::make_unique<HardenedHashSet<
 }
 
 STPathSet::STPathSet(STPathSet const& other)
-    : STBase{other}
+    : STTypedBase{other}
     , CountedObject<STPathSet>{other}
     , value_{other.value_}
     , seen_{
@@ -71,7 +71,7 @@ STPathSet::operator=(STPathSet const& other)
     return *this;
 }
 
-STPathSet::STPathSet(SerialIter& sit, SField const& name) : STBase(name)
+STPathSet::STPathSet(SerialIter& sit, SField const& name) : STTypedBase(name)
 {
     std::vector<STPathElement> path;
 
@@ -126,18 +126,6 @@ STPathSet::STPathSet(SerialIter& sit, SField const& name) : STBase(name)
     } while (type != STPathElementType::None);
 }
 
-STBase*
-STPathSet::copy(std::size_t n, void* buf) const
-{
-    return emplace(n, buf, *this);
-}
-
-STBase*
-STPathSet::move(std::size_t n, void* buf)
-{
-    return emplace(n, buf, std::move(*this));
-}
-
 bool
 STPathSet::assembleAdd(STPath const& base, STPathElement const& tail)
 {  // assemble base+tail and add it to the set if it's not a duplicate
@@ -145,13 +133,6 @@ STPathSet::assembleAdd(STPath const& base, STPathElement const& tail)
     STPath combined = base;
     combined.pushBack(tail);
     return appendUnique([&](auto& value) { value.push_back(std::move(combined)); });
-}
-
-bool
-STPathSet::isEquivalent(STBase const& t) const
-{
-    auto const* v = dynamic_cast<STPathSet const*>(&t);
-    return (v != nullptr) && (value_ == v->value_);
 }
 
 bool
@@ -209,12 +190,6 @@ STPathSet::getJson(JsonOptions options) const
         ret.append(it.getJson(options));
 
     return ret;
-}
-
-SerializedTypeID
-STPathSet::getSType() const
-{
-    return STI_PATHSET;
 }
 
 void
