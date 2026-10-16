@@ -22,7 +22,6 @@
 #include <xrpl/protocol/XRPAmount.h>
 #include <xrpl/protocol/json_get_or_throw.h>
 
-#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -42,7 +41,7 @@ namespace xrpl {
 // Wire form:
 // High 8 bits are (offset+142), legal range is, 80 to 22 inclusive
 // Low 56 bits are value, legal range is 10^15 to (10^16 - 1) inclusive
-class STAmount final : public STBase, public CountedObject<STAmount>
+class STAmount final : public STTypedBase<STI_AMOUNT, STAmount>, public CountedObject<STAmount>
 {
 public:
     using MantissaType = std::uint64_t;
@@ -269,9 +268,6 @@ public:
     //
     //--------------------------------------------------------------------------
 
-    [[nodiscard]] SerializedTypeID
-    getSType() const override;
-
     [[nodiscard]] std::string
     getFullText() const override;
 
@@ -282,9 +278,6 @@ public:
 
     void
     add(Serializer& s) const override;
-
-    [[nodiscard]] bool
-    isEquivalent(STBase const& t) const override;
 
     [[nodiscard]] bool
     isDefault() const override;
@@ -309,11 +302,6 @@ private:
     void
     canonicalize();
 
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
-
     STAmount&
     operator=(IOUAmount const& iou);
 
@@ -331,7 +319,7 @@ STAmount::STAmount(
     ExponentType exponent,
     bool negative,
     Unchecked)
-    : STBase(name), asset_(asset), value_(mantissa), offset_(exponent), isNegative_(negative)
+    : STTypedBase(name), asset_(asset), value_(mantissa), offset_(exponent), isNegative_(negative)
 {
 }
 
@@ -353,7 +341,7 @@ STAmount::STAmount(
     std::uint64_t mantissa,
     int exponent,
     bool negative)
-    : STBase(name), asset_(asset), value_(mantissa), offset_(exponent), isNegative_(negative)
+    : STTypedBase(name), asset_(asset), value_(mantissa), offset_(exponent), isNegative_(negative)
 {
     // value_ is uint64, but needs to fit in the range of int64
     if (Number::getMantissaScale() == MantissaRange::MantissaScale::Small)

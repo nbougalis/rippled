@@ -4,6 +4,7 @@
 #include <xrpl/basics/CountedObject.h>
 #include <xrpl/basics/Number.h>
 #include <xrpl/basics/Slice.h>
+#include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/utility/instrumentation.h>
@@ -46,6 +47,23 @@ throwFieldNotFound(SField const& field)
     Throw<std::runtime_error>("Field not found: " + field.getName());
 }
 
+/**
+ * A serialized object that contains a collection of named fields.
+ *
+ * An STObject is a container type that holds a heterogeneous collection
+ * of @ref STBase-derived fields, each identified by an @ref SField.
+ *
+ * It provides the foundation for all structured serialized types in the
+ * protocol, including transactions, ledger entries, and inner objects.
+ *
+ * Unlike the leaf serialized types (e.g. @ref STAccount), STObject does
+ * not derive from @ref STTypedBase since other classes must derive from
+ * it (e.g. @ref STTx). Those classes each represent distinct high-level
+ * types (e.g. @ref STI_TRANSACTION) with distinct @ref SerializedTypeID
+ * values.
+ *
+ * @see STBase, STTypedBase, STTx, STLedgerEntry
+ */
 class STObject : public STBase, public CountedObject<STObject>
 {
     // Proxy value for a STBase derived class
@@ -86,9 +104,9 @@ public:
 
     STObject&
     operator=(STObject const&) = default;
-    STObject(STObject&&);
+    STObject(STObject&&) noexcept;
     STObject&
-    operator=(STObject&& other);
+    operator=(STObject&& other) noexcept;
 
     STObject(SOTemplate const& type, SField const& name);
     STObject(
@@ -131,7 +149,10 @@ public:
     set(SerialIter& u, int depth = 0, bool requireCanonicalOrder = false);
 
     [[nodiscard]] SerializedTypeID
-    getSType() const override;
+    getSType() const noexcept override
+    {
+        return STI_OBJECT;
+    }
 
     [[nodiscard]] bool
     isEquivalent(STBase const& t) const override;
@@ -143,10 +164,31 @@ public:
     add(Serializer& s) const override;
 
     [[nodiscard]] std::string
-    getFullText() const override;
+    getFullText() const override
+    {
+        std::string ret;
+
+        if (getFName().hasName())
+        {
+            ret = getFName().getName();
+            ret += " = {";
+        }
+        else
+        {
+            ret = "{";
+        }
+
+        ret += rangeToString(v_, [](detail::STVar const& object) { return object->getFullText(); });
+
+        return ret + "}";
+    }
 
     [[nodiscard]] std::string
-    getText() const override;
+    getText() const override
+    {
+        return "{" +
+            rangeToString(v_, [](detail::STVar const& object) { return object->getText(); }) + "}";
+    }
 
     // TODO(tom): options should be an enum.
     [[nodiscard]] json::Value getJson(JsonOptions = JsonOptions::Values::None) const override;
@@ -1158,8 +1200,7 @@ STObject::setFieldH160(SField const& field, BaseUInt<160, Tag> const& v)
     if (rf->getSType() == STI_NOTPRESENT)
         rf = makeFieldPresent(field);
 
-    using Bits = STBitString<160>;
-    if (auto cf = dynamic_cast<Bits*>(rf))
+    if (auto cf = dynamic_cast<STUInt160*>(rf))
     {
         cf->setValue(v);
     }

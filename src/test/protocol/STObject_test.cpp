@@ -480,9 +480,10 @@ public:
 
         try
         {
+            // Contains a duplicate field:
             std::array<std::uint8_t, 7> const payload{{0xe9, 0x12, 0xab, 0xcd, 0x12, 0xfe, 0xdc}};
             SerialIter sit{makeSlice(payload)};
-            auto const obj = std::make_shared<STArray>(sit, sfMetadata);
+            auto const obj = std::make_shared<STArray>(sit, sfMemos);
             BEAST_EXPECT(!obj);
         }
         catch (std::exception const& e)
@@ -492,7 +493,35 @@ public:
 
         try
         {
-            std::array<std::uint8_t, 3> const payload{{0xe2, 0xe1, 0xe2}};
+            // This contains a duplicate field.
+            std::array<std::uint8_t, 8> const payload{
+                {0xe9, 0x12, 0xab, 0xcd, 0x12, 0xfe, 0xdc, 0xe1}};
+            SerialIter sit{makeSlice(payload)};
+            auto const obj = std::make_shared<STArray>(sit, sfMemos);
+            BEAST_EXPECT(!obj);
+        }
+        catch (std::exception const& e)
+        {
+            BEAST_EXPECT(strcmp(e.what(), "Duplicate field detected") == 0);
+        }
+
+        try
+        {
+            // Array containing an array
+            std::array<std::uint8_t, 9> const payload{
+                {0xf5, 0xe9, 0x12, 0xab, 0xcd, 0x13, 0xfe, 0xdc, 0xe1}};
+            SerialIter sit{makeSlice(payload)};
+            auto const obj = std::make_shared<STArray>(sit, sfAffectedNodes);
+            BEAST_EXPECT(!obj);
+        }
+        catch (std::exception const& e)
+        {
+            BEAST_EXPECT(strcmp(e.what(), "Non-object in array") == 0);
+        }
+
+        try
+        {
+            std::array<std::uint8_t, 4> const payload{{0xe2, 0xe1, 0xe2, 0xe1}};
             SerialIter sit{makeSlice(payload)};
             auto const obj = std::make_shared<STObject>(sit, sfMetadata);
             BEAST_EXPECT(!obj);

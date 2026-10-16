@@ -51,7 +51,7 @@ public:
     STNumber(SerialIter& sit, SField const& field);
 
     [[nodiscard]] SerializedTypeID
-    getSType() const override;
+    getSType() const noexcept override;
     [[nodiscard]] std::string
     getText() const override;
     void

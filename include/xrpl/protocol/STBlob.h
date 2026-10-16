@@ -3,12 +3,14 @@
 #include <xrpl/basics/Buffer.h>
 #include <xrpl/basics/CountedObject.h>
 #include <xrpl/basics/Slice.h>
+#include <xrpl/basics/strHex.h>
+#include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STBase.h>
 #include <xrpl/protocol/Serializer.h>
 
+#include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -16,7 +18,7 @@
 namespace xrpl {
 
 // variable length byte string
-class STBlob : public STBase, public CountedObject<STBlob>
+class STBlob final : public STTypedBase<STI_VL, STBlob>, public CountedObject<STBlob>
 {
     Buffer value_;
 
@@ -33,103 +35,90 @@ public:
     STBlob&
     operator=(STBlob&&) noexcept = default;
 
-    STBlob(SField const& f, void const* data, std::size_t size);
-    STBlob(SField const& f, Buffer&& b);
-    STBlob(SField const& n);
-    STBlob(SerialIter&, SField const& name = sfGeneric);
+    STBlob(SField const& f, void const* data, std::size_t size) : STTypedBase(f), value_(data, size)
+    {
+    }
+
+    STBlob(SField const& f, Buffer&& b) : STTypedBase(f), value_(std::move(b))
+    {
+    }
+
+    STBlob(SField const& n) : STTypedBase(n)
+    {
+    }
+
+    STBlob(SerialIter& sit, SField const& name = sfGeneric) : STTypedBase(name), value_(sit.getVL())
+    {
+    }
 
     [[nodiscard]] std::size_t
-    size() const;
+    size() const noexcept
+    {
+        return value_.size();
+    }
 
     [[nodiscard]] std::uint8_t const*
-    data() const;
-
-    [[nodiscard]] SerializedTypeID
-    getSType() const override;
+    data() const noexcept
+    {
+        return value_.data();
+    }
 
     [[nodiscard]] std::string
-    getText() const override;
+    getText() const override
+    {
+        return strHex(value_);
+    }
 
     void
-    add(Serializer& s) const override;
+    add(Serializer& s) const override
+    {
+        XRPL_ASSERT(getFName().isBinary(), "xrpl::STBlob::add : field is binary");
+        XRPL_ASSERT(
+            (getFName().fieldType == STI_VL) || (getFName().fieldType == STI_ACCOUNT),
+            "xrpl::STBlob::add : valid field type");
+        s.addVL(Slice{value_.data(), value_.size()});
+    }
 
     [[nodiscard]] bool
-    isEquivalent(STBase const& t) const override;
-
-    [[nodiscard]] bool
-    isDefault() const override;
+    isDefault() const override
+    {
+        return value_.empty();
+    }
 
     STBlob&
-    operator=(Slice const& slice);
+    operator=(Slice const& slice)
+    {
+        value_ = Buffer(slice.data(), slice.size());
+        return *this;
+    }
 
     [[nodiscard]] value_type
-    value() const noexcept;
+    value() const noexcept
+    {
+        return value_;
+    }
 
     STBlob&
-    operator=(Buffer&& buffer);
+    operator=(Buffer&& buffer)
+    {
+        value_ = std::move(buffer);
+        return *this;
+    }
 
     void
-    setValue(Buffer&& b);
-
-private:
-    STBase*
-    copy(std::size_t n, void* buf) const override;
-    STBase*
-    move(std::size_t n, void* buf) override;
+    setValue(Buffer&& b)
+    {
+        value_ = std::move(b);
+    }
 
     friend class detail::STVar;
+
+    friend bool
+    operator==(STBlob const& lhs, STBlob const& rhs) noexcept
+    {
+        return lhs.value_ == rhs.value_;
+    }
 };
-
-inline STBlob::STBlob(SField const& f, void const* data, std::size_t size)
-    : STBase(f), value_(data, size)
-{
-}
-
-inline STBlob::STBlob(SField const& f, Buffer&& b) : STBase(f), value_(std::move(b))
-{
-}
-
-inline STBlob::STBlob(SField const& n) : STBase(n)
-{
-}
-
-inline std::size_t
-STBlob::size() const
-{
-    return value_.size();
-}
-
-inline std::uint8_t const*
-STBlob::data() const
-{
-    return value_.data();
-}
-
-inline STBlob&
-STBlob::operator=(Slice const& slice)
-{
-    value_ = Buffer(slice.data(), slice.size());
-    return *this;
-}
-
-inline STBlob::value_type
-STBlob::value() const noexcept
-{
-    return value_;
-}
-
-inline STBlob&
-STBlob::operator=(Buffer&& buffer)
-{
-    value_ = std::move(buffer);
-    return *this;
-}
-
-inline void
-STBlob::setValue(Buffer&& b)
-{
-    value_ = std::move(b);
-}
 
 // An STVar that holds an STBlob in its internal buffer relocates it using
 // the move constructor, so that must neither allocate nor throw.
@@ -137,3 +126,4 @@ static_assert(std::is_nothrow_move_constructible_v<STBlob>);
 static_assert(std::is_nothrow_move_assignable_v<STBlob>);
 
 }  // namespace xrpl
+
