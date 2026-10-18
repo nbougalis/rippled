@@ -113,7 +113,7 @@ Sig::operator()(Env& env, JTx& jt) const
     catch (ParseError const&)
     {
         env.test.log << pretty(jt.jv) << std::endl;
-        rethrow();
+        throw;
     }
     STTx const& stx = STTx{std::move(*st)};
     auto& js = jt[sfBatchSigners.getJsonName()];
@@ -152,7 +152,7 @@ Msig::operator()(Env& env, JTx& jt) const
     catch (ParseError const&)
     {
         env.test.log << pretty(jt.jv) << std::endl;
-        rethrow();
+        throw;
     }
     STTx const& stx = STTx{std::move(*st)};
     auto& bs = jt[sfBatchSigners.getJsonName()];
