@@ -185,7 +185,7 @@ public:
         catch (std::exception&)
         {
             cleanup();
-            rethrow();
+            throw;
         }
     }
 
