@@ -127,7 +127,7 @@ Workers::Workers(
         if (!workers_.empty())
             stop();
 
-        rethrow();
+        throw;
     }
 }
 

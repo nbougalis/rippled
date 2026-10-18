@@ -925,7 +925,7 @@ RCLConsensus::timerEntry(
         ss << "During consensus timerEntry: " << mn.what();
         JLOG(j_.error()) << ss.str();
         CLOG(clog) << ss.str();
-        rethrow();
+        throw;
     }
 }
 
@@ -941,7 +941,7 @@ RCLConsensus::gotTxSet(NetClock::time_point const& now, RCLTxSet const& txSet)
     {
         // This should never happen
         JLOG(j_.error()) << "During consensus gotTxSet: " << mn.what();
-        rethrow();
+        throw;
     }
 }
 

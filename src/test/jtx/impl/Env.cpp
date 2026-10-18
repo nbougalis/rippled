@@ -630,7 +630,7 @@ Env::autofill(JTx& jt)
     {
         if (!parseFailureExpected_)
             test.log << "parse failure:\n" << pretty(jv) << std::endl;
-        rethrow();
+        throw;
     }
 }
 
@@ -647,7 +647,7 @@ Env::st(JTx const& jt)
     catch (jtx::ParseError const&)
     {
         test.log << "Exception: ParseError\n" << pretty(jt.jv) << std::endl;
-        rethrow();
+        throw;
     }
 
     try
@@ -673,7 +673,7 @@ Env::ust(JTx const& jt)
     catch (jtx::ParseError const&)
     {
         test.log << "Exception: ParseError\n" << pretty(jt.jv) << std::endl;
-        rethrow();
+        throw;
     }
 
     try

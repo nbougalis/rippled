@@ -87,7 +87,7 @@ Msig::operator()(Env&, JTx& jt) const
         catch (ParseError const&)
         {
             env.test.log << pretty(jtx.jv) << std::endl;
-            rethrow();
+            throw;
         }
         auto& js = sigObject[sfSigners];
         for (std::size_t i = 0; i < mySigners.size(); ++i)
