@@ -3,7 +3,6 @@
 #include <xrpl/basics/Blob.h>
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/basics/contract.h>
 #include <xrpl/nodestore/Database.h>
 #include <xrpl/nodestore/NodeObject.h>
 #include <xrpl/nodestore/Scheduler.h>
@@ -80,7 +79,7 @@ DatabaseNodeImp::fetchNodeObject(
         {
             JLOG(j_.fatal()) << "fetchNodeObject " << hash
                              << ": Exception fetching from backend: " << e.what();
-            rethrow();
+            throw;
         }
 
         switch (status)
