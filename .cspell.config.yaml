@@ -392,3 +392,4 @@ words:
   - CGNAT
   - ungated
   - Futex
+  - xoroshiro
