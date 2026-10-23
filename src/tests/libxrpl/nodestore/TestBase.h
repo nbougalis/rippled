@@ -55,7 +55,7 @@ createPredictableBatch(std::size_t numObjects, std::uint64_t seed)
     for (auto i = 0uz; i < numObjects; ++i)
     {
         NodeObjectType const type = [&] {
-            switch (randInt(rng, 3))
+            switch (randInt(3, rng))
             {
                 case 0:
                     return NodeObjectType::Ledger;
@@ -72,7 +72,7 @@ createPredictableBatch(std::size_t numObjects, std::uint64_t seed)
         UInt256 hash;
         beast::rngfill(hash.begin(), hash.size(), rng);
 
-        Blob blob(randInt(rng, kMinPayloadBytes, kMaxPayloadBytes));
+        Blob blob(randInt(kMinPayloadBytes, kMaxPayloadBytes, rng));
         beast::rngfill(blob.data(), blob.size(), rng);
 
         batch.emplace_back(NodeObject::createObject(type, std::move(blob), hash));

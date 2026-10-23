@@ -61,13 +61,15 @@ protected:
     makeGossip()
     {
         Gossip gossip;
-        std::uint8_t const v(10 + randInt(9));
-        std::uint8_t const n(10 + randInt(9));
+
+        auto const v = randInt<std::uint8_t>(10, 19);
+        auto const n = randInt<std::uint8_t>(10, 19);
+
         gossip.items.reserve(n);
         for (std::uint8_t i = 0; i < n; ++i)
         {
             Gossip::Item item;
-            item.balance = 100 + randInt(499);
+            item.balance = randInt(100, 599);
             beast::ip::AddressV4::bytes_type const d = {
                 {
                     192,
