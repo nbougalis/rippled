@@ -1,8 +1,6 @@
 // MODULES: ../impl/IPEndpoint.cpp ../impl/IPAddressV4.cpp
 // ../impl/IPAddressV6.cpp
 
-#include <test/beast/IPEndpointCommon.h>
-
 #include <xrpl/basics/random.h>
 #include <xrpl/beast/net/IPAddress.h>
 #include <xrpl/beast/net/IPAddressV4.h>
@@ -21,6 +19,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 namespace beast::ip {
 
@@ -382,17 +381,43 @@ public:
         failParseEP("[abcdef]:12345");
         failParseEP("foo.org 12345");
 
-        // test with hashed container
-        std::unordered_set<Endpoint> eps;
-        static constexpr auto kItems{100};
-        float maxLf{0};
-        for (auto i = 0; i < kItems; ++i)
+        // Endpoint must be usable as a key in a hashed container: distinct
+        // endpoints must not collapse, and equal endpoints must.
         {
-            eps.insert(randomEP(xrpl::randInt(0, 1) == 1));
-            maxLf = std::max(maxLf, eps.load_factor());
+            std::unordered_set<Endpoint> eps;
+
+            AddressV4::bytes_type v4{{198, 51, 100, 0}};
+            AddressV6::bytes_type v6{{0x20, 0x01, 0x0d, 0xb8}};
+
+            static constexpr int kAddresses = 160;
+
+            for (int i = 0; i < kAddresses; ++i)
+            {
+                ++v4.back();
+                ++v6.back();
+
+                for (std::uint16_t port : {std::uint16_t{80}, std::uint16_t{443}})
+                {
+                    BEAST_EXPECT(eps.insert(Endpoint{AddressV4{v4}, port}).second);
+                    BEAST_EXPECT(eps.insert(Endpoint{AddressV6{v6}, port}).second);
+                }
+
+                BEAST_EXPECT(
+                    eps.insert(Endpoint{AddressV4{v4}, xrpl::randInt<std::uint16_t>(1025, 65535)})
+                        .second);
+                BEAST_EXPECT(
+                    eps.insert(Endpoint{AddressV6{v6}, xrpl::randInt<std::uint16_t>(1025, 65535)})
+                        .second);
+            }
+
+            BEAST_EXPECT(eps.size() == 6 * kAddresses);
+
+            // Re-inserting existing keys must be a no-op.
+            for (auto const& ep : std::vector<Endpoint>(eps.begin(), eps.end()))
+                BEAST_EXPECT(!eps.insert(ep).second);
+
+            BEAST_EXPECT(eps.size() == 6 * kAddresses);
         }
-        BEAST_EXPECT(eps.bucket_count() >= kItems);
-        BEAST_EXPECT(maxLf > 0.90);
     }
 
     //--------------------------------------------------------------------------
