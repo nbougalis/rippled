@@ -123,7 +123,7 @@ RCLConsensus::Adaptor::Adaptor(
     , inboundTransactions_{inboundTransactions}
     , j_(journal)
     , validatorKeys_(validatorKeys)
-    , valCookie_(1 + randInt(cryptoPrng(), std::numeric_limits<std::uint64_t>::max() - 1))
+    , valCookie_(1 + randInt(std::numeric_limits<std::uint64_t>::max() - 1, cryptoPrng()))
     , nUnlVote_(validatorKeys_.nodeID, j_)
 {
     XRPL_ASSERT(valCookie_, "xrpl::RCLConsensus::Adaptor::Adaptor : nonzero cookie");

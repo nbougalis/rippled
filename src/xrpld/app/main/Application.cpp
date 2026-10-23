@@ -315,7 +315,7 @@ public:
         , config_(std::move(config))
         , logs_(std::move(logs))
         , timeKeeper_(std::move(timeKeeper))
-        , instanceCookie_(1 + randInt(cryptoPrng(), std::numeric_limits<std::uint64_t>::max() - 1))
+        , instanceCookie_(1 + randInt(std::numeric_limits<std::uint64_t>::max() - 1, cryptoPrng()))
         , journal_(logs_->journal("Application"))
         // PerfLog must be started before any other threads are launched.
         , perfLog_(

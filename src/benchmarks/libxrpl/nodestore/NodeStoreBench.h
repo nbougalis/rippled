@@ -36,17 +36,16 @@
 namespace xrpl::node_store {
 
 // Fill `bytes` of memory at `buffer` with random bits drawn from `g`.
-template <class Generator>
 inline void
-rngcpy(void* buffer, std::size_t bytes, Generator& g)
+rngcpy(void* buffer, std::size_t bytes, std::uniform_random_bit_generator auto& g)
 {
-    using result_type = typename Generator::result_type;
+    using result_type = std::invoke_result_t<decltype(g)&>;
     while (bytes > 0)
     {
         auto const v = g();
         auto const chunk = std::min(bytes, sizeof(result_type));
         std::memcpy(buffer, &v, chunk);
-        buffer = reinterpret_cast<std::uint8_t*>(buffer) + chunk;
+        buffer = static_cast<std::uint8_t*>(buffer) + chunk;
         bytes -= chunk;
     }
 }
@@ -55,8 +54,8 @@ rngcpy(void* buffer, std::size_t bytes, Generator& g)
  * @brief Deterministic generator of a reproducible sequence of random NodeObjects.
  *
  * Indexing is stable: `obj(n)` and `key(n)` always return the same value for a
- * given `n`, regardless of call order, because the engine is reseeded from `n`
- * on every call.
+ * given `n`, regardless of call order, because each call constructs its own
+ * engine seeded from `n`.
  *
  * Using different prefixes guarantees the two key spaces are disjoint for the fetch-miss
  * workloads.
@@ -64,56 +63,58 @@ rngcpy(void* buffer, std::size_t bytes, Generator& g)
 class Sequence
 {
 private:
-    static constexpr auto kMinSize = 250;
-    static constexpr auto kMaxSize = 1250;
+    static constexpr std::uint32_t kMinSize = 250;
+    static constexpr std::uint32_t kMaxSize = 1250;
 
-    beast::XorShiftEngine gen_;
     std::uint8_t prefix_;
-    std::discrete_distribution<std::uint32_t> dType_;
-    std::uniform_int_distribution<std::uint32_t> dSize_;
+
+    // Lays out a key: prefix at byte 0, RNG over the rest. Shared by key() and
+    // obj() so the two key spaces stay disjoint by construction.
+    UInt256
+    makeKey(beast::XorShiftEngine& gen) const
+    {
+        std::array<unsigned char, UInt256::kBytes> bytes;
+        bytes[0] = prefix_;
+        rngcpy(bytes.data() + 1, bytes.size() - 1, gen);
+        return UInt256{bytes};
+    }
 
 public:
-    explicit Sequence(std::uint8_t prefix)
-        : prefix_(prefix)
-        // uniform distribution over hotLEDGER - hotTRANSACTION_NODE
-        // but exclude hotTRANSACTION = 2 (removed)
-        , dType_({1, 1, 0, 1, 1})
-        , dSize_(kMinSize, kMaxSize)
+    explicit Sequence(std::uint8_t prefix) : prefix_(prefix)
     {
     }
 
     // Returns the n-th key. Used to generate keys that are never stored.
-    // The layout mirrors obj()'s: prefix at byte 0, RNG over the rest, so the
-    // two key spaces stay disjoint by construction (not by coincidence).
     UInt256
-    key(std::size_t n)
+    key(std::size_t n) const
     {
-        gen_.seed(n + 1);
-        UInt256 result;
-        auto const data = static_cast<std::uint8_t*>(&*result.begin());
-        *data = prefix_;
-        rngcpy(data + 1, result.size() - 1, gen_);
-        return result;
+        beast::XorShiftEngine gen(n);
+        return makeKey(gen);
     }
 
     // Returns the n-th complete NodeObject.
     std::shared_ptr<NodeObject>
-    obj(std::size_t n)
+    obj(std::size_t n) const
     {
-        gen_.seed(n + 1);
-        UInt256 key;
-        auto const data = static_cast<std::uint8_t*>(&*key.begin());
-        *data = prefix_;
-        rngcpy(data + 1, key.size() - 1, gen_);
-        Blob value(dSize_(gen_));
-        rngcpy(&value[0], value.size(), gen_);
-        return NodeObject::createObject(
-            safeCast<NodeObjectType>(dType_(gen_)), std::move(value), key);
+        // Uniform over hotLEDGER .. hotTRANSACTION_NODE, excluding the removed
+        // hotTRANSACTION = 2. The weights are constant, so the distribution
+        // (which owns a vector) is built once.
+        static std::discrete_distribution<std::uint32_t> const kType({1, 1, 0, 1, 1});
+        std::uniform_int_distribution<std::uint32_t> size(kMinSize, kMaxSize);
+
+        beast::XorShiftEngine gen(n);
+        auto key = makeKey(gen);
+        Blob value(size(gen));
+        rngcpy(value.data(), value.size(), gen);
+        // discrete_distribution::operator() is non-const; a copy is cheap next
+        // to the allocation it would otherwise repeat.
+        auto type = kType;
+        return NodeObject::createObject(safeCast<NodeObjectType>(type(gen)), std::move(value), key);
     }
 
     // Fills `b` with `size` consecutive NodeObjects starting at index `n`.
     void
-    batch(std::size_t n, Batch& b, std::size_t size)
+    batch(std::size_t n, Batch& b, std::size_t size) const
     {
         b.clear();
         b.reserve(size);
@@ -138,7 +139,7 @@ parseConfig(std::string const& s)
 inline Batch
 makePool(std::uint8_t prefix, std::size_t count, std::size_t start = 0)
 {
-    Sequence seq(prefix);
+    Sequence const seq(prefix);
     Batch pool;
     pool.reserve(count);
     for (auto i = 0uz; i < count; ++i)
@@ -151,7 +152,7 @@ makePool(std::uint8_t prefix, std::size_t count, std::size_t start = 0)
 inline std::vector<UInt256>
 makeMissingKeys(std::size_t count)
 {
-    Sequence seq(2);
+    Sequence const seq(2);
     std::vector<UInt256> keys;
     keys.reserve(count);
     for (auto i = 0uz; i < count; ++i)

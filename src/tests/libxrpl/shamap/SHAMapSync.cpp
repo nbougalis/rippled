@@ -1127,7 +1127,7 @@ TEST_F(SHAMapSyncTest, sync)
     {
         std::vector<SHAMapNodeData> a;
 
-        ASSERT_TRUE(source.getNodeFat(SHAMapNodeID(), a, randBool(eng_), randInt(eng_, 2)));
+        ASSERT_TRUE(source.getNodeFat(SHAMapNodeID(), a, randBool(eng_), randInt(2, eng_)));
 
         ASSERT_FALSE(a.empty()) << "NodeSize";
 
@@ -1155,7 +1155,7 @@ TEST_F(SHAMapSyncTest, sync)
             // Keep failures fatal here because this loop is data-dependent.
             // non-deterministic number of times and the number of tests run
             // should be deterministic
-            if (!source.getNodeFat(it.first, b, randBool(eng_), randInt(eng_, 2)))
+            if (!source.getNodeFat(it.first, b, randBool(eng_), randInt(2, eng_)))
                 FAIL() << "Unable to fetch node";
         }
 
