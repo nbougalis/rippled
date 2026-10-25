@@ -221,7 +221,7 @@ public:
         UInt256 const hash(xrpl::sha512Half(123456789));
         getLedger->set_ledgerhash(hash.begin(), hash.size());
         getLedger->set_ledgerseq(123456789);
-        xrpl::SHAMapNodeID const sha(64, hash);
+        auto const sha = xrpl::SHAMapNodeID::createID(64, hash);
         getLedger->add_nodeids(sha.getRawString());
         getLedger->set_requestcookie(123456789);
         getLedger->set_querytype(protocol::qtINDIRECT);
@@ -283,7 +283,7 @@ public:
             UInt256 hash(xrpl::sha512Half(i));
             auto object = getObject->add_objects();
             object->set_hash(hash.data(), hash.size());
-            xrpl::SHAMapNodeID const sha(64, hash);
+            auto const sha = xrpl::SHAMapNodeID::createID(64, hash);
             object->set_nodeid(sha.getRawString());
             object->set_index("");
             object->set_data("");
