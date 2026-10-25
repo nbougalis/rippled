@@ -104,9 +104,10 @@ enum class SHAMapState : std::uint8_t {
 struct SHAMapNodeData
 {
     SHAMapNodeID nodeID;
-    // The `data` field (a Blob, 8-byte aligned) needs 4 bytes of padding after the `nodeID` field
-    // (36 bytes, 4-byte aligned) regardless of what comes between them, so `isLeaf` costs nothing
-    // extra here. Moving it after `data` would add 8 bytes to the size of this struct instead.
+    // `nodeID` is 40 bytes with 8-byte alignment (its only padding is internal), and `data` is a
+    // Blob, also 8-byte aligned. A bool therefore costs 8 bytes wherever it goes: here it is
+    // followed by 7 bytes of padding, and after `data` it would be followed by the same 7. The
+    // struct is 72 bytes in either layout.
     bool isLeaf;
     Blob data;
 };

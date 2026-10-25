@@ -1,12 +1,12 @@
 #include <xrpl/shamap/SHAMapNodeID.h>
 
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/protocol/Serializer.h>
 #include <xrpl/shamap/SHAMap.h>
 
 #include <gtest/gtest.h>
 
 #include <stdexcept>
+#include <string>
 
 namespace xrpl::tests {
 
@@ -17,22 +17,26 @@ constexpr UInt256 kTestKey("b92891fe4ef6cee585fdc6fda1e09eb4d386363158ec3321b812
 TEST(SHAMapNodeIDTest, root_is_prefix_of_every_key)
 {
     SHAMapNodeID const root;
+    EXPECT_TRUE(root.isRoot());
     EXPECT_EQ(root.getDepth(), 0u);
     EXPECT_TRUE(root.isPrefixOf(UInt256{}));
     EXPECT_TRUE(root.isPrefixOf(kTestKey));
 }
 
-TEST(SHAMapNodeIDTest, child_id_is_prefix_of_keys_in_that_branch)
+TEST(SHAMapNodeIDTest, child_id_matches_create_id_at_every_depth)
 {
-    // Walking the branches spelled by the key's own nibbles must keep every
-    // intermediate ID a prefix of that key.
+    // Walking the branches spelled by the key's own nibbles must keep every intermediate ID a
+    // prefix of that key, and must land on the same ID that createID computes directly. The two
+    // are independent code paths: one writes a nibble into a copy, the other masks the key.
     SHAMapNodeID id;
     for (auto depth = 0u; depth < SHAMap::kLeafDepth; ++depth)
     {
         id = id.getChildNodeID(selectBranch(id, kTestKey));
         EXPECT_EQ(id.getDepth(), depth + 1);
         EXPECT_TRUE(id.isPrefixOf(kTestKey)) << "depth " << id.getDepth();
+        EXPECT_EQ(id, SHAMapNodeID::createID(depth + 1, kTestKey)) << "depth " << id.getDepth();
     }
+    EXPECT_EQ(id.getDepth(), SHAMap::kLeafDepth);
 }
 
 TEST(SHAMapNodeIDTest, wrong_branch_is_not_prefix_of_key)
@@ -54,7 +58,8 @@ TEST(SHAMapNodeIDTest, wrong_branch_is_not_prefix_of_key)
 TEST(SHAMapNodeIDTest, prefix_check_is_depth_sensitive)
 {
     // kTestKey and kOther agree on the first two nibbles ("b9") and then diverge.
-    constexpr UInt256 kOther("b99891fe4ef6cee585fdc6fda1e09eb4d386363158ec3321b8123e5a772c6ca8");
+    constexpr UInt256 kOther =
+        kTestKey ^ UInt256{"00F0000000000000000000000000000000000000000000000000000000000000"};
 
     auto id = SHAMapNodeID{}.getChildNodeID(selectBranch(SHAMapNodeID{}, kTestKey));
     EXPECT_TRUE(id.isPrefixOf(kTestKey));
@@ -72,12 +77,11 @@ TEST(SHAMapNodeIDTest, prefix_check_is_depth_sensitive)
 
 TEST(SHAMapNodeIDTest, leaf_id_from_key_is_prefix_of_that_key)
 {
-    SHAMapNodeID const leaf{SHAMap::kLeafDepth, kTestKey};
+    auto const leaf = SHAMapNodeID::createID(SHAMap::kLeafDepth, kTestKey);
     EXPECT_TRUE(leaf.isPrefixOf(kTestKey));
 
     // At full depth the prefix is the whole key, so nothing else matches.
-    constexpr UInt256 kOther("b92891fe4ef6cee585fdc6fda1e09eb4d386363158ec3321b8123e5a772c6ca9");
-    EXPECT_FALSE(leaf.isPrefixOf(kOther));
+    EXPECT_FALSE(leaf.isPrefixOf(kTestKey.next()));
 }
 
 TEST(SHAMapNodeIDTest, create_id_masks_key_to_depth)
@@ -88,6 +92,22 @@ TEST(SHAMapNodeIDTest, create_id_masks_key_to_depth)
         EXPECT_EQ(id.getDepth(), depth);
         EXPECT_TRUE(id.isPrefixOf(kTestKey)) << "depth " << depth;
     }
+}
+
+TEST(SHAMapNodeIDTest, comparison_orders_by_depth_then_prefix)
+{
+    // The spaceship is defaulted over (depth_, id_), so depth is the primary key.
+    auto const shallow = SHAMapNodeID::createID(1, kTestKey);
+    auto const deep = SHAMapNodeID::createID(2, kTestKey);
+    EXPECT_LT(SHAMapNodeID{}, shallow);
+    EXPECT_LT(shallow, deep);
+
+    // At equal depth, the prefix decides.
+    auto const branch0 = SHAMapNodeID{}.getChildNodeID(0);
+    auto const branch15 = SHAMapNodeID{}.getChildNodeID(15);
+    EXPECT_LT(branch0, branch15);
+    EXPECT_NE(branch0, branch15);
+    EXPECT_EQ(branch0, SHAMapNodeID{}.getChildNodeID(0));
 }
 
 // The guards below must hold with XRPL_ASSERT compiled out (NDEBUG), so each one
@@ -102,13 +122,10 @@ TEST(SHAMapNodeIDTest, child_of_leaf_depth_id_throws)
 
 TEST(SHAMapNodeIDDeathTest, out_of_range_depth_is_clamped)
 {
-    // A depth past kLeafDepth has no mask in depthMask's 65-entry table, so both the constructor
-    // and createID clamp it. createID needs its own clamp: it picks the mask while evaluating the
-    // constructor's argument, so the constructor's clamp cannot cover that read.
-    //
-    // Both clamps are marked UNREACHABLE, which is an assert and therefore fatal wherever asserts
-    // are live. Only a build with them compiled out (or routed to Antithesis's non-fatal handler)
-    // reaches the clamp itself, so that is the only configuration that can assert on the result.
+    // A depth past kLeafDepth has no mask in the 65-entry table. createID is the only way to make
+    // a non-root ID, so it is the one place that bounds the depth: it asserts, and clamps so that
+    // a build with asserts compiled out (or routed to Antithesis's non-fatal handler) cannot read
+    // past the table. Only such a build reaches the clamp, so only it can assert on the result.
 #if defined(NDEBUG) || defined(ENABLE_VOIDSTAR)
     for (auto const depth : {SHAMap::kLeafDepth + 1u, 100u, 255u, 256u, 320u})
     {
@@ -121,16 +138,7 @@ TEST(SHAMapNodeIDDeathTest, out_of_range_depth_is_clamped)
         // id_ and depth_ still agree, so the object is usable rather than merely non-crashing.
         EXPECT_TRUE(id.isPrefixOf(kTestKey)) << "depth " << depth;
         EXPECT_EQ(id, SHAMapNodeID::createID(SHAMap::kLeafDepth, kTestKey)) << "depth " << depth;
-
-        // The clamp holds through the wire format too, which encodes the depth in one byte.
-        auto const roundTripped = deserializeSHAMapNodeID(id.getRawString());
-        ASSERT_TRUE(roundTripped.has_value()) << "depth " << depth;
-        EXPECT_EQ(roundTripped->getDepth(), SHAMap::kLeafDepth) << "depth " << depth;
     }
-
-    // The constructor clamps on its own, for the paths that do not go through createID.
-    SHAMapNodeID const direct{SHAMap::kLeafDepth + 1u, UInt256{}};
-    EXPECT_EQ(direct.getDepth(), SHAMap::kLeafDepth);
 #else
     EXPECT_DEATH(
         (void)SHAMapNodeID::createID(SHAMap::kLeafDepth + 1u, kTestKey), "depth within tree");
@@ -165,30 +173,44 @@ TEST(SHAMapNodeIDDeathTest, select_branch_clamps_leaf_depth)
 #endif
 }
 
-TEST(SHAMapNodeIDTest, deserialize_rejects_out_of_range_depth)
+TEST(SHAMapNodeIDTest, deserialize_rejects_wrong_length)
 {
-    // getRawString() only serializes a depth already accepted by the constructor's own
-    // assertion, so an out-of-range depth here is built by hand instead.
-    auto const serializeWithRawDepth = [](unsigned int depth) {
-        Serializer s;
-        s.addBitString(UInt256{});
-        s.add8(static_cast<unsigned char>(depth));
-        return s.takeData();
-    };
-
-    for (auto const depth : {65u, 100u, 255u})
+    // The wire format is exactly 33 bytes. Any other length is rejected before the contents are
+    // looked at, so the bytes themselves can be anything; zero is a valid prefix at every depth.
+    for (std::size_t length = 0; length <= 40; ++length)
     {
-        auto const raw = serializeWithRawDepth(depth);
-        EXPECT_FALSE(deserializeSHAMapNodeID(raw.data(), raw.size()).has_value())
-            << "depth " << depth;
+        std::string const wire(length, '\0');
+        EXPECT_EQ(deserializeSHAMapNodeID(wire).has_value(), length == UInt256::size() + 1)
+            << "length " << length;
     }
+}
 
-    // A depth-64 ID is legal, since leaves live there, but it has no children.
-    auto const id =
-        deserializeSHAMapNodeID(SHAMapNodeID{SHAMap::kLeafDepth, UInt256{}}.getRawString());
-    ASSERT_TRUE(id.has_value());
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access) has_value checked above
-    EXPECT_THROW((void)id->getChildNodeID(0), std::logic_error);
+TEST(SHAMapNodeIDTest, deserialize_accepts_only_consistent_depth_and_prefix)
+{
+    // Eleven non-zero nibbles, then zeros. Odd, so that the boundary falls mid-byte: at depth 11
+    // the mask keeps the high nibble of byte 5 and clears the low one.
+    constexpr UInt256 kPrefix{"a1b2c3d4e5f00000000000000000000000000000000000000000000000000000"};
+    constexpr unsigned int kPrefixNibbles = 11;
+
+    for (unsigned int depth = 0; depth <= 255; ++depth)
+    {
+        std::string wire(kPrefix.begin(), kPrefix.end());
+        wire.push_back(static_cast<char>(depth));
+
+        // Accepted only when the depth is within the tree and the prefix carries nothing below
+        // it: the first eleven nibbles are set, so any shallower depth is rejected.
+        bool const expected = (depth >= kPrefixNibbles) && (depth <= SHAMap::kLeafDepth);
+
+        auto const id = deserializeSHAMapNodeID(wire);
+        ASSERT_EQ(id.has_value(), expected) << "depth " << depth;
+
+        if (id.has_value())
+        {
+            EXPECT_EQ(id->getDepth(), depth) << "depth " << depth;
+            EXPECT_EQ(id->getNodeID(), kPrefix) << "depth " << depth;
+            EXPECT_EQ(id->getRawString(), wire) << "depth " << depth;
+        }
+    }
 }
 
 }  // namespace xrpl::tests

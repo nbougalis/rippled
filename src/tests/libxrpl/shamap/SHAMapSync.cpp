@@ -351,7 +351,8 @@ TEST_F(SHAMapSyncTest, node_that_cannot_be_hooked_is_bad_data)
     ASSERT_TRUE(map.addRootNode(chain.rootHash, chain.nodeAt(0), nullptr).isGood());
 
     // nodeAt(1) is the node the root is missing and its hash matches, but we claim depth 2.
-    auto const wrongDepth = map.addKnownNode(SHAMapNodeID{2, UInt256{}}, chain.nodeAt(1), nullptr);
+    auto const wrongDepth =
+        map.addKnownNode(SHAMapNodeID::createID(2, UInt256{}), chain.nodeAt(1), nullptr);
 
     EXPECT_TRUE(tallyIs(wrongDepth, 0, 1, 0));
     EXPECT_FALSE(wrongDepth.isUseful());
@@ -361,13 +362,14 @@ TEST_F(SHAMapSyncTest, node_that_cannot_be_hooked_is_bad_data)
     UInt256 otherBranch;
     otherBranch.begin()[0] = 0x10;
     auto const emptyBranch =
-        map.addKnownNode(SHAMapNodeID{1, otherBranch}, chain.nodeAt(1), nullptr);
+        map.addKnownNode(SHAMapNodeID::createID(1, otherBranch), chain.nodeAt(1), nullptr);
 
     EXPECT_TRUE(tallyIs(emptyBranch, 0, 1, 0));
 
     // The right position this time, but the data hashes to something other than the child the root
     // says belongs there.
-    auto const corrupt = map.addKnownNode(SHAMapNodeID{1, UInt256{}}, chain.nodeAt(2), nullptr);
+    auto const corrupt =
+        map.addKnownNode(SHAMapNodeID::createID(1, UInt256{}), chain.nodeAt(2), nullptr);
 
     EXPECT_TRUE(tallyIs(corrupt, 0, 1, 0));
 
@@ -956,7 +958,7 @@ TEST_F(SHAMapSyncTest, sync_filter_is_told_the_ledger_sequence)
     RecordingFilter filter;
 
     ASSERT_TRUE(map.addRootNode(root->getHash(), root, &filter).isGood());
-    ASSERT_TRUE(map.addKnownNode(SHAMapNodeID{1, UInt256{}}, middle, &filter).isUseful());
+    ASSERT_TRUE(map.addKnownNode(SHAMapNodeID::createID(1, UInt256{}), middle, &filter).isUseful());
 
     // The deepest node becomes resolvable only now, after the two above were added directly.
     filter.serve(deepest);
@@ -1209,7 +1211,7 @@ TEST_F(SHAMapSyncTest, add_known_node_reports_duplicate_once_a_map_stops_synchin
     };
     ASSERT_TRUE(makeOffer());
 
-    SHAMapNodeID const target{1, UInt256{}};
+    auto const target = SHAMapNodeID::createID(1, UInt256{});
 
     // Synching, so the offer is examined, and refused because the empty root has no branch to
     // hook it onto. The point is that the map looked.
