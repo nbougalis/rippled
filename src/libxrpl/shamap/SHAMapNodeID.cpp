@@ -8,79 +8,80 @@
 #include <xrpl/shamap/SHAMap.h>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace xrpl {
 
-static UInt256 const&
-depthMask(unsigned int depth)
-{
-    static constexpr auto kMaskSize = SHAMap::kLeafDepth + 1;
+namespace {
 
-    struct MasksT
+/**
+ * Masks for each possible tree depth.
+ *
+ * The mask at depth `d` has the first `d` nibbles set. This means that
+ * `key & kDepthMask[d]` returns the prefix that identifies the subtree
+ * that a node at depth `d` is the root of.
+ */
+constexpr auto kDepthMask = []() consteval {
+    std::array<UInt256, SHAMap::kLeafDepth + 1> masks;
+
+    // One hex digit per nibble: the mask at depth d keeps the first d.
+    std::array<char, 2 * UInt256::kBytes> hex;
+    hex.fill('0');
+
+    for (std::size_t d = 0; d <= SHAMap::kLeafDepth; ++d)
     {
-        UInt256 entry[kMaskSize];
+        masks[d] = UInt256{std::string_view{hex}};
 
-        MasksT()
-        {
-            UInt256 selector;
-            for (auto i = 0u; i < kMaskSize - 1; i += 2)
-            {
-                entry[i] = selector;
-                *(selector.begin() + (i / 2)) = 0xF0;
-                entry[i + 1] = selector;
-                *(selector.begin() + (i / 2)) = 0xFF;
-            }
-            entry[kMaskSize - 1] = selector;
-        }
-    };
-
-    static MasksT const kMasks;
-    return kMasks.entry[depth];
-}
-
-// The prefix of `key` at `depth`: the leading nibbles naming the subtree a node at that depth
-// identifies, with the remainder of the key masked off.
-static UInt256
-maskedToDepth(UInt256 const& key, unsigned int depth)
-{
-    return key & depthMask(depth);
-}
-
-// Whether `id` at `depth` is what `key` looks like once masked down to that depth, i.e.
-// whether an ID with this depth and id names a subtree that `key` falls under.
-static bool
-isPrefixOfAtDepth(UInt256 const& id, unsigned int depth, UInt256 const& key)
-{
-    return maskedToDepth(key, depth) == id;
-}
-
-// canonicalize the hash to a node ID for this depth
-SHAMapNodeID::SHAMapNodeID(unsigned int depth, UInt256 const& hash) : id_(hash), depth_(depth)
-{
-    // Every SHAMapNodeID's depth is stored here, so this is the one place that can stop an
-    // out-of-range one from being kept: a depth past kLeafDepth would go on to index depthMask
-    // out of bounds, and getRawString would narrow it to a byte, silently renaming the node.
-    // Clamp rather than throw, since node IDs are built from peer-supplied depths on the ledger
-    // data path, where no caller catches an exception before it reaches a thread boundary.
-    if (depth_ > SHAMap::kLeafDepth)
-    {
-        // LCOV_EXCL_START
-        UNREACHABLE("xrpl::SHAMapNodeID::SHAMapNodeID : depth within tree");
-        depth_ = SHAMap::kLeafDepth;
-        id_ = maskedToDepth(id_, depth_);
-        // LCOV_EXCL_STOP
+        if (d < SHAMap::kLeafDepth)
+            hex[d] = 'F';
     }
 
-    // Reads the clamped member rather than the depth argument, so it cannot index depthMask past
-    // its last entry even once the clamp above has reported the bad input and carried on.
+    return masks;
+}();
+
+/**
+ * The prefix of a key at a given depth.
+ *
+ * @param key   A leaf key, or any 256-bit value on the path to one.
+ * @param depth The depth to truncate to; at most SHAMap::kLeafDepth.
+ * @return `key` with everything past its first `depth` nibbles cleared:
+ *         the ID of the node at that depth on the path to `key`.
+ */
+UInt256
+maskedToDepth(UInt256 const& key, unsigned int depth) noexcept
+{
     XRPL_ASSERT(
-        isPrefixOf(id_), "xrpl::SHAMapNodeID::SHAMapNodeID : hash and depth inputs do match");
+        depth <= SHAMap::kLeafDepth, "xrpl::SHAMapNodeID::maskedToDepth : depth within tree");
+    return key & kDepthMask[depth];
+}
+
+}  // namespace
+
+SHAMapNodeID::SHAMapNodeID(unsigned int depth, UInt256 const& hash) noexcept
+    : depth_(depth), id_(hash)
+{
+    XRPL_ASSERT(
+        depth_ <= SHAMap::kLeafDepth, "xrpl::SHAMapNodeID::SHAMapNodeID : depth within tree");
+}
+
+SHAMapNodeID
+SHAMapNodeID::createID(unsigned int depth, UInt256 const& key) noexcept
+{
+    // Callers are expected to pass a depth they have already bounded; the
+    // assert catches one that does not, and the clamp ensures a violation
+    // will not become an out-of-bounds read of kDepthMask.
+    XRPL_ASSERT(depth <= SHAMap::kLeafDepth, "xrpl::SHAMapNodeID::createID : depth within tree");
+    depth = std::min(depth, SHAMap::kLeafDepth);
+
+    return {depth, maskedToDepth(key, depth)};
 }
 
 std::string
@@ -98,57 +99,56 @@ SHAMapNodeID::getChildNodeID(unsigned int branch) const
     XRPL_ASSERT(
         branch < SHAMap::kBranchFactor, "xrpl::SHAMapNodeID::getChildNodeID : valid branch input");
 
-    // A SHAMap has exactly 65 levels, so nodes must not exceed that
-    // depth; if they do, this breaks the invariant of never allowing
-    // the construction of a SHAMapNodeID at an invalid depth. We assert
-    // to catch this in debug builds.
-    //
-    // We throw (but never assert) if the node is at level 64, since
-    // entries at that depth are leaf nodes and have no children and even
-    // constructing a child node from them would break the above invariant.
-    XRPL_ASSERT(
-        depth_ <= SHAMap::kLeafDepth, "xrpl::SHAMapNodeID::getChildNodeID : maximum leaf depth");
-
+    // A node at kLeafDepth is a leaf: it has no children, and a child ID would sit at a depth
+    // that no node can have. This is a caller error rather than a broken invariant, so it is
+    // reported with an exception, not an assert.
     if (depth_ >= SHAMap::kLeafDepth)
         Throw<std::logic_error>(std::format("Request for child node ID of {}", to_string(*this)));
 
-    if (!isPrefixOf(id_))
-        Throw<std::logic_error>(std::format("Incorrect mask for {}", to_string(*this)));
+    // The child's ID is this node's prefix extended by one nibble. id_ is already masked to
+    // depth_, so replacing nibble depth_ (the high half of its byte when depth_ is even, the
+    // low half when odd) yields an ID masked to depth_ + 1 with no further work; this is why
+    // the private constructor is used here rather than createID, which would mask again.
+    auto id = id_;
 
-    SHAMapNodeID node{depth_ + 1, id_};
-    node.id_.begin()[depth_ / 2] |= ((depth_ & 1) != 0u) ? branch : (branch << 4);
-    return node;
+    auto& b = id.begin()[depth_ / 2];
+    b = ((depth_ & 1) != 0u) ? ((b & 0xF0) | branch) : ((b & 0x0F) | (branch << 4));
+
+    return {depth_ + 1, id};
 }
 
 bool
-SHAMapNodeID::isPrefixOf(UInt256 const& key) const
+SHAMapNodeID::isPrefixOf(UInt256 const& key) const noexcept
 {
-    return isPrefixOfAtDepth(id_, depth_, key);
+    return maskedToDepth(key, depth_) == id_;
 }
 
 [[nodiscard]] std::optional<SHAMapNodeID>
-deserializeSHAMapNodeID(void const* data, std::size_t size)
+deserializeSHAMapNodeID(std::string_view data) noexcept
 {
-    std::optional<SHAMapNodeID> ret;
+    if (data.size() != UInt256::size() + 1)
+        return std::nullopt;
 
-    if (size == UInt256::size() + 1)
-    {
-        std::span const bytes{static_cast<unsigned char const*>(data), size};
+    auto const bytes = std::as_bytes(std::span(data));
 
-        if (unsigned int const depth = bytes[UInt256::size()]; depth <= SHAMap::kLeafDepth)
-        {
-            // Reject a serialized ID carrying bits below its own depth. Checked before
-            // constructing the node, since the constructor asserts that same property.
-            if (UInt256 const id{bytes.first<UInt256::size()>()}; isPrefixOfAtDepth(id, depth, id))
-                ret.emplace(depth, id);
-        }
-    }
+    auto const depth = std::to_integer<unsigned int>(bytes[UInt256::size()]);
+
+    if (depth > SHAMap::kLeafDepth)
+        return std::nullopt;
+
+    UInt256 const id{bytes.first<UInt256::size()>()};
+
+    std::optional ret{SHAMapNodeID::createID(depth, id)};
+
+    // A serialized ID must carry no bits below its own depth: masking it must be a no-op.
+    if (ret->getNodeID() != id)
+        ret.reset();
 
     return ret;
 }
 
 [[nodiscard]] unsigned int
-selectBranch(SHAMapNodeID const& id, UInt256 const& hash)
+selectBranch(SHAMapNodeID const& id, UInt256 const& hash) noexcept
 {
     XRPL_ASSERT(id.getDepth() < SHAMap::kLeafDepth, "xrpl::selectBranch : depth below leaf depth");
 
@@ -168,23 +168,6 @@ selectBranch(SHAMapNodeID const& id, UInt256 const& hash)
 
     XRPL_ASSERT(branch < SHAMap::kBranchFactor, "xrpl::selectBranch : maximum result");
     return branch;
-}
-
-SHAMapNodeID
-SHAMapNodeID::createID(unsigned int depth, UInt256 const& key)
-{
-    // The mask is chosen here, before the constructor runs, so the clamp there cannot cover this
-    // call: an out-of-range depth would index depthMask's table while still evaluating this
-    // argument. A public factory has to hold its own bound.
-    if (depth > SHAMap::kLeafDepth)
-    {
-        // LCOV_EXCL_START
-        UNREACHABLE("xrpl::SHAMapNodeID::createID : depth within tree");
-        depth = SHAMap::kLeafDepth;
-        // LCOV_EXCL_STOP
-    }
-
-    return SHAMapNodeID(depth, maskedToDepth(key, depth));
 }
 
 }  // namespace xrpl

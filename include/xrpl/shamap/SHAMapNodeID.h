@@ -1,37 +1,63 @@
 #pragma once
 
-#include <xrpl/basics/CountedObject.h>
 #include <xrpl/basics/base_uint.h>
 
 #include <compare>
-#include <cstddef>
 #include <optional>
 #include <ostream>
 #include <string>
 #include <string_view>
-#include <tuple>
 
 namespace xrpl {
 
 /**
  * Identifies a node inside a SHAMap
  */
-class SHAMapNodeID : public CountedObject<SHAMapNodeID>
+class SHAMapNodeID
 {
-private:
-    UInt256 id_;
+    /**
+     * The depth of the node, from 0 for the root to SHAMap::kLeafDepth.
+     *
+     * A node at depth d is reached from the root by d branch selections,
+     * one per nibble of the key.
+     *
+     * @note Declared before id_ so that the defaulted spaceship operator,
+     *       which compares members in declaration order, will order node
+     *       IDs by depth first and then by prefix. Nothing relies on the
+     *       order today, but this emulates the semantics of the previous
+     *       hand-written comparison.
+     */
     unsigned int depth_ = 0;
 
-public:
-    SHAMapNodeID() = default;
-    SHAMapNodeID(SHAMapNodeID const& other) = default;
-    SHAMapNodeID(unsigned int depth, UInt256 const& hash);
+    /**
+     * The path to the node: the first depth_ nibbles of any key beneath
+     * it, with every nibble past that cleared.
+     *
+     * This is a prefix, not a key! A leaf's key is the full 256 bits; a
+     * node's ID is that key truncated to its depth, so two leaves under
+     * the same node share the node's ID as a prefix.
+     */
+    UInt256 id_;
 
-    SHAMapNodeID&
-    operator=(SHAMapNodeID const& other) = default;
+    /**
+     * Construct a node ID from its parts.
+     *
+     * This constructor is private because it does not validate any of
+     * its arguments are consistent, although debug builds will assert.
+     *
+     * @param depth The depth of the node.
+     * @param hash  The node's prefix, already masked to depth.
+     */
+    SHAMapNodeID(unsigned int depth, UInt256 const& hash) noexcept;
+
+public:
+    /**
+     * The root node's ID: depth zero and an empty prefix.
+     */
+    SHAMapNodeID() = default;
 
     [[nodiscard]] bool
-    isRoot() const
+    isRoot() const noexcept
     {
         return depth_ == 0;
     }
@@ -41,17 +67,29 @@ public:
     getRawString() const;
 
     [[nodiscard]] unsigned int
-    getDepth() const
+    getDepth() const noexcept
     {
         return depth_;
     }
 
     [[nodiscard]] UInt256 const&
-    getNodeID() const
+    getNodeID() const noexcept
     {
         return id_;
     }
 
+    /**
+     * The ID of this node's child along the given branch.
+     *
+     * The child sits one level deeper, with `branch` as the nibble that
+     * selects it, so its ID is this node's prefix extended by that nibble.
+     *
+     * @param branch The branch to descend; must be below SHAMap::kBranchFactor.
+     * @return The child's ID, at depth getDepth() + 1.
+     * @throws std::logic_error if this node is at SHAMap::kLeafDepth, since
+     *         a node there is a leaf and has no children and asking for one
+     *         is a caller error.
+     */
     [[nodiscard]] SHAMapNodeID
     getChildNodeID(unsigned int branch) const;
 
@@ -67,48 +105,36 @@ public:
      * @return whether this node ID is a prefix of the leaf key
      */
     [[nodiscard]] bool
-    isPrefixOf(UInt256 const& key) const;
+    isPrefixOf(UInt256 const& key) const noexcept;
 
     /**
-     * Create a SHAMapNodeID of a node with the depth of the node and
-     * the key of a leaf
+     * The ID of the node at a given depth on the path to a key.
      *
-     * @param depth  the depth of the node
-     * @param key  the key of a leaf
-     * @return SHAMapNodeID of the node
+     * This is the only way to make a non-root node ID. The key is masked
+     * to the first `depth` nibbles, so it need not be a leaf's key: any
+     * 256-bit value with the right prefix produces the same ID.
+     *
+     * @param depth The depth of the node; at most SHAMap::kLeafDepth.
+     * @param key   A key beneath the node, or any value sharing its prefix.
+     * @return The node's ID.
+     *
+     * @note Debug builds assert that @p depth is at most SHAMap::kLeafDepth;
+     *       release builds clamp it.
      */
-    static SHAMapNodeID
-    createID(unsigned int depth, UInt256 const& key);
+    [[nodiscard]] static SHAMapNodeID
+    createID(unsigned int depth, UInt256 const& key) noexcept;
 
     /**
      * Comparison operators
      *
-     * <, >, <= and >= are synthesized from the spaceship. It is written out
-     * rather than defaulted because the ordering is by depth first, and the
-     * members are not declared in that order.
+     * Orders by depth, then by ID, following member declaration order. Being
+     * defaulted, this also declares the defaulted operator==.
      */
-    std::strong_ordering
-    operator<=>(SHAMapNodeID const& n) const
-    {
-        return std::tie(depth_, id_) <=> std::tie(n.depth_, n.id_);
-    }
-
-    /**
-     * Equality, which the spaceship above does not provide.
-     *
-     * Only a *defaulted* operator<=> implicitly declares a defaulted
-     * operator==; the one above is user-provided, so == has to be written.
-     * It cannot be defaulted either, because a defaulted == would also compare
-     * the CountedObject base, which is not equality comparable.
-     */
-    bool
-    operator==(SHAMapNodeID const& n) const
-    {
-        return (depth_ == n.depth_) && (id_ == n.id_);
-    }
+    friend std::strong_ordering
+    operator<=>(SHAMapNodeID const& lhs, SHAMapNodeID const& rhs) noexcept = default;
 };
 
-inline std::string
+[[nodiscard]] inline std::string
 to_string(SHAMapNodeID const& node)
 {
     if (node.isRoot())
@@ -124,29 +150,28 @@ operator<<(std::ostream& out, SHAMapNodeID const& node)
 }
 
 /**
- * Return an object representing a serialized SHAMap Node ID
+ * Parse a node ID from its wire format.
  *
- * @param s A string of bytes
- * @param data a non-null pointer to a buffer of @param size bytes.
- * @param size the size, in bytes, of the buffer pointed to by @param data.
- * @return A seated optional if the buffer contained a serialized SHAMap
- *         node ID and an unseated optional otherwise.
+ * The wire format is the 256-bit node ID followed by a single depth
+ * byte, 33 bytes in all. The depth must not exceed SHAMap::kLeafDepth
+ * and the ID must carry no bits below the first `depth` nibbles.
+ *
+ * @param data The serialized bytes.
+ * @return The node ID, or an unseated optional if the input is not
+ *         exactly 33 bytes or does not describe a valid node ID.
+ *
+ * @todo Since the input is bytes and not characters, this should really
+ *       be accepting a `std::span<std::byte const>`; unfortunately, all
+ *       callers currently hold a `std::string`, which directly converts
+ *       into a `string_view` but not to a span of bytes.
  */
-/** @{ */
 [[nodiscard]] std::optional<SHAMapNodeID>
-deserializeSHAMapNodeID(void const* data, std::size_t size);
-
-[[nodiscard]] inline std::optional<SHAMapNodeID>
-deserializeSHAMapNodeID(std::string_view s)
-{
-    return deserializeSHAMapNodeID(s.data(), s.size());
-}
-/** @} */
+deserializeSHAMapNodeID(std::string_view data) noexcept;
 
 /**
  * Returns the branch that would contain the given hash
  */
 [[nodiscard]] unsigned int
-selectBranch(SHAMapNodeID const& id, UInt256 const& hash);
+selectBranch(SHAMapNodeID const& id, UInt256 const& hash) noexcept;
 
 }  // namespace xrpl
