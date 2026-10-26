@@ -11,7 +11,6 @@
 #include <xrpl/protocol/Serializer.h>
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -74,13 +73,6 @@ public:
     // is this a ledger entry that can be threaded
     [[nodiscard]] bool
     isThreadedType(Rules const& rules) const;
-
-    bool
-    thread(
-        UInt256 const& txID,
-        std::uint32_t ledgerSeq,
-        UInt256& prevTxID,
-        std::uint32_t& prevLedgerID);
 
 private:
     /*  Make STObject comply with the template for this SLE type

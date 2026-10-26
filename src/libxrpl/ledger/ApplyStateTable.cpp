@@ -25,6 +25,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -536,13 +537,33 @@ ApplyStateTable::destroyXRP(XRPAmount const& fee)
 void
 ApplyStateTable::threadItem(TxMeta& meta, SLE::Ref sle)
 {
-    key_type prevTxID;
-    LedgerIndex prevLgrID = 0;
+    auto const txID = meta.getTxID();
+    auto const ledgerSeq = meta.getLgrSeq();
 
-    if (!sle->thread(meta.getTxID(), meta.getLgrSeq(), prevTxID, prevLgrID))
+    auto const oldPrevTxID = sle->getFieldH256(sfPreviousTxnID);
+    auto const oldPrevLgrSeq = sle->getFieldU32(sfPreviousTxnLgrSeq);
+
+    if (oldPrevTxID == txID)
+    {
+        // The entry may already be threaded by this transaction, because it is
+        // shared by multiple accounts (think of a trust line). If the hashes
+        // match, the ledger sequences must match too; anything else indicates
+        // corrupted metadata.
+        if (oldPrevLgrSeq != ledgerSeq)
+            logicError(
+                std::format(
+                    "ApplyStateTable::threadItem: {} ledger sequence mismatch ({} vs {})",
+                    to_string(txID),
+                    oldPrevLgrSeq,
+                    ledgerSeq));
+
         return;
+    }
 
-    if (!prevTxID.isZero())
+    sle->setFieldH256(sfPreviousTxnID, txID);
+    sle->setFieldU32(sfPreviousTxnLgrSeq, ledgerSeq);
+
+    if (!oldPrevTxID.isZero())
     {
         auto& node = meta.getAffectedNode(sle, sfModifiedNode);
 
@@ -552,16 +573,16 @@ ApplyStateTable::threadItem(TxMeta& meta, SLE::Ref sle)
                 node.getFieldIndex(sfPreviousTxnLgrSeq) == -1,
                 "xrpl::ApplyStateTable::threadItem : previous ledger is not "
                 "set");
-            node.setFieldH256(sfPreviousTxnID, prevTxID);
-            node.setFieldU32(sfPreviousTxnLgrSeq, prevLgrID);
+            node.setFieldH256(sfPreviousTxnID, oldPrevTxID);
+            node.setFieldU32(sfPreviousTxnLgrSeq, oldPrevLgrSeq);
         }
 
         XRPL_ASSERT(
-            node.getFieldH256(sfPreviousTxnID) == prevTxID,
+            node.getFieldH256(sfPreviousTxnID) == oldPrevTxID,
             "xrpl::ApplyStateTable::threadItem : previous transaction is a "
             "match");
         XRPL_ASSERT(
-            node.getFieldU32(sfPreviousTxnLgrSeq) == prevLgrID,
+            node.getFieldU32(sfPreviousTxnLgrSeq) == oldPrevLgrSeq,
             "xrpl::ApplyStateTable::threadItem : previous ledger is a match");
     }
 }
