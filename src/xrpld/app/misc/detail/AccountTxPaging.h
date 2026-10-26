@@ -1,6 +1,7 @@
 #pragma once
 
 #include <xrpl/basics/Blob.h>
+#include <xrpl/basics/Slice.h>
 #include <xrpl/core/PerfLog.h>
 #include <xrpl/rdb/RelationalDatabase.h>
 
@@ -16,8 +17,8 @@ convertBlobsToTxResult(
     RelationalDatabase::AccountTxs& to,
     std::uint32_t ledgerIndex,
     std::string const& status,
-    Blob const& rawTxn,
-    Blob const& rawMeta,
+    Slice rawTxn,
+    Slice rawMeta,
     Application& app);
 
 void

@@ -430,7 +430,8 @@ SQLiteDatabase::oldestAccountTxPage(AccountTxPageOptions const& options)
                                    std::string const& status,
                                    Blob const& rawTxn,
                                    Blob const& rawMeta) {
-        convertBlobsToTxResult(ret, ledgerIndex, status, rawTxn, rawMeta, app);
+        convertBlobsToTxResult(
+            ret, ledgerIndex, status, makeSlice(rawTxn), makeSlice(rawMeta), app);
     };
 
     if (existsTransaction())
@@ -461,7 +462,8 @@ SQLiteDatabase::newestAccountTxPage(AccountTxPageOptions const& options)
                                    std::string const& status,
                                    Blob const& rawTxn,
                                    Blob const& rawMeta) {
-        convertBlobsToTxResult(ret, ledgerIndex, status, rawTxn, rawMeta, app);
+        convertBlobsToTxResult(
+            ret, ledgerIndex, status, makeSlice(rawTxn), makeSlice(rawMeta), app);
     };
 
     if (existsTransaction())
