@@ -270,7 +270,7 @@ ApplyStateTable::apply(
         //        metadata even when the base view is open?
         JLOG(j.trace()) << "metadata " << meta.getJson(JsonOptions::Values::None);
 
-        metadata = meta;
+        metadata = std::move(meta);
     }
 
     if (!isDryRun)
@@ -590,46 +590,41 @@ ApplyStateTable::threadItem(TxMeta& meta, SLE::Ref sle)
 SLE::pointer
 ApplyStateTable::getForMod(ReadView const& base, key_type const& key, Mods& mods, beast::Journal j)
 {
+    if (auto const iter = mods.find(key); iter != mods.end())
     {
-        auto const miter = mods.find(key);
-        if (miter != mods.end())
-        {
-            XRPL_ASSERT(miter->second, "xrpl::ApplyStateTable::getForMod : non-null result");
-            return miter->second;
-        }
+        XRPL_ASSERT(iter->second, "xrpl::ApplyStateTable::getForMod : non-null result");
+        return iter->second;
     }
-    {
-        auto const iter = items_.find(key);
-        if (iter != items_.end())
-        {
-            auto const& item = iter->second;
-            if (item.first == Action::Erase)
-            {
-                // The Destination of an Escrow or a PayChannel may have been
-                // deleted.  In that case the account we're threading to will
-                // not be found and it is appropriate to return a nullptr.
-                JLOG(j.warn()) << "Trying to thread to deleted node";
-                return nullptr;
-            }
-            if (item.first != Action::Cache)
-                return item.second;
 
-            // If it's only cached, then the node is being modified only by
-            // metadata; fall through and track it in the mods table.
-        }
-    }
-    auto const c = base.read(keylet::unchecked(key));
-    if (!c)
+    if (auto const iter = items_.find(key); iter != items_.end())
     {
-        // The Destination of an Escrow or a PayChannel may have been
-        // deleted.  In that case the account we're threading to will
-        // not be found and it is appropriate to return a nullptr.
-        JLOG(j.warn()) << "ApplyStateTable::getForMod: key not found";
-        return nullptr;
+        auto const& item = iter->second;
+
+        // This transaction could be deleting the account, so objects that
+        // are owned by the account (e.g. tickets) can also be deleted but
+        // there will be no account root for them to thread back to.
+        if (item.first == Action::Erase)
+            return nullptr;
+
+        if (item.first != Action::Cache)
+            return item.second;
+
+        // If it's only cached, then the node is being modified only by
+        // metadata; fall through and track it in the mods table.
     }
-    auto sle = std::make_shared<SLE>(*c);
-    mods.emplace(key, sle);
-    return sle;
+
+    if (auto const c = base.read(keylet::unchecked(key)))
+    {
+        auto sle = std::make_shared<SLE>(*c);
+        mods.emplace(key, sle);
+        return sle;
+    }
+
+    // The Destination of an Escrow or a PayChannel may have been
+    // deleted.  In that case the account we're threading to will
+    // not be found and it is appropriate to return a nullptr.
+    JLOG(j.warn()) << "ApplyStateTable::getForMod: key not found";
+    return nullptr;
 }
 
 void
@@ -640,19 +635,15 @@ ApplyStateTable::threadTx(
     Mods& mods,
     beast::Journal j)
 {
-    auto const sle = getForMod(base, keylet::account(to).key, mods, j);
-    if (!sle)
-    {
-        // The Destination of an Escrow or PayChannel may have been deleted.
-        // In that case the account we are threading to will not be found.
-        // So this logging is just a warning.
-        JLOG(j.warn()) << "Threading to non-existent account: " << toBase58(to);
-        return;
-    }
-    // threadItem only applied to AccountRoot
-    XRPL_ASSERT(
-        sle->isThreadedType(base.rules()), "xrpl::ApplyStateTable::threadTx : SLE is threaded");
-    threadItem(meta, sle);
+    // Previous versions of the code would allow an account that was the
+    // destination of either an Escrow or a PayChannel to be deleted, so
+    // we may not find it; not much we can do about it.
+    //
+    // CHECKME: getForMod is only used to look for an AccountRoot, so why not
+    //          rename it to `accountForMod` to make that clear, and check if
+    //          the returned object actually _is_ an AccountRoot?
+    if (auto const sle = getForMod(base, keylet::account(to).key, mods, j))
+        threadItem(meta, sle);
 }
 
 void
@@ -663,8 +654,7 @@ ApplyStateTable::threadOwners(
     Mods& mods,
     beast::Journal j)
 {
-    LedgerEntryType const ledgerType{sle->getType()};
-    switch (ledgerType)
+    switch (sle->getType())
     {
         case ltACCOUNT_ROOT: {
             // Nothing to do
