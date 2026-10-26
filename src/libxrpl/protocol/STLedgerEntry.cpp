@@ -1,6 +1,5 @@
 #include <xrpl/protocol/STLedgerEntry.h>
 
-#include <xrpl/basics/Log.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/basics/safe_cast.h>
@@ -137,33 +136,6 @@ STLedgerEntry::isThreadedType(Rules const& rules) const
     bool const excludePrevTxnID = !rules.enabled(fixPreviousTxnID) &&
         (std::count(kNewPreviousTxnIdTypes.cbegin(), kNewPreviousTxnIdTypes.cend(), type_) != 0);
     return !excludePrevTxnID && getFieldIndex(sfPreviousTxnID) != -1;
-}
-
-bool
-STLedgerEntry::thread(
-    UInt256 const& txID,
-    std::uint32_t ledgerSeq,
-    UInt256& prevTxID,
-    std::uint32_t& prevLedgerID)
-{
-    UInt256 const oldPrevTxID = getFieldH256(sfPreviousTxnID);
-
-    JLOG(debugLog().info()) << "Thread Tx:" << txID << " prev:" << oldPrevTxID;
-
-    if (oldPrevTxID == txID)
-    {
-        // this transaction is already threaded
-        XRPL_ASSERT(
-            getFieldU32(sfPreviousTxnLgrSeq) == ledgerSeq,
-            "xrpl::STLedgerEntry::thread : ledger sequence match");
-        return false;
-    }
-
-    prevTxID = oldPrevTxID;
-    prevLedgerID = getFieldU32(sfPreviousTxnLgrSeq);
-    setFieldH256(sfPreviousTxnID, txID);
-    setFieldU32(sfPreviousTxnLgrSeq, ledgerSeq);
-    return true;
 }
 
 }  // namespace xrpl
