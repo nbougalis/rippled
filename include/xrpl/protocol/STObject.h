@@ -27,6 +27,7 @@
 
 #include <boost/iterator/transform_iterator.hpp>
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -97,7 +98,15 @@ public:
     STObject(STObject const&) = default;
 
     template <typename F>
+        requires std::invocable<F&, STObject&>
     STObject(SOTemplate const& type, SField const& name, F&& f) : STObject(type, name)
+    {
+        f(*this);
+    }
+
+    template <typename F>
+        requires std::invocable<F&, STObject&>
+    STObject(SField const& name, F&& f) : STObject(name)
     {
         f(*this);
     }

@@ -12,9 +12,8 @@
 #include <xrpl/protocol/TxFormats.h>
 #include <xrpl/protocol/TxMeta.h>
 
-#include <boost/container/flat_set.hpp>
-
 #include <cstdint>
+#include <flat_set>
 #include <memory>
 #include <string>
 
@@ -51,7 +50,7 @@ public:
         return meta_;
     }
 
-    [[nodiscard]] boost::container::flat_set<AccountID> const&
+    [[nodiscard]] std::flat_set<AccountID> const&
     getAffected() const
     {
         return affected_;
@@ -89,7 +88,7 @@ public:
 private:
     std::shared_ptr<STTx const> txn_;
     TxMeta meta_;
-    boost::container::flat_set<AccountID> affected_;
+    std::flat_set<AccountID> affected_;
     Blob rawMeta_;
     json::Value json_;
 };

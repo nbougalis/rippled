@@ -880,7 +880,8 @@ getAccountTxs(
             if (txn)
             {
                 ret.emplace_back(
-                    txn, std::make_shared<TxMeta>(txn->getID(), txn->getLedger(), txnMeta));
+                    txn,
+                    std::make_shared<TxMeta>(txn->getID(), txn->getLedger(), makeSlice(txnMeta)));
                 total++;
             }
         }
@@ -1402,7 +1403,7 @@ getTransaction(
 
         auto const inLedger = rangeCheckedCast<std::uint32_t>(ledgerSeq.value());
 
-        auto txMeta = std::make_shared<TxMeta>(id, inLedger, rawMeta);
+        auto txMeta = std::make_shared<TxMeta>(id, inLedger, makeSlice(rawMeta));
 
         return std::pair{std::move(txn), std::move(txMeta)};
     }

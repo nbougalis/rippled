@@ -121,10 +121,10 @@ public:
 
     template <class... Args>
         requires std::constructible_from<STObject, Args&&...>
-    void
+    STObject&
     emplaceBack(Args&&... args)
     {
-        v_.emplace_back(std::forward<Args>(args)...);
+        return v_.emplace_back(std::forward<Args>(args)...);
     }
 
     template <std::convertible_to<STObject> T>

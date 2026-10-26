@@ -7,13 +7,14 @@
 
 #include <xrpl/basics/Blob.h>
 #include <xrpl/basics/Slice.h>
+#include <xrpl/basics/contract.h>
 #include <xrpl/core/NetworkIDService.h>
-#include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STTx.h>
 #include <xrpl/protocol/Serializer.h>
 #include <xrpl/protocol/TxMeta.h>
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -25,34 +26,29 @@ convertBlobsToTxResult(
     RelationalDatabase::AccountTxs& to,
     std::uint32_t ledgerIndex,
     std::string const& status,
-    Blob const& rawTxn,
-    Blob const& rawMeta,
+    Slice rawTxn,
+    Slice rawMeta,
     Application& app)
 {
-    SerialIter it(makeSlice(rawTxn));
-    auto const txn = std::make_shared<STTx const>(it);
+    auto const txn = std::make_shared<STTx const>(SerialIter{rawTxn});
     std::string reason;
 
     auto tr = std::make_shared<Transaction>(txn, reason, app);
 
     auto const metaset = std::make_shared<TxMeta>(tr->getID(), ledgerIndex, rawMeta);
 
-    // if properly formed meta is available we can use it to generate ctid
-    if (metaset->getAsObject().isFieldPresent(sfTransactionIndex))
-    {
-        tr->setStatus(
-            Transaction::sqlTransactionStatus(status),
-            ledgerIndex,
-            metaset->getAsObject().getFieldU32(sfTransactionIndex),
-            app.getNetworkIDService().getNetworkID());
-    }
-    else
-    {
-        tr->setStatus(Transaction::sqlTransactionStatus(status), ledgerIndex);
-    }
+    // The transaction index from the metadata is needed to generate the CTID
+    if (metaset->getIndex() == std::numeric_limits<std::uint32_t>::max())
+        logicError("convertBlobsToTxResult : TxMeta without a transaction index");
+
+    tr->setStatus(
+        Transaction::sqlTransactionStatus(status),
+        ledgerIndex,
+        metaset->getIndex(),
+        app.getNetworkIDService().getNetworkID());
 
     to.emplace_back(std::move(tr), metaset);
-};
+}
 
 void
 saveLedgerAsync(Application& app, std::uint32_t seq)
