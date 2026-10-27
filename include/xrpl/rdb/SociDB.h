@@ -9,27 +9,19 @@
  * This module requires the @ref beast_sqlite external module.
  */
 
-#include <soci/blob.h>
-#include <soci/session.h>
-
-#include <memory>
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated"
-#endif
-
 #include <xrpl/core/JobQueue.h>
 #include <xrpl/core/ServiceRegistry.h>
 
-#define SOCI_USE_BOOST
+#include <soci/blob.h>
+#include <soci/session.h>
 
+#include <concepts>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <ranges>
 #include <string>
-#include <vector>
-
-namespace sqlite_api {
-struct sqlite3;
-}  // namespace sqlite_api
+#include <type_traits>
 
 namespace xrpl {
 
@@ -85,14 +77,38 @@ getKBUsedAll(soci::session& s);
 std::uint32_t
 getKBUsedDB(soci::session& s);
 
+namespace detail {
+
+template <class R>
+concept ByteRange = std::ranges::contiguous_range<R> && std::ranges::sized_range<R> &&
+    sizeof(std::ranges::range_value_t<R>) == 1 &&
+    std::is_trivially_copyable_v<std::ranges::range_value_t<R>>;
+
+template <class C>
+concept ByteBuffer = ByteRange<C> && std::ranges::output_range<C, std::ranges::range_value_t<C>> &&
+    requires(C& c, std::size_t n) { c.resize(n); };
+
+}  // namespace detail
+
+template <detail::ByteRange R>
 void
-convert(soci::blob& from, std::vector<std::uint8_t>& to);
+convert(R const& from, soci::blob& to)
+{
+    to.trim(0);
+
+    if (auto const size = std::ranges::size(from); size != 0)
+        to.write(0, reinterpret_cast<char const*>(std::ranges::data(from)), size);
+}
+
+template <detail::ByteBuffer C>
 void
-convert(soci::blob& from, std::string& to);
-void
-convert(std::vector<std::uint8_t> const& from, soci::blob& to);
-void
-convert(std::string const& from, soci::blob& to);
+convert(soci::blob& from, C& to)
+{
+    to.resize(from.get_len());
+
+    if (!std::ranges::empty(to))
+        from.read(0, reinterpret_cast<char*>(std::ranges::data(to)), std::ranges::size(to));
+}
 
 class Checkpointer : public std::enable_shared_from_this<Checkpointer>
 {
@@ -119,7 +135,3 @@ std::shared_ptr<Checkpointer>
 makeCheckpointer(std::uintptr_t id, std::weak_ptr<soci::session>, JobQueue&, ServiceRegistry&);
 
 }  // namespace xrpl
-
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif

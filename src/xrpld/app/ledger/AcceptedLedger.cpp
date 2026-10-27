@@ -11,11 +11,14 @@ namespace xrpl {
 
 AcceptedLedger::AcceptedLedger(std::shared_ptr<ReadView const> ledger) : ledger_(std::move(ledger))
 {
+    XRPL_ASSERT(!ledger_->open(), "xrpl::AcceptedLedger::AcceptedLedger : ledger is closed");
+
     transactions_.reserve(256);
+
     for (auto const& item : ledger_->txs)
     {
         transactions_.emplace_back(
-            std::make_unique<AcceptedLedgerTx>(ledger_, item.first, item.second));
+            std::make_unique<AcceptedLedgerTx>(ledger_->seq(), item.first, item.second));
     }
 
     std::ranges::sort(transactions_, [](auto const& a, auto const& b) {

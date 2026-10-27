@@ -375,36 +375,6 @@ STTx::getJson(JsonOptions options, bool binary) const
     return ret;
 }
 
-std::string const&
-STTx::getMetaSQLInsertReplaceHeader()
-{
-    static std::string const kSql =
-        "INSERT OR REPLACE INTO Transactions "
-        "(TransID, TransType, FromAcct, FromSeq, LedgerSeq, Status, RawTxn, "
-        "TxnMeta)"
-        " VALUES ";
-
-    return kSql;
-}
-
-std::string
-STTx::getMetaSQL(std::uint32_t inLedger, std::string const& escapedMetaData) const
-{
-    auto const format = TxFormats::getInstance().findByType(txType_);
-    XRPL_ASSERT(format, "xrpl::STTx::getMetaSQL : non-null type format");
-
-    return std::format(
-        "('{}', '{}', '{}', '{}', '{}', '{}', {}, {})",
-        to_string(getTransactionID()),
-        format->getName(),
-        toBase58(getAccountID(sfAccount)),
-        getFieldU32(sfSequence),
-        inLedger,
-        safeCast<char>(TxnSql::Validated),
-        sqlBlobLiteral(getSerializer().slice()),
-        escapedMetaData);
-}
-
 static std::expected<void, std::string>
 singleSignHelper(STObject const& sigObject, Slice const& data)
 {

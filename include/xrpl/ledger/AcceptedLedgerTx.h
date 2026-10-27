@@ -1,9 +1,6 @@
 #pragma once
 
-#include <xrpl/basics/Blob.h>
 #include <xrpl/basics/CountedObject.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/ledger/ReadView.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Protocol.h>
 #include <xrpl/protocol/STObject.h>
@@ -15,35 +12,47 @@
 #include <cstdint>
 #include <flat_set>
 #include <memory>
-#include <string>
+#include <utility>
 
 namespace xrpl {
 
 /**
- * A transaction that is in a closed ledger.
+ * A transaction in a closed ledger, with its metadata.
  *
- * Description
- *
- * An accepted ledger transaction contains additional information that the
- * server needs to tell clients about the transaction. For example,
- *     - The transaction in JSON form
- *     - Which accounts are affected
- *       * This is used by InfoSub to report to clients
- *     - Cached stuff
+ * Holds the transaction and metadata as deserialized from the ledger,
+ * along with the set of accounts the transaction affected, which is
+ * computed once here because both the SQL indexer and the subscription
+ * publisher need it.
  */
 class AcceptedLedgerTx : public CountedObject<AcceptedLedgerTx>
 {
 public:
     AcceptedLedgerTx(
-        std::shared_ptr<ReadView const> const& ledger,
-        std::shared_ptr<STTx const> const&,
-        std::shared_ptr<STObject const> const&);
+        std::uint32_t ledgerSeq,
+        std::shared_ptr<STTx const> txn,
+        std::shared_ptr<STObject const> meta)
+        : txn_(std::move(txn))
+        , rawMeta_(std::move(meta))
+        , meta_(txn_->getTransactionID(), ledgerSeq, *rawMeta_)
+        , affected_(meta_.getAffectedAccounts())
+    {
+    }
 
     [[nodiscard]] std::shared_ptr<STTx const> const&
     getTxn() const
     {
         return txn_;
     }
+
+    /**
+     * The metadata as deserialized from the ledger.
+     */
+    [[nodiscard]] std::shared_ptr<STObject const> const&
+    getRawMeta() const
+    {
+        return rawMeta_;
+    }
+
     [[nodiscard]] TxMeta const&
     getMeta() const
     {
@@ -61,36 +70,30 @@ public:
     {
         return txn_->getTransactionID();
     }
+
     [[nodiscard]] TxType
     getTxnType() const
     {
         return txn_->getTxnType();
     }
+
     [[nodiscard]] TER
     getResult() const
     {
         return meta_.getResultTER();
     }
+
     [[nodiscard]] std::uint32_t
     getTxnSeq() const
     {
         return meta_.getIndex();
     }
-    [[nodiscard]] std::string
-    getEscMeta() const;
-
-    [[nodiscard]] json::Value const&
-    getJson() const
-    {
-        return json_;
-    }
 
 private:
     std::shared_ptr<STTx const> txn_;
+    std::shared_ptr<STObject const> rawMeta_;
     TxMeta meta_;
     std::flat_set<AccountID> affected_;
-    Blob rawMeta_;
-    json::Value json_;
 };
 
 }  // namespace xrpl

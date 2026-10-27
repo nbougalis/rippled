@@ -1,34 +1,28 @@
+#include <xrpl/rdb/SociDB.h>
+
+#include <xrpl/basics/ByteUtilities.h>
 #include <xrpl/basics/Log.h>
+#include <xrpl/basics/contract.h>
 #include <xrpl/config/BasicConfig.h>
 #include <xrpl/config/Constants.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
 #include <xrpl/core/ServiceRegistry.h>
+#include <xrpl/rdb/DatabaseCon.h>
 
 #include <soci/blob.h>
+#include <soci/sqlite3/soci-sqlite3.h>  // IWYU pragma: keep
 
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <format>
+#include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated"
-#endif
-
-#include <xrpl/basics/ByteUtilities.h>
-#include <xrpl/basics/contract.h>
-#include <xrpl/rdb/DatabaseCon.h>
-#include <xrpl/rdb/SociDB.h>
-
-#include <soci/sqlite3/soci-sqlite3.h>  // IWYU pragma: keep
-
-#include <format>
-#include <memory>
 
 namespace xrpl {
 
@@ -109,23 +103,21 @@ open(soci::session& s, std::string const& beName, std::string const& connectionS
 static sqlite_api::sqlite3*
 getConnection(soci::session& s)
 {
-    sqlite_api::sqlite3* result = nullptr;  // NOLINT(misc-const-correctness)
-    auto be = s.get_backend();
-    if (auto b = dynamic_cast<soci::sqlite3_session_backend*>(be))
-        result = b->conn_;
+    auto const* const be = dynamic_cast<soci::sqlite3_session_backend*>(s.get_backend());
 
-    if (result == nullptr)
+    if (be == nullptr || be->conn_ == nullptr)
         Throw<std::logic_error>("Didn't get a database connection.");
 
-    return result;
+    return be->conn_;
 }
 
 std::uint32_t
 getKBUsedAll(soci::session& s)
 {
-    if (getConnection(s) == nullptr)
-        Throw<std::logic_error>("No connection found.");
-    return static_cast<size_t>(sqlite_api::sqlite3_memory_used() / kilobytes(1));
+    return static_cast<std::uint32_t>(std::clamp<std::int64_t>(
+        sqlite_api::sqlite3_memory_used() / kilobytes(std::int64_t{1}),
+        0,
+        std::numeric_limits<std::uint32_t>::max()));
 }
 
 std::uint32_t
@@ -138,51 +130,8 @@ getKBUsedDB(soci::session& s)
         sqlite_api::sqlite3_db_status(conn, SQLITE_DBSTATUS_CACHE_USED, &cur, &hiw, 0);
         return cur / kilobytes(1);
     }
-    Throw<std::logic_error>("");
-    return 0;  // Silence compiler warning.
-}
 
-void
-convert(soci::blob& from, std::vector<std::uint8_t>& to)
-{
-    to.resize(from.get_len());
-    if (to.empty())
-        return;
-    from.read(0, reinterpret_cast<char*>(&to[0]), from.get_len());
-}
-
-void
-convert(soci::blob& from, std::string& to)
-{
-    std::vector<std::uint8_t> tmp;
-    convert(from, tmp);
-    to.assign(tmp.begin(), tmp.end());
-}
-
-void
-convert(std::vector<std::uint8_t> const& from, soci::blob& to)
-{
-    if (!from.empty())
-    {
-        to.write(0, reinterpret_cast<char const*>(&from[0]), from.size());
-    }
-    else
-    {
-        to.trim(0);
-    }
-}
-
-void
-convert(std::string const& from, soci::blob& to)
-{
-    if (!from.empty())
-    {
-        to.write(0, from.data(), from.size());
-    }
-    else
-    {
-        to.trim(0);
-    }
+    Throw<std::logic_error>("No connection found.");
 }
 
 namespace {
@@ -341,7 +290,3 @@ makeCheckpointer(
 }
 
 }  // namespace xrpl
-
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
