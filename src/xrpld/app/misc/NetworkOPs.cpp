@@ -3359,7 +3359,7 @@ NetworkOPsImp::pubLedger(std::shared_ptr<ReadView const> const& lpAccepted)
     // Don't lock since pubAcceptedTransaction is locking.
     for (auto const& accTx : *alpAccepted)
     {
-        JLOG(journal_.trace()) << "pubAccepted: " << accTx->getJson();
+        JLOG(journal_.trace()) << "pubAccepted: " << accTx->getTransactionID();
         bool const last = &*accTx == &alpAccepted->back();
         pubValidatedTransaction(lpAccepted, *accTx, last);
     }

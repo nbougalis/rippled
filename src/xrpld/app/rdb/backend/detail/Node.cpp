@@ -285,12 +285,6 @@ saveValidatedLedger(
 
     {
         static constexpr char const* kDeleteLedger = "DELETE FROM Ledgers WHERE LedgerSeq = {};";
-        static constexpr char const* kDeleteTranS1 =
-            "DELETE FROM Transactions WHERE LedgerSeq = {};";
-        static constexpr char const* kDeleteTranS2 =
-            "DELETE FROM AccountTransactions WHERE LedgerSeq = {};";
-        static constexpr char const* kDeleteAcctTrans =
-            "DELETE FROM AccountTransactions WHERE TransID = '{}';";
 
         {
             auto db = ldgDB.checkoutDb();
@@ -311,77 +305,98 @@ saveValidatedLedger(
 
             soci::transaction tr(*db);
 
-            *db << std::format(kDeleteTranS1, seq);
-            *db << std::format(kDeleteTranS2, seq);
+            *db << "DELETE FROM Transactions WHERE LedgerSeq = :seq;", soci::use(seq);
+            *db << "DELETE FROM AccountTransactions WHERE LedgerSeq = :seq;", soci::use(seq);
 
-            std::string const ledgerSeq(std::to_string(seq));
+            // Bound once, assigned per row.
+            std::string txnId;
+            std::string txnType;
+            std::string fromAcct;
+            std::uint32_t fromSeq = 0;
+            std::uint32_t txnSeq = 0;
+            std::string account;
+            soci::blob rawTxn(*db);
+            soci::blob rawMeta(*db);
+
+            static std::string const kStatus(1, safeCast<char>(TxnSql::Validated));
+
+            soci::statement deleteAcctTx =
+                (db->prepare << "DELETE FROM AccountTransactions WHERE TransID = :id;",
+                 soci::use(txnId));
+
+            soci::statement insertAcctTx =
+                (db->prepare << "INSERT INTO AccountTransactions "
+                                "(TransID, Account, LedgerSeq, TxnSeq) "
+                                "VALUES (:id, :acct, :seq, :txnSeq);",
+                 soci::use(txnId),
+                 soci::use(account),
+                 soci::use(seq),
+                 soci::use(txnSeq));
+
+            soci::statement insertTx =
+                (db->prepare << "INSERT OR REPLACE INTO Transactions "
+                                "(TransID, TransType, FromAcct, FromSeq, LedgerSeq, Status, "
+                                "RawTxn, TxnMeta) "
+                                "VALUES (:id, :type, :acct, :fromSeq, :seq, :status, :txn, "
+                                ":meta);",
+                 soci::use(txnId),
+                 soci::use(txnType),
+                 soci::use(fromAcct),
+                 soci::use(fromSeq),
+                 soci::use(seq),
+                 soci::use(kStatus),
+                 soci::use(rawTxn),
+                 soci::use(rawMeta));
 
             for (auto const& acceptedLedgerTx : *aLedger)
             {
-                UInt256 const transactionID = acceptedLedgerTx->getTransactionID();
+                auto const& txn = acceptedLedgerTx->getTxn();
 
-                std::string const txnId(to_string(transactionID));
-                std::string const txnSeq(std::to_string(acceptedLedgerTx->getTxnSeq()));
+                txnId = to_string(acceptedLedgerTx->getTransactionID());
+                txnSeq = acceptedLedgerTx->getTxnSeq();
 
-                *db << std::format(kDeleteAcctTrans, txnId);
+                deleteAcctTx.execute(true);
 
                 auto const& accts = acceptedLedgerTx->getAffected();
 
                 if (!accts.empty())
                 {
-                    std::string sql(
-                        "INSERT INTO AccountTransactions "
-                        "(TransID, Account, LedgerSeq, TxnSeq) VALUES ");
-
-                    // Try to make an educated guess on how much space we'll
-                    // need for our arguments. In argument order we have: 64
-                    // + 34 + 10 + 10 = 118 + 10 extra = 128 bytes
-                    sql.reserve(sql.length() + (accts.size() * 128));
-
-                    bool first = true;
-                    for (auto const& account : accts)
+                    for (auto const& acct : accts)
                     {
-                        if (!first)
-                        {
-                            sql += ", ('";
-                        }
-                        else
-                        {
-                            sql += "('";
-                            first = false;
-                        }
-
-                        sql += txnId;
-                        sql += "','";
-                        sql += toBase58(account);
-                        sql += "',";
-                        sql += ledgerSeq;
-                        sql += ',';
-                        sql += txnSeq;
-                        sql += ')';
+                        account = toBase58(acct);
+                        insertAcctTx.execute(true);
                     }
-                    sql += ';';
-                    JLOG(j.trace()) << "ActTx: " << sql;
-                    *db << sql;
                 }
-                else if (auto const& sleTxn = acceptedLedgerTx->getTxn(); !isPseudoTx(*sleTxn))
+                else if (!isPseudoTx(*txn))
                 {
                     // It's okay for pseudo transactions to not affect any
                     // accounts.  But otherwise...
                     JLOG(j.warn()) << "Transaction in ledger " << seq << " affects no accounts";
-                    JLOG(j.warn()) << sleTxn->getJson(JsonOptions::Values::None);
+                    JLOG(j.warn()) << txn->getJson(JsonOptions::Values::None);
                 }
 
-                *db
-                    << (STTx::getMetaSQLInsertReplaceHeader() +
-                        acceptedLedgerTx->getTxn()->getMetaSQL(
-                            seq, acceptedLedgerTx->getEscMeta()) +
-                        ";");
+                {
+                    auto const format = TxFormats::getInstance().findByType(txn->getTxnType());
+                    XRPL_ASSERT(format, "xrpl::detail::saveValidatedLedger : known tx type");
+                    txnType = format->getName();
+                }
+                fromAcct = toBase58(txn->getAccountID(sfAccount));
+                fromSeq = txn->getFieldU32(sfSequence);
+
+                convert(txn->getSerializer().slice(), rawTxn);
+
+                {
+                    Serializer s;
+                    acceptedLedgerTx->getRawMeta()->add(s);
+                    convert(s.slice(), rawMeta);
+                }
+
+                insertTx.execute(true);
 
                 app.getMasterTransaction().inLedger(
-                    transactionID,
+                    acceptedLedgerTx->getTransactionID(),
                     seq,
-                    acceptedLedgerTx->getTxnSeq(),
+                    txnSeq,
                     app.getNetworkIDService().getNetworkID());
             }
 

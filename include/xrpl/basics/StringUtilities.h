@@ -19,20 +19,6 @@
 
 namespace xrpl {
 
-/**
- * Format arbitrary binary data as an SQLite "blob literal".
- *
- * In SQLite, blob literals must be encoded when used in a query. Per
- * https://sqlite.org/lang_expr.html#literal_values_constants_ they are
- * encoded as string literals containing hexadecimal data and preceded
- * by a single 'X' character.
- *
- * @param blob An arbitrary blob of binary data
- * @return The input, encoded as a blob literal.
- */
-std::string
-sqlBlobLiteral(Slice blob);
-
 namespace detail {
 
 template <typename T>
