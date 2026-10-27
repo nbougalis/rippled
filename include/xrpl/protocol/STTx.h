@@ -150,13 +150,6 @@ public:
     [[nodiscard]] std::expected<void, std::string>
     checkBatchSign() const;
 
-    // SQL Functions with metadata.
-    static std::string const&
-    getMetaSQLInsertReplaceHeader();
-
-    [[nodiscard]] std::string
-    getMetaSQL(std::uint32_t inLedger, std::string const& escapedMetaData) const;
-
     /**
      * The IDs of the inner transactions of a Batch.
      */
