@@ -9,16 +9,12 @@
  * This module requires the @ref beast_sqlite external module.
  */
 
-#include <xrpl/core/JobQueue.h>
-#include <xrpl/core/ServiceRegistry.h>
-
 #include <soci/blob.h>
 #include <soci/session.h>
 
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <ranges>
 #include <string>
 #include <type_traits>
@@ -28,54 +24,50 @@ namespace xrpl {
 class BasicConfig;
 
 /**
- * DBConfig is used when a client wants to delay opening a soci::session after
- * parsing the config parameters. If a client want to open a session
- * immediately, use the free function "open" below.
+ * Returns the connection string for a database named in the config.
+ *
+ * @param config Supplies the backend and the database directory.
+ * @param name Name of the database. For sqlite it becomes part of the
+ *             filename, with the extension chosen from the name.
+ *
+ * @throws std::runtime_error if the configured backend is not sqlite, or
+ *         the name is empty.
  */
-class DBConfig
-{
-    std::string connectionString_;
-    explicit DBConfig(std::string dbPath);
-
-public:
-    DBConfig(BasicConfig const& config, std::string const& dbName);
-    [[nodiscard]] std::string
-    connectionString() const;
-    void
-    open(soci::session& s) const;
-};
+[[nodiscard]] std::string
+setupSession(BasicConfig const& config, std::string_view name);
 
 /**
- * Open a soci session.
+ * Opens a soci session.
  *
  * @param s Session to open.
- *
- * @param config Parameters to pick the soci backend and how to connect to that
- *               backend.
- *
- * @param dbName Name of the database. This has different meaning for different
- *               backends. Sometimes it is part of a filename (sqlite3),
- *               other times it is a database name (postgresql).
+ * @param setup Typically from setupSession(); an empty
+ *              string opens a temporary database.
  */
 void
-open(soci::session& s, BasicConfig const& config, std::string const& dbName);
+openSession(soci::session& s, std::string const& setup);
 
 /**
- * Open a soci session.
+ * A per-database memory counter that getKBUsedDB() can report.
  *
- * @param s Session to open.
- * @param beName Backend name.
- * @param connectionString Connection string to forward to soci::open.
- *        see the soci::open documentation for how to use this.
- *
+ * These are the sqlite status codes whose value is a byte count; the counters
+ * that report hits, misses or object counts are deliberately absent, since
+ * reporting them in kilobytes would be meaningless.
  */
-void
-open(soci::session& s, std::string const& beName, std::string const& connectionString);
+enum class DbMemoryUse { Cache, SharedCache };
 
+/**
+ * Returns the memory sqlite has allocated process-wide, in kilobytes.
+ */
 std::uint32_t
-getKBUsedAll(soci::session& s);
+getKBUsedAll();
+
+/**
+ * Returns the memory a single database is using, in kilobytes.
+ *
+ * @throws std::logic_error if the session is not backed by sqlite.
+ */
 std::uint32_t
-getKBUsedDB(soci::session& s);
+getKBUsedDB(soci::session& s, DbMemoryUse use = DbMemoryUse::Cache);
 
 namespace detail {
 
@@ -94,44 +86,51 @@ template <detail::ByteRange R>
 void
 convert(R const& from, soci::blob& to)
 {
-    to.trim(0);
+    auto const size = std::ranges::size(from);
 
-    if (auto const size = std::ranges::size(from); size != 0)
+    if (to.get_len() > size)
+        to.trim(size);
+
+    if (size != 0)
+    {
+#if SOCI_VERSION >= 400100
+        to.write_from_start(std::ranges::data(from), size);
+#else
         to.write(0, reinterpret_cast<char const*>(std::ranges::data(from)), size);
+#endif
+    }
 }
 
 template <detail::ByteBuffer C>
 void
 convert(soci::blob& from, C& to)
 {
-    to.resize(from.get_len());
+    // resize_and_overwrite invokes its callback with C::value_type*, so
+    // op is declared as taking exactly that, so that the requires probe
+    // below sees op as a valid argument.
+    auto op = [&from](std::ranges::range_value_t<C>* buf, std::size_t n) -> std::size_t {
+        if (n == 0)
+            return 0;
 
-    if (!std::ranges::empty(to))
-        from.read(0, reinterpret_cast<char*>(std::ranges::data(to)), std::ranges::size(to));
+#if SOCI_VERSION >= 400100
+        return from.read_from_start(buf, n);
+#else
+        return from.read(0, reinterpret_cast<char*>(buf), n);
+#endif
+    };
+
+    auto const len = from.get_len();
+
+    // ByteBuffer only guarantees that resize is present, but some types
+    // offer a better alternative in C++23: resize_and_overwrite. Detect
+    // whether it is available and, if it is, use it.
+    if constexpr (requires { to.resize_and_overwrite(len, op); })
+        to.resize_and_overwrite(len, op);
+    else
+    {
+        to.resize(len);
+        op(std::ranges::data(to), len);
+    }
 }
-
-class Checkpointer : public std::enable_shared_from_this<Checkpointer>
-{
-public:
-    virtual std::uintptr_t
-    id() const = 0;
-    virtual ~Checkpointer() = default;
-
-    virtual void
-    schedule() = 0;
-
-    virtual void
-    checkpoint() = 0;
-};
-
-/**
- * Returns a new checkpointer which makes checkpoints of a
- * soci database every checkpointPageCount pages, using a job on the job queue.
- *
- * The checkpointer contains references to the session and job queue
- * and so must outlive them both.
- */
-std::shared_ptr<Checkpointer>
-makeCheckpointer(std::uintptr_t id, std::weak_ptr<soci::session>, JobQueue&, ServiceRegistry&);
 
 }  // namespace xrpl

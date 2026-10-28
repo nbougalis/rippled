@@ -1,51 +1,41 @@
 #include <xrpl/rdb/SociDB.h>
 
 #include <xrpl/basics/ByteUtilities.h>
-#include <xrpl/basics/Log.h>
 #include <xrpl/basics/contract.h>
+#include <xrpl/basics/safe_cast.h>
+#include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/config/BasicConfig.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/core/Job.h>
-#include <xrpl/core/JobQueue.h>
-#include <xrpl/core/ServiceRegistry.h>
-#include <xrpl/rdb/DatabaseCon.h>
+#include <xrpl/rdb/detail/SqliteConnection.h>
 
-#include <soci/blob.h>
 #include <soci/sqlite3/soci-sqlite3.h>  // IWYU pragma: keep
+#include <soci/version.h>
 
-#include <cstddef>
+#include <algorithm>
+#include <concepts>
 #include <cstdint>
 #include <filesystem>
 #include <format>
-#include <memory>
-#include <mutex>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
-#include <vector>
+
+// Tripwire for the soci version bump. The convert() templates in SociDB.h
+// carry a legacy branch for soci < 4.1, where the sqlite3 backend does not
+// implement read_from_start()/write_from_start(). On >= 4.1 that branch is
+// dead code behind an #if, so no deprecation warning will ever point at it.
+//
+// To fix: delete the #else branches in both convert() overloads, then delete
+// this block. Do not raise the threshold.
+#if SOCI_VERSION >= 400100
+#error "soci >= 4.1: remove the legacy blob read/write branches from convert() in SociDB.h"
+#endif
 
 namespace xrpl {
 
-static auto gCheckpointPageCount = 1000;
-
-namespace detail {
-
 std::string
-getSociSqliteInit(std::string const& name, std::string const& dir, std::string const& ext)
-{
-    if (name.empty())
-    {
-        Throw<std::runtime_error>(std::format(
-            "Sqlite databases must specify a dir and a name. Name: {} Dir: {}", name, dir));
-    }
-    std::filesystem::path file(dir);
-    if (std::filesystem::is_directory(file))
-        file /= name + ext;
-    return file.string();
-}
-
-std::string
-getSociInit(BasicConfig const& config, std::string const& dbName)
+setupSession(BasicConfig const& config, std::string_view name)
 {
     auto const& section = config.section(Sections::kSqdb);
     auto const backendName = get(section, Keys::kBackend, "sqlite");
@@ -53,240 +43,95 @@ getSociInit(BasicConfig const& config, std::string const& dbName)
     if (backendName != "sqlite")
         Throw<std::runtime_error>(std::format("Unsupported soci backend: {}", backendName));
 
-    auto const path = config.legacy(Sections::kDatabasePath);
-    auto const ext = dbName == "validators" || dbName == "peerfinder" ? ".sqlite" : ".db";
-    return detail::getSociSqliteInit(dbName, path, ext);
-}
+    auto const dir = config.legacy(Sections::kDatabasePath);
 
-}  // namespace detail
+    // CHECKME: the message claims both are required, but only the name is
+    // checked, and it is interpolated while known to be empty. Every caller
+    // passes a literal, so this is a programming error, not a config error.
+    if (name.empty())
+    {
+        Throw<std::runtime_error>(std::format(
+            "Sqlite databases must specify a dir and a name. Name: {} Dir: {}", name, dir));
+    }
 
-DBConfig::DBConfig(std::string dbPath) : connectionString_(std::move(dbPath))
-{
-}
+    // CHECKME: when the directory does not exist the name and extension are
+    // dropped and the result is whatever `dir` was. For an empty dir -- what
+    // standalone produces, since Config clears dataDir and never sets
+    // database_path -- that yields an empty connection string, i.e. a
+    // temporary database, and that is load bearing. The same branch also
+    // swallows a dir that is non-empty but is not a directory (a typo, or a
+    // path naming a file): the server then starts, persists nothing, and
+    // says nothing.
+    std::filesystem::path file(dir);
+    if (std::filesystem::is_directory(file))
+    {
+        file /= name;
+        file += name == "validators" || name == "peerfinder" ? ".sqlite" : ".db";
+    }
 
-DBConfig::DBConfig(BasicConfig const& config, std::string const& dbName)
-    : DBConfig(detail::getSociInit(config, dbName))
-{
-}
-
-std::string
-DBConfig::connectionString() const
-{
-    return connectionString_;
+    return file.string();
 }
 
 void
-DBConfig::open(soci::session& s) const
+openSession(soci::session& s, std::string const& setup)
 {
-    s.open(soci::sqlite3, connectionString());
-}
-
-void
-open(soci::session& s, BasicConfig const& config, std::string const& dbName)
-{
-    DBConfig(config, dbName).open(s);
-}
-
-void
-open(soci::session& s, std::string const& beName, std::string const& connectionString)
-{
-    if (beName == "sqlite")
-    {
-        s.open(soci::sqlite3, connectionString);
-    }
-    else
-    {
-        Throw<std::runtime_error>(std::format("Unsupported soci backend: {}", beName));
-    }
-}
-
-static sqlite_api::sqlite3*
-getConnection(soci::session& s)
-{
-    auto const* const be = dynamic_cast<soci::sqlite3_session_backend*>(s.get_backend());
-
-    if (be == nullptr || be->conn_ == nullptr)
-        Throw<std::logic_error>("Didn't get a database connection.");
-
-    return be->conn_;
-}
-
-std::uint32_t
-getKBUsedAll(soci::session& s)
-{
-    return static_cast<std::uint32_t>(std::clamp<std::int64_t>(
-        sqlite_api::sqlite3_memory_used() / kilobytes(std::int64_t{1}),
-        0,
-        std::numeric_limits<std::uint32_t>::max()));
-}
-
-std::uint32_t
-getKBUsedDB(soci::session& s)
-{
-    // This function will have to be customized when other backends are added
-    if (auto conn = getConnection(s))
-    {
-        int cur = 0, hiw = 0;
-        sqlite_api::sqlite3_db_status(conn, SQLITE_DBSTATUS_CACHE_USED, &cur, &hiw, 0);
-        return cur / kilobytes(1);
-    }
-
-    Throw<std::logic_error>("No connection found.");
+    s.open(soci::sqlite3, setup);
 }
 
 namespace {
 
 /**
- * Run a thread to checkpoint the write ahead log (wal) for
- * the given soci::session every 1000 pages. This is only implemented
- * for sqlite databases.
+ * Converts a byte count to kilobytes, saturating rather than wrapping.
  *
- * Note: According to: https://www.sqlite.org/wal.html#ckpt this
- * is the default behavior of sqlite. We may be able to remove this
- * class.
+ * The sqlite counters are signed and narrower than the result, so neither a
+ * negative value nor one past the top of the range can be represented. The
+ * clamp is what makes the cast below value-preserving.
  */
-
-class WALCheckpointer : public Checkpointer
+template <std::signed_integral T>
+constexpr std::uint32_t
+toKilobytes(T bytes) noexcept
 {
-public:
-    WALCheckpointer(
-        std::uintptr_t id,
-        std::weak_ptr<soci::session> session,
-        JobQueue& q,
-        ServiceRegistry& registry)
-        : id_(id)
-        , session_(std::move(session))
-        , jobQueue_(q)
-        , j_(registry.getJournal("WALCheckpointer"))
+    return checkedCast<std::uint32_t>(std::clamp<std::int64_t>(
+        static_cast<std::int64_t>(bytes) / kilobytes(std::int64_t{1}),
+        0,
+        std::numeric_limits<std::uint32_t>::max()));
+}
+
+constexpr int
+sqliteStatusOp(DbMemoryUse use) noexcept
+{
+    switch (use)
     {
-        if (auto [conn, keepAlive] = getConnection(); conn)
-        {
-            (void)keepAlive;
-            // The checkpointer is identified to the C callback by an integer id
-            // (resolved via checkpointerFromId) rather than a raw `this`, so it
-            // cannot dangle if the checkpointer is destroyed. Passing the id
-            // through sqlite's void* user-data requires an integer-to-pointer
-            // cast.
-            // NOLINTNEXTLINE(performance-no-int-to-ptr)
-            sqlite_api::sqlite3_wal_hook(conn, &sqliteWALHook, reinterpret_cast<void*>(id_));
-        }
+        case DbMemoryUse::Cache:
+            return SQLITE_DBSTATUS_CACHE_USED;
+        case DbMemoryUse::SharedCache:
+            return SQLITE_DBSTATUS_CACHE_USED_SHARED;
     }
 
-    std::pair<sqlite_api::sqlite3*, std::shared_ptr<soci::session>>
-    getConnection() const
-    {
-        if (auto const p = session_.lock())
-        {
-            return {xrpl::getConnection(*p), p};
-        }
-        return {nullptr, std::shared_ptr<soci::session>{}};
-    }
-
-    std::uintptr_t
-    id() const override
-    {
-        return id_;
-    }
-
-    ~WALCheckpointer() override = default;
-
-    void
-    schedule() override
-    {
-        {
-            std::scoped_lock const lock(mutex_);
-            if (running_)
-                return;
-            running_ = true;
-        }
-
-        // If the Job is not added to the JobQueue then we're not running_.
-        if (!jobQueue_.addJob(
-                JobType::WriteAheadLog,
-                "WAL",
-                // If the owning DatabaseCon is destroyed, no need to checkpoint
-                // or keep the checkpointer alive so use a weak_ptr to this.
-                // There is a separate check in `checkpoint` for a valid
-                // connection in the rare case when the DatabaseCon is destroyed
-                // after locking this weak_ptr
-                [wp = std::weak_ptr<Checkpointer>{shared_from_this()}] {
-                    if (auto const self = wp.lock())
-                        self->checkpoint();
-                }))
-        {
-            std::scoped_lock const lock(mutex_);
-            running_ = false;
-        }
-    }
-
-    void
-    checkpoint() override
-    {
-        auto [conn, keepAlive] = getConnection();
-        (void)keepAlive;
-        if (conn == nullptr)
-            return;
-
-        int log = 0, ckpt = 0;
-        int const ret = sqlite_api::sqlite3_wal_checkpoint_v2(
-            conn, nullptr, SQLITE_CHECKPOINT_PASSIVE, &log, &ckpt);
-
-        auto fname = sqlite_api::sqlite3_db_filename(conn, "main");
-        if (ret != SQLITE_OK)
-        {
-            auto const jm = (ret == SQLITE_LOCKED) ? j_.trace() : j_.warn();
-            JLOG(jm) << "WAL(" << fname << "): error " << ret;
-        }
-        else
-        {
-            JLOG(j_.trace()) << "WAL(" << fname << "): frames=" << log << ", written=" << ckpt;
-        }
-
-        std::scoped_lock const lock(mutex_);
-        running_ = false;
-    }
-
-protected:
-    std::uintptr_t const id_;
-    // session is owned by the DatabaseCon parent that holds the checkpointer.
-    // It is possible (though rare) for the DatabaseCon class to be destroyed
-    // before the checkpointer.
-    std::weak_ptr<soci::session> session_;
-    std::mutex mutex_;
-    JobQueue& jobQueue_;
-
-    bool running_ = false;
-    beast::Journal const j_;
-
-    static int
-    sqliteWALHook(void* cpId, sqlite_api::sqlite3* conn, char const* dbName, int walSize)
-    {
-        if (walSize >= gCheckpointPageCount)
-        {
-            if (auto const checkpointer =
-                    checkpointerFromId(reinterpret_cast<std::uintptr_t>(cpId)))
-            {
-                checkpointer->schedule();
-            }
-            else
-            {
-                sqlite_api::sqlite3_wal_hook(conn, nullptr, nullptr);
-            }
-        }
-        return SQLITE_OK;
-    }
-};
+    UNREACHABLE("xrpl::sqliteStatusOp : invalid DbMemoryUse");
+    return SQLITE_DBSTATUS_CACHE_USED;
+}
 
 }  // namespace
 
-std::shared_ptr<Checkpointer>
-makeCheckpointer(
-    std::uintptr_t id,
-    std::weak_ptr<soci::session> session,
-    JobQueue& queue,
-    ServiceRegistry& registry)
+std::uint32_t
+getKBUsedAll()
 {
-    return std::make_shared<WALCheckpointer>(id, std::move(session), queue, registry);
+    return toKilobytes(sqlite_api::sqlite3_memory_used());
+}
+
+std::uint32_t
+getKBUsedDB(soci::session& s, DbMemoryUse use)
+{
+    // This function will have to be customized when other backends are added
+    if (auto* const conn = detail::getConnection(s))
+    {
+        int current = 0, highWater = 0;
+        sqlite_api::sqlite3_db_status(conn, sqliteStatusOp(use), &current, &highWater, 0);
+        return toKilobytes(current);
+    }
+
+    Throw<std::logic_error>("No connection found.");
 }
 
 }  // namespace xrpl
