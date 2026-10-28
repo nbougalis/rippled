@@ -18,8 +18,8 @@
 #include <cstring>
 #include <exception>
 #include <filesystem>
-#include <iterator>
 #include <limits>
+#include <ranges>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -97,18 +97,15 @@ public:
         testcase("sqliteFileNames");
         BasicConfig c;
         setupSQLiteConfig(c, getDatabasePath());
-        std::vector<std::pair<std::string, std::string>> const d({
+        constexpr std::pair<std::string_view, std::string_view> d[] = {
             {"peerfinder", ".sqlite"},
             {"state", ".db"},
             {"random", ".db"},
             {"validators", ".sqlite"},
-        });
+        };
 
-        for (auto const& i : d)
-        {
-            DBConfig const sc(c, i.first);
-            BEAST_EXPECT(sc.connectionString().ends_with(i.first + i.second));
-        }
+        for (auto const& [name, ext] : d)
+            BEAST_EXPECT(setupSession(c, name).ends_with(std::format("{}{}", name, ext)));
     }
     void
     testSQLiteSession()
@@ -116,7 +113,7 @@ public:
         testcase("open");
         BasicConfig c;
         setupSQLiteConfig(c, getDatabasePath());
-        DBConfig const sc(c, "SociTestDB");
+        auto const setup = setupSession(c, "SociTestDB");
         std::vector<std::string> const stringData({"String1", "String2", "String3"});
         std::vector<int> const intData({1, 2, 3});
         auto const checkValues = [this, &stringData, &intData](soci::session& s) {
@@ -127,19 +124,20 @@ public:
                 soci::into(intResult);
             BEAST_EXPECT(
                 stringResult.size() == stringData.size() && intResult.size() == intData.size());
-            for (int i = 0; i < stringResult.size(); ++i)
+
+            for (auto const& [str, num] : std::views::zip(stringResult, intResult))
             {
-                auto const si = std::distance(
-                    stringData.begin(), std::ranges::find(stringData, stringResult[i]));
-                auto const ii =
-                    std::distance(intData.begin(), std::ranges::find(intData, intResult[i]));
-                BEAST_EXPECT(si == ii && si < stringResult.size());
+                auto const si = std::ranges::find(stringData, str);
+                auto const ii = std::ranges::find(intData, num);
+
+                BEAST_EXPECT(si != stringData.end());
+                BEAST_EXPECT(si - stringData.begin() == ii - intData.begin());
             }
         };
 
         {
             soci::session s;
-            sc.open(s);
+            openSession(s, setup);
             s << "CREATE TABLE IF NOT EXISTS SociTestTable ("
                  "  Key                    INTEGER PRIMARY KEY,"
                  "  StringData             TEXT,"
@@ -154,13 +152,13 @@ public:
         {
             // Check values in db after session was closed
             soci::session s;
-            sc.open(s);
+            openSession(s, setup);
             checkValues(s);
         }
         {
             namespace bfs = std::filesystem;
             // Remove the database
-            bfs::path const dbPath(sc.connectionString());
+            bfs::path const dbPath(setup);
             if (bfs::is_regular_file(dbPath))
                 bfs::remove(dbPath);
         }
@@ -172,16 +170,15 @@ public:
         testcase("select");
         BasicConfig c;
         setupSQLiteConfig(c, getDatabasePath());
-        DBConfig const sc(c, "SociTestDB");
-        std::vector<std::uint64_t> const ubid(
-            {(std::uint64_t)std::numeric_limits<std::int64_t>::max(), 20, 30});
+        auto const setup = setupSession(c, "SociTestDB");
+        std::vector<std::uint64_t> const ubid({std::numeric_limits<std::int64_t>::max(), 20, 30});
         std::vector<std::int64_t> const bid({-10, -20, -30});
         std::vector<std::uint32_t> const uid({std::numeric_limits<std::uint32_t>::max(), 2, 3});
         std::vector<std::int32_t> const id({-1, -2, -3});
 
         {
             soci::session s;
-            sc.open(s);
+            openSession(s, setup);
 
             s << "DROP TABLE IF EXISTS STT;";
 
@@ -234,32 +231,35 @@ public:
         {
             namespace bfs = std::filesystem;
             // Remove the database
-            bfs::path const dbPath(sc.connectionString());
+            bfs::path const dbPath(setup);
             if (bfs::is_regular_file(dbPath))
                 bfs::remove(dbPath);
         }
     }
+
     void
     testSQLiteDeleteWithSubselect()
     {
         testcase("deleteWithSubselect");
         BasicConfig c;
         setupSQLiteConfig(c, getDatabasePath());
-        DBConfig const sc(c, "SociTestDB");
+        auto const setup = setupSession(c, "SociTestDB");
         {
             soci::session s;
-            sc.open(s);
+            openSession(s, setup);
 
             std::string_view const dbInit[] = {
                 "BEGIN TRANSACTION;",
-                "CREATE TABLE Ledgers (                     \
-                LedgerHash      CHARACTER(64) PRIMARY KEY,  \
-                LedgerSeq       BIGINT UNSIGNED             \
-            );",
+
+                "CREATE TABLE Ledgers ("
+                "  LedgerHash CHARACTER(64) PRIMARY KEY,"
+                "  LedgerSeq  BIGINT UNSIGNED"
+                ");",
+
                 "CREATE INDEX SeqLedger ON Ledgers(LedgerSeq);",
             };
-            for (auto const c : dbInit)
-                s << c;
+            for (auto const st : dbInit)
+                s << st;
             char lh[65];
             memset(lh, 'a', 64);
             lh[64] = '\0';
@@ -287,7 +287,7 @@ public:
         }
         namespace bfs = std::filesystem;
         // Remove the database
-        bfs::path const dbPath(sc.connectionString());
+        bfs::path const dbPath(setup);
         if (bfs::is_regular_file(dbPath))
             bfs::remove(dbPath);
     }

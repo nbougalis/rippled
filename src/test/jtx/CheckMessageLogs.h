@@ -5,7 +5,7 @@
 
 #include <memory>
 #include <string>
-#include <utility>
+#include <string_view>
 
 namespace xrpl::test {
 
@@ -49,8 +49,8 @@ public:
      * @param pFound Pointer to the variable to set to true if the message is
      * found
      */
-    CheckMessageLogs(std::string msg, bool* pFound)
-        : Logs{beast::Severity::Debug}, msg_{std::move(msg)}, pFound_{pFound}
+    CheckMessageLogs(std::string_view msg, bool* pFound)
+        : Logs{beast::Severity::Debug}, msg_{msg}, pFound_{pFound}
     {
     }
 

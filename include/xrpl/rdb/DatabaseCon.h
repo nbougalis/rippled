@@ -1,21 +1,16 @@
 #pragma once
 
-#include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/core/PerfLog.h>
-#include <xrpl/core/ServiceRegistry.h>
 #include <xrpl/core/StartUpType.h>
+#include <xrpl/rdb/Checkpointer.h>
 #include <xrpl/rdb/SociDB.h>
 
-#include <soci/statement.h>
-
-#include <array>
-#include <cstddef>
-#include <cstdint>
 #include <filesystem>
-#include <functional>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -35,15 +30,15 @@ private:
     std::unique_lock<Mutex> lock_;
 
 public:
+    LockedSociSession() = delete;
+
     LockedSociSession(std::shared_ptr<soci::session> it, Mutex& m)
         : session_(std::move(it)), lock_(m)
     {
     }
-    LockedSociSession(LockedSociSession&& rhs) noexcept
-        : session_(std::move(rhs.session_)), lock_(std::move(rhs.lock_))
-    {
-    }
-    LockedSociSession() = delete;
+
+    LockedSociSession(LockedSociSession&& rhs) noexcept = default;
+
     LockedSociSession(LockedSociSession const& rhs) = delete;
     LockedSociSession&
     operator=(LockedSociSession const& rhs) = delete;
@@ -80,92 +75,33 @@ public:
         StartUpType startUp = StartUpType::Normal;
         bool standAlone = false;
         std::filesystem::path dataDir;
-        // Indicates whether or not to return the `globalPragma`
-        // from commonPragma()
-        bool useGlobalPragma = false;
 
-        [[nodiscard]] std::vector<std::string> const*
-        commonPragma() const
-        {
-            XRPL_ASSERT(
-                !useGlobalPragma || globalPragma,
-                "xrpl::DatabaseCon::Setup::commonPragma : consistent global "
-                "pragma");
-            return useGlobalPragma && globalPragma ? globalPragma.get() : nullptr;
-        }
+        // Pragmas for this database. commonPragma is a copy of globalPragma
+        // for the databases that take it, and empty for those that do not.
+        std::vector<std::string> commonPragma;
+        std::vector<std::string> txPragma;
+        std::vector<std::string> lgrPragma;
 
-        static std::unique_ptr<std::vector<std::string> const> globalPragma;
-        std::array<std::string, 4> txPragma;
-        std::array<std::string, 1> lgrPragma;
+        // Built once per process and cached here, so that repeated calls to
+        // setupDatabaseCon() do not re-derive them from the config.
+        inline static std::unique_ptr<std::vector<std::string> const> globalPragma;
     };
 
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
-    struct CheckpointerSetup
-    {
-        JobQueue* jobQueue{};
-        std::reference_wrapper<ServiceRegistry> registry;
-    };
-
-    template <std::size_t N, std::size_t M>
     DatabaseCon(
         Setup const& setup,
-        std::string const& dbName,
-        std::array<std::string, N> const& pragma,
-        std::array<char const*, M> const& initSQL,
-        beast::Journal journal)
-        // Use temporary files or regular DB files?
-        : DatabaseCon(
-              setup.standAlone && setup.startUp != StartUpType::Load &&
-                      setup.startUp != StartUpType::LoadFile && setup.startUp != StartUpType::Replay
-                  ? ""
-                  : (setup.dataDir / dbName),
-              setup.commonPragma(),
-              pragma,
-              initSQL,
-              journal)
-    {
-    }
+        std::string_view dbName,
+        std::span<std::string const> pragma,
+        std::span<std::string_view const> initSQL,
+        beast::Journal journal);
 
     // Use this constructor to setup checkpointing
-    template <std::size_t N, std::size_t M>
     DatabaseCon(
         Setup const& setup,
-        std::string const& dbName,
-        std::array<std::string, N> const& pragma,
-        std::array<char const*, M> const& initSQL,
-        CheckpointerSetup const& checkpointerSetup,
-        beast::Journal journal)
-        : DatabaseCon(setup, dbName, pragma, initSQL, journal)
-    {
-        setupCheckpointing(checkpointerSetup.jobQueue, checkpointerSetup.registry.get());
-    }
-
-    template <std::size_t N, std::size_t M>
-    DatabaseCon(
-        std::filesystem::path const& dataDir,
-        std::string const& dbName,
-        std::array<std::string, N> const& pragma,
-        std::array<char const*, M> const& initSQL,
-        beast::Journal journal)
-        : DatabaseCon(dataDir / dbName, nullptr, pragma, initSQL, journal)
-    {
-    }
-
-    // Use this constructor to setup checkpointing
-    template <std::size_t N, std::size_t M>
-    DatabaseCon(
-        std::filesystem::path const& dataDir,
-        std::string const& dbName,
-        std::array<std::string, N> const& pragma,
-        std::array<char const*, M> const& initSQL,
-        CheckpointerSetup const& checkpointerSetup,
-        beast::Journal journal)
-        : DatabaseCon(dataDir, dbName, pragma, initSQL, journal)
-    {
-        setupCheckpointing(checkpointerSetup.jobQueue, checkpointerSetup.registry.get());
-    }
-
-    ~DatabaseCon();
+        std::string_view dbName,
+        std::span<std::string const> pragma,
+        std::span<std::string_view const> initSQL,
+        CheckpointScheduler schedule,
+        beast::Journal journal);
 
     soci::session&
     getSession()
@@ -184,59 +120,25 @@ public:
     }
 
 private:
-    void
-    setupCheckpointing(JobQueue*, ServiceRegistry&);
+    void setupCheckpointing(CheckpointScheduler);
 
-    template <std::size_t N, std::size_t M>
     DatabaseCon(
-        std::filesystem::path const& pPath,
-        std::vector<std::string> const* commonPragma,
-        std::array<std::string, N> const& pragma,
-        std::array<char const*, M> const& initSQL,
-        beast::Journal journal)
-        : session_(std::make_shared<soci::session>()), j_(journal)
-    {
-        open(*session_, "sqlite", pPath.string());
-
-        for (auto const& p : pragma)
-        {
-            soci::statement st = session_->prepare << p;
-            st.execute(true);
-        }
-
-        if (commonPragma)
-        {
-            for (auto const& p : *commonPragma)
-            {
-                soci::statement st = session_->prepare << p;
-                st.execute(true);
-            }
-        }
-
-        for (auto const& sql : initSQL)
-        {
-            soci::statement st = session_->prepare << sql;
-            st.execute(true);
-        }
-    }
+        std::filesystem::path const& dbPath,
+        std::span<std::string const> commonPragma,
+        std::span<std::string const> pragma,
+        std::span<std::string_view const> initSQL,
+        beast::Journal journal);
 
     LockedSociSession::Mutex lock_;
 
-    // checkpointer may outlive the DatabaseCon when the checkpointer jobQueue
-    // callback locks a weak pointer and the DatabaseCon is then destroyed. In
-    // this case, the checkpointer needs to make sure it doesn't use an already
-    // destroyed session. Thus this class keeps a shared_ptr to the session (so
-    // the checkpointer can keep a weak_ptr) and the checkpointer is a
-    // shared_ptr in this class. session_ will never be null.
+    // Declaration order matters: members are destroyed in reverse, so the
+    // checkpointer goes first and can still reach the session to disarm
+    // itself and wait for any checkpoint in flight. Do not reorder these.
+    // session_ will never be null.
     std::shared_ptr<soci::session> const session_;
-    std::shared_ptr<Checkpointer> checkpointer_;
+    std::unique_ptr<Checkpointer> checkpointer_;
 
     beast::Journal const j_;
 };
-
-// Return the checkpointer from its id. If the checkpointer no longer exists, an
-// nullptr is returned
-std::shared_ptr<Checkpointer>
-checkpointerFromId(std::uintptr_t id);
 
 }  // namespace xrpl

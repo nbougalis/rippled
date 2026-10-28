@@ -10,6 +10,9 @@
 #include <xrpl/basics/RangeSet.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/contract.h>
+#include <xrpl/core/Job.h>
+#include <xrpl/core/JobQueue.h>
+#include <xrpl/core/ServiceRegistry.h>
 #include <xrpl/ledger/Ledger.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/LedgerHeader.h>
@@ -38,9 +41,9 @@ bool
 SQLiteDatabase::makeLedgerDBs(
     Config const& config,
     DatabaseCon::Setup const& setup,
-    DatabaseCon::CheckpointerSetup const& checkpointerSetup)
+    CheckpointScheduler const& schedule)
 {
-    auto [lgr, tx, res] = detail::makeLedgerDBs(config, setup, checkpointerSetup, j_);
+    auto [lgr, tx, res] = detail::makeLedgerDBs(config, setup, schedule, j_);
     txdb_ = std::move(tx);
     ledgerDb_ = std::move(lgr);
     return res;
@@ -593,7 +596,7 @@ SQLiteDatabase::getKBUsedAll()
 {
     if (existsLedger())
     {
-        return xrpl::getKBUsedAll(ledgerDb_->getSession());
+        return xrpl::getKBUsedAll();
     }
 
     return 0;
@@ -642,10 +645,9 @@ SQLiteDatabase::SQLiteDatabase(ServiceRegistry& registry, Config const& config, 
     , j_(registry.getJournal("SQLiteDatabase"))
 {
     DatabaseCon::Setup const setup = setupDatabaseCon(config, j_);
-    if (!makeLedgerDBs(
-            config,
-            setup,
-            DatabaseCon::CheckpointerSetup{.jobQueue = &jobQueue, .registry = registry_}))
+    if (!makeLedgerDBs(config, setup, [&jobQueue](std::function<void()> work) {
+            return jobQueue.addJob(JobType::WriteAheadLog, "WAL", std::move(work));
+        }))
     {
         static constexpr std::string_view kError = "Failed to create ledger databases";
 

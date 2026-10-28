@@ -224,7 +224,7 @@ public:
             jtx::Env env(*this);
             DatabaseCon::Setup setup;
             setup.dataDir = getDatabasePath();
-            assert(!setup.useGlobalPragma);
+            assert(setup.commonPragma.empty());
 
             auto dbCon = makeTestWalletDB(setup, dbName, env.journal);
 

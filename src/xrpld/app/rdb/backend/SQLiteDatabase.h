@@ -427,14 +427,14 @@ private:
      *        store, and stores their descriptors in private member variables.
      * @param config Config object.
      * @param setup Path to the databases and other opening parameters.
-     * @param checkpointerSetup Checkpointer parameters.
+     * @param schedule Runs a WAL checkpoint off the committing thread.
      * @return True if node databases opened successfully.
      */
     bool
     makeLedgerDBs(
         Config const& config,
         DatabaseCon::Setup const& setup,
-        DatabaseCon::CheckpointerSetup const& checkpointerSetup);
+        CheckpointScheduler const& schedule);
 
     /**
      * @brief existsLedger Checks if the node store ledger database exists.

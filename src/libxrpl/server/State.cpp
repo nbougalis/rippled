@@ -21,7 +21,7 @@ namespace xrpl {
 void
 initStateDB(soci::session& session, BasicConfig const& config, std::string const& dbName)
 {
-    open(session, config, dbName);
+    openSession(session, setupSession(config, dbName));
 
     session << "PRAGMA synchronous=FULL;";
 

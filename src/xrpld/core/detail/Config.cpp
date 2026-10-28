@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -41,9 +42,11 @@
 #include <memory>
 #include <optional>
 #include <regex>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <thread>
 #include <type_traits>
@@ -1254,6 +1257,99 @@ setupFeeVote(Section const& section)
     return setup;
 }
 
+namespace {
+
+// Valid values for each of the common sqlite settings, and the subset of
+// those that trade durability for speed.
+constexpr std::string_view kJournalModes[]{"delete", "truncate", "persist", "memory", "wal", "off"};
+constexpr std::string_view kRiskyJournalModes[]{"memory", "off"};
+
+constexpr std::string_view kSynchronousLevels[]{"off", "normal", "full", "extra"};
+constexpr std::string_view kRiskySynchronousLevels[]{"off"};
+
+constexpr std::string_view kTempStores[]{"default", "file", "memory"};
+constexpr std::string_view kRiskyTempStores[]{"memory"};
+
+constexpr std::int64_t kMinPageSize = 512;
+constexpr std::int64_t kMaxPageSize = 65536;
+constexpr std::int64_t kDefaultPageSize = 4096;
+constexpr std::int64_t kDefaultJournalSizeLimit = 1582080;
+constexpr std::int64_t kMaxPageCount = 4294967294;
+constexpr std::int64_t kMmapSize = 17179869184;
+
+/**
+ * Builds the pragmas applied to every database that takes them.
+ *
+ * @throws std::runtime_error if the [sqlite] section is inconsistent or names
+ *         a value the backend does not accept.
+ */
+std::vector<std::string>
+buildGlobalPragma(Config const& c, std::optional<beast::Journal> j)
+{
+    auto const& sqlite = c.section(Sections::kSqlite);
+
+    // defaults
+    std::string safetyLevel;
+    std::string journalMode = "wal";
+    std::string synchronous = "normal";
+    std::string tempStore = "file";
+    bool showRiskWarning = false;
+
+    if (set(safetyLevel, "safety_level", sqlite))
+    {
+        if (boost::iequals(safetyLevel, "low"))
+        {
+            // low safety defaults
+            journalMode = "memory";
+            synchronous = "off";
+            tempStore = "memory";
+            showRiskWarning = true;
+        }
+        else if (!boost::iequals(safetyLevel, "high"))
+        {
+            Throw<std::runtime_error>(std::format("Invalid safety_level value: {}", safetyLevel));
+        }
+    }
+
+    // Reads one setting, rejects a value outside `allowed`, and notes whether
+    // it is one of `risky`. A setting may not be given alongside safety_level,
+    // which already implies one.
+    auto const read = [&](std::string& value,
+                          std::string const& key,
+                          std::span<std::string_view const> allowed,
+                          std::span<std::string_view const> risky) {
+        if (set(value, key, sqlite) && !safetyLevel.empty())
+        {
+            Throw<std::runtime_error>(std::format(
+                "Configuration file may not define both \"safety_level\" and \"{}\"", key));
+        }
+
+        auto const matches = [&value](std::string_view v) { return boost::iequals(value, v); };
+
+        if (std::ranges::none_of(allowed, matches))
+            Throw<std::runtime_error>(std::format("Invalid {} value: {}", key, value));
+
+        showRiskWarning = showRiskWarning || std::ranges::any_of(risky, matches);
+    };
+
+    read(journalMode, "journal_mode", kJournalModes, kRiskyJournalModes);
+    read(synchronous, "synchronous", kSynchronousLevels, kRiskySynchronousLevels);
+    read(tempStore, "temp_store", kTempStores, kRiskyTempStores);
+
+    if (showRiskWarning && j && c.ledgerHistory > kSqliteTuningCutoff)
+    {
+        JLOG(j->warn()) << kSqliteTuningWarning;
+    }
+
+    return {
+        commonDbPragmaJournal(journalMode),
+        commonDbPragmaSync(synchronous),
+        commonDbPragmaTemp(tempStore),
+    };
+}
+
+}  // namespace
+
 DatabaseCon::Setup
 setupDatabaseCon(Config const& c, std::optional<beast::Journal> j)
 {
@@ -1269,142 +1365,39 @@ setupDatabaseCon(Config const& c, std::optional<beast::Journal> j)
 
     if (!setup.globalPragma)
     {
-        auto const& sqlite = c.section(Sections::kSqlite);
-        auto result = std::make_unique<std::vector<std::string>>();
-        result->reserve(3);
-
-        // defaults
-        std::string safetyLevel;
-        std::string journalMode = "wal";
-        std::string synchronous = "normal";
-        std::string tempStore = "file";
-        bool showRiskWarning = false;
-
-        if (set(safetyLevel, "safety_level", sqlite))
-        {
-            if (boost::iequals(safetyLevel, "low"))
-            {
-                // low safety defaults
-                journalMode = "memory";
-                synchronous = "off";
-                tempStore = "memory";
-                showRiskWarning = true;
-            }
-            else if (!boost::iequals(safetyLevel, "high"))
-            {
-                Throw<std::runtime_error>(
-                    std::format("Invalid safety_level value: {}", safetyLevel));
-            }
-        }
-
-        {
-            // #journal_mode Valid values : delete, truncate, persist,
-            // memory, wal, off
-            if (set(journalMode, "journal_mode", sqlite) && !safetyLevel.empty())
-            {
-                Throw<std::runtime_error>(
-                    "Configuration file may not define both "
-                    "\"safety_level\" and \"journal_mode\"");
-            }
-            bool const higherRisk =
-                boost::iequals(journalMode, "memory") || boost::iequals(journalMode, "off");
-            showRiskWarning = showRiskWarning || higherRisk;
-            if (higherRisk || boost::iequals(journalMode, "delete") ||
-                boost::iequals(journalMode, "truncate") || boost::iequals(journalMode, "persist") ||
-                boost::iequals(journalMode, "wal"))
-            {
-                result->emplace_back(commonDbPragmaJournal(journalMode));
-            }
-            else
-            {
-                Throw<std::runtime_error>(
-                    std::format("Invalid journal_mode value: {}", journalMode));
-            }
-        }
-
-        {
-            // #synchronous Valid values : off, normal, full, extra
-            if (set(synchronous, "synchronous", sqlite) && !safetyLevel.empty())
-            {
-                Throw<std::runtime_error>(
-                    "Configuration file may not define both "
-                    "\"safety_level\" and \"synchronous\"");
-            }
-            bool const higherRisk = boost::iequals(synchronous, "off");
-            showRiskWarning = showRiskWarning || higherRisk;
-            if (higherRisk || boost::iequals(synchronous, "normal") ||
-                boost::iequals(synchronous, "full") || boost::iequals(synchronous, "extra"))
-            {
-                result->emplace_back(commonDbPragmaSync(synchronous));
-            }
-            else
-            {
-                Throw<std::runtime_error>(
-                    std::format("Invalid synchronous value: {}", synchronous));
-            }
-        }
-
-        {
-            // #temp_store Valid values : default, file, memory
-            if (set(tempStore, "temp_store", sqlite) && !safetyLevel.empty())
-            {
-                Throw<std::runtime_error>(
-                    "Configuration file may not define both "
-                    "\"safety_level\" and \"temp_store\"");
-            }
-            bool const higherRisk = boost::iequals(tempStore, "memory");
-            showRiskWarning = showRiskWarning || higherRisk;
-            if (higherRisk || boost::iequals(tempStore, "default") ||
-                boost::iequals(tempStore, "file"))
-            {
-                result->emplace_back(commonDbPragmaTemp(tempStore));
-            }
-            else
-            {
-                Throw<std::runtime_error>(std::format("Invalid temp_store value: {}", tempStore));
-            }
-        }
-
-        if (showRiskWarning && j && c.ledgerHistory > kSqliteTuningCutoff)
-        {
-            JLOG(j->warn()) << "reducing the data integrity guarantees from the "
-                               "default [sqlite] behavior is not recommended for "
-                               "nodes storing large amounts of history, because of the "
-                               "difficulty inherent in rebuilding corrupted data.";
-        }
-        XRPL_ASSERT(
-            result->size() == 3, "xrpl::setup_DatabaseCon::globalPragma : result size is 3");
-        setup.globalPragma = std::move(result);
+        setup.globalPragma =
+            std::make_unique<std::vector<std::string> const>(buildGlobalPragma(c, j));
     }
-    setup.useGlobalPragma = true;
+    setup.commonPragma = *setup.globalPragma;
 
-    auto const setPragma = [](std::string& pragma, std::string const& key, int64_t value) {
-        pragma = "PRAGMA " + key + "=" + std::to_string(value) + ";";
+    auto const pragma = [](std::string_view key, std::int64_t value) {
+        return std::format("PRAGMA {}={};", key, value);
     };
 
     // Lgr Pragma
-    setPragma(setup.lgrPragma[0], "journal_size_limit", 1582080);
+    setup.lgrPragma.emplace_back(pragma("journal_size_limit", kDefaultJournalSizeLimit));
 
     // TX Pragma
-    int64_t pageSize = 4096;
-    int64_t journalSizeLimit = 1582080;
+    std::int64_t pageSize = kDefaultPageSize;
+    std::int64_t journalSizeLimit = kDefaultJournalSizeLimit;
     if (c.exists(Sections::kSqlite))
     {
-        auto& s = c.section(Sections::kSqlite);
+        auto const& s = c.section(Sections::kSqlite);
         set(journalSizeLimit, Keys::kJournalSizeLimit, s);
         set(pageSize, Keys::kPageSize, s);
-        if (pageSize < 512 || pageSize > 65536)
+        if (pageSize < kMinPageSize || pageSize > kMaxPageSize)
             Throw<std::runtime_error>("Invalid page_size. Must be between 512 and 65536.");
 
-        if ((pageSize & (pageSize - 1)) != 0)
+        if (!std::has_single_bit(static_cast<std::uint64_t>(pageSize)))
             Throw<std::runtime_error>("Invalid page_size. Must be a power of 2.");
     }
 
-    setPragma(setup.txPragma[0], "page_size", pageSize);
-    setPragma(setup.txPragma[1], "journal_size_limit", journalSizeLimit);
-    setPragma(setup.txPragma[2], "max_page_count", 4294967294);
-    setPragma(setup.txPragma[3], "mmap_size", 17179869184);
+    setup.txPragma.emplace_back(pragma("page_size", pageSize));
+    setup.txPragma.emplace_back(pragma("journal_size_limit", journalSizeLimit));
+    setup.txPragma.emplace_back(pragma("max_page_count", kMaxPageCount));
+    setup.txPragma.emplace_back(pragma("mmap_size", kMmapSize));
 
     return setup;
 }
+
 }  // namespace xrpl
