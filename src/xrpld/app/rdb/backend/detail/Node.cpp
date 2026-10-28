@@ -103,13 +103,12 @@ DatabasePairValid
 makeLedgerDBs(
     Config const& config,
     DatabaseCon::Setup const& setup,
-    DatabaseCon::CheckpointerSetup const& checkpointerSetup,
+    CheckpointScheduler const& schedule,
     beast::Journal j)
 {
     // ledger database
     auto lgr{
-        std::make_unique<DatabaseCon>(
-            setup, kLgrDbName, setup.lgrPragma, kLgrDbInit, checkpointerSetup, j),
+        std::make_unique<DatabaseCon>(setup, kLgrDbName, setup.lgrPragma, kLgrDbInit, schedule, j),
     };
     lgr->getSession() << std::format(
         "PRAGMA cache_size=-{};", kilobytes(config.getValueFor(SizedItem::LgrDbCache)));
@@ -118,8 +117,7 @@ makeLedgerDBs(
     {
         // transaction database
         auto tx{
-            std::make_unique<DatabaseCon>(
-                setup, kTxDbName, setup.txPragma, kTxDbInit, checkpointerSetup, j),
+            std::make_unique<DatabaseCon>(setup, kTxDbName, setup.txPragma, kTxDbInit, schedule, j),
         };
         tx->getSession() << std::format(
             "PRAGMA cache_size=-{};", kilobytes(config.getValueFor(SizedItem::TxnDbCache)));

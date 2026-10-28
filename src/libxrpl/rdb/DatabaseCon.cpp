@@ -1,100 +1,87 @@
 #include <xrpl/rdb/DatabaseCon.h>
 
 #include <xrpl/basics/contract.h>
-#include <xrpl/core/ServiceRegistry.h>
+#include <xrpl/core/StartUpType.h>
+#include <xrpl/rdb/Checkpointer.h>
 #include <xrpl/rdb/SociDB.h>
 
-#include <chrono>
-#include <cstdint>
+#include <soci/session.h>
+#include <soci/statement.h>
+
+#include <filesystem>
 #include <memory>
-#include <mutex>
+#include <span>
 #include <stdexcept>
 #include <string>
-#include <thread>
-#include <unordered_map>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace xrpl {
 
-class CheckpointersCollection
+DatabaseCon::DatabaseCon(
+    std::filesystem::path const& dbPath,
+    std::span<std::string const> commonPragma,
+    std::span<std::string const> pragma,
+    std::span<std::string_view const> initSQL,
+    beast::Journal journal)
+    : session_(std::make_shared<soci::session>()), j_(journal)
 {
-    std::uintptr_t nextId_{0};
-    // Mutex protects the CheckpointersCollection
-    std::mutex mutex_;
-    // Each checkpointer is given a unique id. All the checkpointers that are
-    // part of a DatabaseCon are part of this collection. When the DatabaseCon
-    // is destroyed, its checkpointer is removed from the collection
-    std::unordered_map<std::uintptr_t, std::shared_ptr<Checkpointer>> checkpointers_;
+    openSession(*session_, dbPath.string());
 
-public:
-    std::shared_ptr<Checkpointer>
-    fromId(std::uintptr_t id)
-    {
-        std::scoped_lock const l{mutex_};
-        auto const it = checkpointers_.find(id);
-        if (it != checkpointers_.end())
-            return it->second;
-        return nullptr;
-    }
+    auto const execute = [this](auto const& sql) {
+        soci::statement st = session_->prepare << sql;
+        st.execute(true);
+    };
 
-    void
-    erase(std::uintptr_t id)
-    {
-        std::scoped_lock const lock{mutex_};
-        checkpointers_.erase(id);
-    }
+    for (auto const& p : pragma)
+        execute(p);
 
-    std::shared_ptr<Checkpointer>
-    create(
-        std::shared_ptr<soci::session> const& session,
-        JobQueue& jobQueue,
-        ServiceRegistry& registry)
-    {
-        std::scoped_lock const lock{mutex_};
-        auto const id = nextId_++;
-        auto const r = makeCheckpointer(id, session, jobQueue, registry);
-        checkpointers_[id] = r;
-        return r;
-    }
-};
+    for (auto const& p : commonPragma)
+        execute(p);
 
-CheckpointersCollection gCheckpointers;
-
-std::shared_ptr<Checkpointer>
-checkpointerFromId(std::uintptr_t id)
-{
-    return gCheckpointers.fromId(id);
+    for (auto const& sql : initSQL)
+        execute(sql);
 }
 
-DatabaseCon::~DatabaseCon()
+DatabaseCon::DatabaseCon(
+    Setup const& setup,
+    std::string_view dbName,
+    std::span<std::string const> pragma,
+    std::span<std::string_view const> initSQL,
+    beast::Journal journal)
+    // Use temporary files or regular DB files?
+    : DatabaseCon(
+          setup.standAlone && setup.startUp != StartUpType::Load &&
+                  setup.startUp != StartUpType::LoadFile && setup.startUp != StartUpType::Replay
+              ? ""
+              : (setup.dataDir / dbName),
+          setup.commonPragma,
+          pragma,
+          initSQL,
+          journal)
 {
-    if (checkpointer_)
-    {
-        gCheckpointers.erase(checkpointer_->id());
-
-        std::weak_ptr<Checkpointer> const wk(checkpointer_);
-        checkpointer_.reset();
-
-        // The references to our Checkpointer held by 'checkpointer_' and
-        // 'checkpointers' have been removed, so if the use count is nonzero, a
-        // checkpoint is currently in progress. Wait for it to end, otherwise
-        // creating a new DatabaseCon to the same database may fail due to the
-        // database being locked by our (now old) Checkpointer.
-        while (wk.use_count() != 0)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-    }
 }
 
-std::unique_ptr<std::vector<std::string> const> DatabaseCon::Setup::globalPragma;
+DatabaseCon::DatabaseCon(
+    Setup const& setup,
+    std::string_view dbName,
+    std::span<std::string const> pragma,
+    std::span<std::string_view const> initSQL,
+    CheckpointScheduler schedule,
+    beast::Journal journal)
+    : DatabaseCon(setup, dbName, pragma, initSQL, journal)
+{
+    setupCheckpointing(std::move(schedule));
+}
 
 void
-DatabaseCon::setupCheckpointing(JobQueue* q, ServiceRegistry& registry)
+DatabaseCon::setupCheckpointing(CheckpointScheduler schedule)
 {
-    if (q == nullptr)
-        Throw<std::logic_error>("No JobQueue");
-    checkpointer_ = gCheckpointers.create(session_, *q, registry);
+    if (!schedule)
+        Throw<std::logic_error>("No checkpoint scheduler");
+
+    checkpointer_ = makeCheckpointer(session_, std::move(schedule), j_);
 }
 
 }  // namespace xrpl

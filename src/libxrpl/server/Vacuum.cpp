@@ -44,8 +44,7 @@ doVacuumDB(DatabaseCon::Setup const& setup, beast::Journal j)
     std::cout << "VACUUM beginning. page_size: " << pageSize << std::endl;
 
     session << "VACUUM;";
-    XRPL_ASSERT(setup.globalPragma, "xrpl::doVacuumDB : non-null global pragma");
-    for (auto const& p : *setup.globalPragma)
+    for (auto const& p : setup.commonPragma)
         session << p;
     session << "PRAGMA page_size;", soci::into(pageSize);
 

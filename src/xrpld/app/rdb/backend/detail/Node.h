@@ -46,7 +46,7 @@ struct DatabasePairValid
  * @brief makeLedgerDBs Opens ledger and transactions databases.
  * @param config Config object.
  * @param setup Path to database and opening parameters.
- * @param checkpointerSetup Database checkpointer setup.
+ * @param schedule Runs a WAL checkpoint off the committing thread.
  * @param j Journal.
  * @return Struct DatabasePairValid which contain unique pointers to ledger
  *         and transaction databases and flag if opening was successful.
@@ -55,7 +55,7 @@ DatabasePairValid
 makeLedgerDBs(
     Config const& config,
     DatabaseCon::Setup const& setup,
-    DatabaseCon::CheckpointerSetup const& checkpointerSetup,
+    CheckpointScheduler const& schedule,
     beast::Journal j);
 
 /**

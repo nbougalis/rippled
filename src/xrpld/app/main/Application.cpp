@@ -60,6 +60,7 @@
 #include <xrpl/core/ClosureCounter.h>
 #include <xrpl/core/HashRouter.h>
 #include <xrpl/core/Job.h>
+#include <xrpl/core/JobQueue.h>
 #include <xrpl/core/NetworkIDService.h>
 #include <xrpl/core/PeerReservationTable.h>
 #include <xrpl/core/PerfLog.h>
@@ -849,7 +850,7 @@ public:
 
             // wallet database
             auto setup = setupDatabaseCon(*config_, journal_);
-            setup.useGlobalPragma = false;
+            setup.commonPragma.clear();
 
             walletDB_ = makeWalletDB(setup, journal_);
         }
