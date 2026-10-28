@@ -27,10 +27,10 @@ namespace xrpl {
 void
 initPeerFinderDB(soci::session& session, BasicConfig const& config, beast::Journal j)
 {
-    DBConfig const sociConfig(config, "peerfinder");
-    sociConfig.open(session);
+    auto const setup = setupSession(config, "peerfinder");
+    openSession(session, setup);
 
-    JLOG(j.info()) << "Opening database at '" << sociConfig.connectionString() << "'";
+    JLOG(j.info()) << "Opening database at '" << setup << "'";
 
     soci::transaction tr(session);
     session << "PRAGMA encoding=\"UTF-8\";";
