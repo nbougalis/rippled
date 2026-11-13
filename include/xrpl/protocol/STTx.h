@@ -1,6 +1,5 @@
 #pragma once
 
-#include <xrpl/basics/Blob.h>
 #include <xrpl/basics/CountedObject.h>
 #include <xrpl/basics/Slice.h>
 #include <xrpl/basics/base_uint.h>
@@ -78,14 +77,15 @@ public:
     getFullText() const override;
 
     // Outer transaction functions / signature functions.
-    static Blob
-    getSignature(STObject const& sigObject);
 
-    [[nodiscard]] Blob
-    getSignature() const
-    {
-        return getSignature(*this);
-    }
+    /**
+     * Returns the signature of this transaction.
+     *
+     * @return The signature, which is empty if there is none. It refers to
+     *         storage owned by this object: see STObject::getFieldVL.
+     */
+    [[nodiscard]] Slice
+    getSignature() const;
 
     [[nodiscard]] UInt256
     getSigningHash() const;
@@ -93,7 +93,14 @@ public:
     [[nodiscard]] TxType
     getTxnType() const;
 
-    [[nodiscard]] Blob
+    /**
+     * Returns the public key this transaction is signed with.
+     *
+     * @return The signing public key, which is empty for a multi-signed
+     *         transaction. It refers to storage owned by this object: see
+     *         STObject::getFieldVL.
+     */
+    [[nodiscard]] Slice
     getSigningPubKey() const;
 
     [[nodiscard]] SeqProxy
@@ -242,7 +249,7 @@ STTx::getTxnType() const
     return txType_;
 }
 
-inline Blob
+inline Slice
 STTx::getSigningPubKey() const
 {
     return getFieldVL(sfSigningPubKey);

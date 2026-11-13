@@ -1,5 +1,6 @@
 #pragma once
 
+#include <xrpl/basics/Slice.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STAccount.h>
 #include <xrpl/protocol/STArray.h>
@@ -111,10 +112,11 @@ public:
      * @brief Get the signing public key (sfSigningPubKey).
      *
      * This field is REQUIRED for all transactions.
-     * @return The public key used for signing as a blob
+     * @return The public key used for signing. It refers to storage owned by
+     *         the underlying transaction: see STObject::getFieldVL.
      */
     [[nodiscard]]
-    Blob
+    Slice
     getSigningPubKey() const
     {
         return tx_->getFieldVL(sfSigningPubKey);
@@ -334,10 +336,12 @@ public:
      * @brief Get the transaction signature (sfTxnSignature).
      *
      * This field is OPTIONAL and contains the signature for single-signed transactions.
-     * @return The transaction signature as a blob if present, std::nullopt otherwise
+     * @return The transaction signature if present, std::nullopt otherwise. It
+     *         refers to storage owned by the underlying transaction: see
+     *         STObject::getFieldVL.
      */
     [[nodiscard]]
-    std::optional<Blob>
+    std::optional<Slice>
     getTxnSignature() const
     {
         if (tx_->isFieldPresent(sfTxnSignature))

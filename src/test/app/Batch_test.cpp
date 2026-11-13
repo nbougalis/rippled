@@ -3125,7 +3125,7 @@ class Batch_test : public beast::unit_test::Suite
 
         auto const sle = env.le(keylet::account(alice));
         BEAST_EXPECT(sle);
-        BEAST_EXPECT(sle->getFieldVL(sfDomain) == Blob(domain.begin(), domain.end()));
+        BEAST_EXPECT(sle->getFieldVL(sfDomain) == makeSlice(domain));
 
         // Alice consumes sequences (# of txns)
         BEAST_EXPECT(env.seq(alice) == seq + 3);

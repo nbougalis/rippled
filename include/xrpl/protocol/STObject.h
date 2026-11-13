@@ -285,7 +285,20 @@ public:
     [[nodiscard]] AccountID
     getAccountID(SField const& field) const;
 
-    [[nodiscard]] Blob
+    /**
+     * Returns the contents of a variable-length field.
+     *
+     * The bytes are not copied: the returned slice refers to storage owned by
+     * this object, and is only valid until the field is modified or removed,
+     * or this object is destroyed. Copy the bytes to keep them for longer.
+     *
+     * @param field The field to read.
+     * @return The contents of the field, which is empty if the field is
+     *         optional and not present.
+     * @throws std::runtime_error if the field is not part of this object, or
+     *         is not a variable-length field.
+     */
+    [[nodiscard]] Slice
     getFieldVL(SField const& field) const;
     [[nodiscard]] STAmount const&
     getFieldAmount(SField const& field) const;

@@ -406,7 +406,7 @@ checkVL(Slice const& result, std::string const& expected)
 inline bool
 checkVL(SLE::ConstRef sle, SField const& field, std::string const& expected)
 {
-    return makeSlice(sle->getFieldVL(field)) == makeSlice(expected);
+    return sle->getFieldVL(field) == makeSlice(expected);
 }
 
 /* Path finding */

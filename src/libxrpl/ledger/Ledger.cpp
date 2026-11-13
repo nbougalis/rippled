@@ -703,8 +703,7 @@ Ledger::negativeUNL() const
         {
             if (n.isFieldPresent(sfPublicKey))
             {
-                auto const d = n.getFieldVL(sfPublicKey);
-                auto const s = makeSlice(d);
+                auto const s = n.getFieldVL(sfPublicKey);
                 if (!publicKeyType(s))
                 {
                     continue;
@@ -722,9 +721,7 @@ Ledger::validatorToDisable() const
 {
     if (auto const sle = NegativeUNLEntryR(*this); sle && sle->isFieldPresent(sfValidatorToDisable))
     {
-        auto const d = sle->getFieldVL(sfValidatorToDisable);
-        auto const s = makeSlice(d);
-        if (publicKeyType(s))
+        if (auto const s = sle->getFieldVL(sfValidatorToDisable); publicKeyType(s))
             return PublicKey(s);
     }
 
@@ -737,9 +734,7 @@ Ledger::validatorToReEnable() const
     if (auto const sle = NegativeUNLEntryR(*this);
         sle && sle->isFieldPresent(sfValidatorToReEnable))
     {
-        auto const d = sle->getFieldVL(sfValidatorToReEnable);
-        auto const s = makeSlice(d);
-        if (publicKeyType(s))
+        if (auto const s = sle->getFieldVL(sfValidatorToReEnable); publicKeyType(s))
             return PublicKey(s);
     }
 

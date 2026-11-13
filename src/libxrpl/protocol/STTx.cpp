@@ -173,16 +173,16 @@ STTx::getSigningHash() const
     return STObject::getSigningHash(HashPrefix::TxSign);
 }
 
-Blob
-STTx::getSignature(STObject const& sigObject)
+Slice
+STTx::getSignature() const
 {
     try
     {
-        return sigObject.getFieldVL(sfTxnSignature);
+        return getFieldVL(sfTxnSignature);
     }
     catch (std::exception const&)
     {
-        return Blob();
+        return Slice{};
     }
 }
 
@@ -246,7 +246,7 @@ STTx::checkSign(Rules const& rules, STObject const& sigObject, SignatureRole rol
         // at the SigningPubKey.  If it's empty we must be
         // multi-signing.  Otherwise we're single-signing.
 
-        Blob const& signingPubKey = sigObject.getFieldVL(sfSigningPubKey);
+        auto const signingPubKey = sigObject.getFieldVL(sfSigningPubKey);
         bool const multiSigning = signingPubKey.empty();
         auto const prefix = signingPrefix(role, multiSigning, rules);
         return multiSigning ? checkMultiSign(sigObject, prefix)
@@ -322,7 +322,7 @@ STTx::checkBatchSign() const
         auto const txIds = getBatchTransactionIDs();
         for (auto const& signer : signers)
         {
-            Blob const& signingPubKey = signer.getFieldVL(sfSigningPubKey);
+            auto const signingPubKey = signer.getFieldVL(sfSigningPubKey);
             auto const result = signingPubKey.empty() ? checkBatchMultiSign(signer, txIds)
                                                       : checkBatchSingleSign(signer, txIds);
 
@@ -387,12 +387,8 @@ singleSignHelper(STObject const& sigObject, Slice const& data)
     bool validSig = false;
     try
     {
-        auto const spk = sigObject.getFieldVL(sfSigningPubKey);
-        if (publicKeyType(makeSlice(spk)))
-        {
-            Blob const signature = sigObject.getFieldVL(sfTxnSignature);
-            validSig = verify(PublicKey(makeSlice(spk)), data, makeSlice(signature));
-        }
+        if (auto const spk = sigObject.getFieldVL(sfSigningPubKey); publicKeyType(spk))
+            validSig = verify(PublicKey(spk), data, sigObject.getFieldVL(sfTxnSignature));
     }
     catch (std::exception const&)
     {
@@ -473,13 +469,9 @@ multiSignHelper(
         std::optional<std::string> errorWhat;
         try
         {
-            auto const spk = signer.getFieldVL(sfSigningPubKey);
-            if (publicKeyType(makeSlice(spk)))
-            {
-                Blob const signature = signer.getFieldVL(sfTxnSignature);
+            if (auto const spk = signer.getFieldVL(sfSigningPubKey); publicKeyType(spk))
                 validSig = verify(
-                    PublicKey(makeSlice(spk)), makeMsg(accountID).slice(), makeSlice(signature));
-            }
+                    PublicKey(spk), makeMsg(accountID).slice(), signer.getFieldVL(sfTxnSignature));
         }
         catch (std::exception const& e)
         {

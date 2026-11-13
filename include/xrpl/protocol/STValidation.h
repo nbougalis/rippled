@@ -161,7 +161,13 @@ public:
     [[nodiscard]] Blob
     getSerialized() const;
 
-    [[nodiscard]] Blob
+    /**
+     * Returns the signature of this validation.
+     *
+     * @return The signature. It refers to storage owned by this object: see
+     *         STObject::getFieldVL.
+     */
+    [[nodiscard]] Slice
     getSignature() const;
 
     [[nodiscard]] std::string
@@ -195,12 +201,10 @@ template <class LookupNodeID>
 STValidation::STValidation(SerialIter& sit, LookupNodeID&& lookupNodeID, DeserializeOptions options)
     : STObject(validationFormat(), sit, sfValidation, options.requireCanonicalOrder)
     , signingPubKey_([this] {
-        auto const spk = getFieldVL(sfSigningPubKey);
+        if (auto const spk = getFieldVL(sfSigningPubKey); publicKeyType(spk) == KeyType::Secp256k1)
+            return PublicKey{spk};
 
-        if (publicKeyType(makeSlice(spk)) != KeyType::Secp256k1)
-            Throw<std::runtime_error>("Invalid public key in validation");
-
-        return PublicKey{makeSlice(spk)};
+        Throw<std::runtime_error>("Invalid public key in validation");
     }())
     , nodeID_(lookupNodeID(signingPubKey_))
 {

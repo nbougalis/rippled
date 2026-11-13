@@ -1971,8 +1971,7 @@ verifyPubKeyAndSeq(
             return false;
 
         auto seq = n.getFieldU32(sfFirstLedgerSequence);
-        auto const d = n.getFieldVL(sfPublicKey);
-        auto const s = makeSlice(d);
+        auto const s = n.getFieldVL(sfPublicKey);
         if (!publicKeyType(s))
             return false;
         PublicKey const pk(s);

@@ -149,9 +149,9 @@ public:
 
             STObject const object3(elements, it, sfTestObject);
 
-            unexpected(object1.getFieldVL(sfTestVL) != j, "STObject error");
+            unexpected(object1.getFieldVL(sfTestVL) != makeSlice(j), "STObject error");
 
-            unexpected(object3.getFieldVL(sfTestVL) != j, "STObject error");
+            unexpected(object3.getFieldVL(sfTestVL) != makeSlice(j), "STObject error");
         }
 
         {

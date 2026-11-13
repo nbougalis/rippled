@@ -219,7 +219,7 @@ validDomain(ReadView const& view, UInt256 domainID, AccountID const& subject)
     {
         auto const issuer = h.getAccountID(sfIssuer);
         auto const type = h.getFieldVL(sfCredentialType);
-        auto const keyletCredential = keylet::credential(subject, issuer, makeSlice(type));
+        auto const keyletCredential = keylet::credential(subject, issuer, type);
         auto const sleCredential = view.read(keyletCredential);
 
         // We cannot delete expired credentials, that would require ApplyView&
@@ -344,11 +344,12 @@ verifyValidDomain(ApplyView& view, AccountID const& account, UInt256 domainID, b
     STVector256 credentials;
     for (auto const& h : slePD->getFieldArray(sfAcceptedCredentials))
     {
-        auto const issuer = h.getAccountID(sfIssuer);
-        auto const type = h.getFieldVL(sfCredentialType);
-        auto const keyletCredential = keylet::credential(account, issuer, makeSlice(type));
-        if (view.exists(keyletCredential))
+        if (auto const keyletCredential = keylet::credential(
+                account, h.getAccountID(sfIssuer), h.getFieldVL(sfCredentialType));
+            view.exists(keyletCredential))
+        {
             credentials.pushBack(keyletCredential.key);
+        }
     }
 
     auto const foundExpired = credentials::removeExpired(view, credentials, j);
