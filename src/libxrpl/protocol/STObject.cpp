@@ -582,12 +582,10 @@ STObject::getAccountID(SField const& field) const
     return getFieldByValue<STAccount>(field);
 }
 
-Blob
+Slice
 STObject::getFieldVL(SField const& field) const
 {
-    STBlob const empty;
-    auto const& b = getFieldByConstRef<STBlob>(field, empty);
-    return Blob(b.data(), b.data() + b.size());
+    return getFieldByValue<STBlob>(field);
 }
 
 STAmount const&

@@ -1,8 +1,6 @@
 #include <xrpl/tx/transactors/account/AccountSet.h>
 
-#include <xrpl/basics/Blob.h>
 #include <xrpl/basics/Log.h>
-#include <xrpl/basics/Slice.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/ReadView.h>
@@ -248,9 +246,9 @@ AccountSet::doApply()
         [&tx, &acct = accountID_] {
             auto const spk = tx.getSigningPubKey();
 
-            if (publicKeyType(makeSlice(spk)))
+            if (publicKeyType(spk))
             {
-                PublicKey const signingPubKey(makeSlice(spk));
+                PublicKey const signingPubKey(spk);
 
                 if (calcAccountID(signingPubKey) == acct)
                     return true;
@@ -449,7 +447,7 @@ AccountSet::doApply()
     //
     if (tx.isFieldPresent(sfMessageKey))
     {
-        Blob const messageKey = tx.getFieldVL(sfMessageKey);
+        auto const messageKey = tx.getFieldVL(sfMessageKey);
 
         if (messageKey.empty())
         {
@@ -468,7 +466,7 @@ AccountSet::doApply()
     //
     if (tx.isFieldPresent(sfDomain))
     {
-        Blob const domain = tx.getFieldVL(sfDomain);
+        auto const domain = tx.getFieldVL(sfDomain);
 
         if (domain.empty())
         {

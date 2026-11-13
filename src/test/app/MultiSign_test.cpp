@@ -1091,7 +1091,8 @@ public:
             JTx const tx = env.jt(noop(alice), Sig(alice));
             STTx local = *tx.stx;
             // Flip some bits in the signature.
-            auto badSig = local.getFieldVL(sfTxnSignature);
+            auto const sig = local.getFieldVL(sfTxnSignature);
+            Blob badSig(sig.begin(), sig.end());
             badSig[20] ^= 0xAA;
             local.setFieldVL(sfTxnSignature, badSig);
             // Signature should fail.
@@ -1152,7 +1153,8 @@ public:
             STTx local = *tx.stx;
             // Flip some bits in the signature.
             auto& signer = local.peekFieldArray(sfSigners).back();
-            auto badSig = signer.getFieldVL(sfTxnSignature);
+            auto const sig = signer.getFieldVL(sfTxnSignature);
+            Blob badSig(sig.begin(), sig.end());
             badSig[20] ^= 0xAA;
             signer.setFieldVL(sfTxnSignature, badSig);
             // Signature should fail.

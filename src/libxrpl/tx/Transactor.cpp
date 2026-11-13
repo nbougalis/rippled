@@ -123,8 +123,7 @@ namespace detail {
 NotTEC
 preflightCheckSigningKey(STObject const& sigObject, beast::Journal j)
 {
-    if (auto const spk = sigObject.getFieldVL(sfSigningPubKey);
-        !spk.empty() && !publicKeyType(makeSlice(spk)))
+    if (auto const spk = sigObject.getFieldVL(sfSigningPubKey); !spk.empty() && !publicKeyType(spk))
     {
         JLOG(j.debug()) << "preflightCheckSigningKey: invalid signing key";
         return temBAD_SIGNATURE;
@@ -1018,14 +1017,14 @@ Transactor::checkSign(
     // Check Single Sign
     XRPL_ASSERT(!pkSigner.empty(), "xrpl::Transactor::checkSign : non-empty signer");
 
-    if (!publicKeyType(makeSlice(pkSigner)))
+    if (!publicKeyType(pkSigner))
     {
         JLOG(j.trace()) << "checkSign: signing public key type is unknown";
         return tefBAD_AUTH;  // FIXME: should be better error!
     }
 
     // Look up the account.
-    auto const idSigner = calcAccountID(PublicKey(makeSlice(pkSigner)));
+    auto const idSigner = calcAccountID(PublicKey(pkSigner));
     auto const sleAccount = view.read(keylet::account(idAccount));
     if (!sleAccount)
     {
@@ -1150,7 +1149,7 @@ Transactor::checkMultiSign(
 
         // spk being non-empty in non-simulate is checked in
         // STTx::checkMultiSign
-        if (!spk.empty() && !publicKeyType(makeSlice(spk)))
+        if (!spk.empty() && !publicKeyType(spk))
         {
             JLOG(j.trace()) << "checkMultiSign: signing public key type is unknown";
             return tefBAD_SIGNATURE;
@@ -1161,7 +1160,7 @@ Transactor::checkMultiSign(
             "xrpl::Transactor::checkMultiSign : non-empty signer or "
             "simulation");
         AccountID const signingAcctIDFromPubKey =
-            spk.empty() ? txSignerAcctID : calcAccountID(PublicKey(makeSlice(spk)));
+            spk.empty() ? txSignerAcctID : calcAccountID(PublicKey(spk));
 
         // Verify that the signingAcctID and the signingAcctIDFromPubKey
         // belong together.  Here are the rules:

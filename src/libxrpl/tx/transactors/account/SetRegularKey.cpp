@@ -1,6 +1,5 @@
 #include <xrpl/tx/transactors/account/SetRegularKey.h>
 
-#include <xrpl/basics/Slice.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/protocol/Indexes.h>
@@ -19,19 +18,14 @@ XRPAmount
 SetRegularKey::calculateBaseFee(ReadView const& view, STTx const& tx)
 {
     auto const id = tx.getAccountID(sfAccount);
-    auto const spk = tx.getSigningPubKey();
 
-    if (publicKeyType(makeSlice(spk)))
+    if (auto const spk = tx.getSigningPubKey();
+        publicKeyType(spk) && calcAccountID(PublicKey(spk)) == id)
     {
-        if (calcAccountID(PublicKey(makeSlice(spk))) == id)
+        if (auto const sle = view.read(keylet::account(id)); sle && !sle->isFlag(lsfPasswordSpent))
         {
-            auto const sle = view.read(keylet::account(id));
-
-            if (sle && !sle->isFlag(lsfPasswordSpent))
-            {
-                // flag is armed and they signed with the right account
-                return XRPAmount{0};
-            }
+            // flag is armed and they signed with the right account
+            return XRPAmount{0};
         }
     }
 

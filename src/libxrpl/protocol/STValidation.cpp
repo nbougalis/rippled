@@ -129,7 +129,7 @@ STValidation::isValid() const noexcept
             valid_ = verifyDigest(
                 getSignerPublic(),
                 getSigningHash(),
-                makeSlice(getFieldVL(sfSignature)),
+                getFieldVL(sfSignature),
                 (getFlags() & kVfFullyCanonicalSig) != 0u);
         }
         catch (std::exception const& e)
@@ -153,7 +153,7 @@ STValidation::isFull() const noexcept
     return (getFlags() & kVfFullValidation) != 0;
 }
 
-Blob
+Slice
 STValidation::getSignature() const
 {
     return getFieldVL(sfSignature);

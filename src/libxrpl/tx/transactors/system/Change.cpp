@@ -1,7 +1,6 @@
 #include <xrpl/tx/transactors/system/Change.h>
 
 #include <xrpl/basics/Log.h>
-#include <xrpl/basics/Slice.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/utility/Zero.h>
@@ -320,8 +319,8 @@ Change::applyUNLModify()
         return tefFAILURE;
     }
 
-    Blob const validator = ctx_.tx.getFieldVL(sfUNLModifyValidator);
-    if (!publicKeyType(makeSlice(validator)))
+    auto const validator = ctx_.tx.getFieldVL(sfUNLModifyValidator);
+    if (!publicKeyType(validator))
     {
         JLOG(j_.warn()) << "N-UNL: applyUNLModify, bad validator key";
         return tefFAILURE;

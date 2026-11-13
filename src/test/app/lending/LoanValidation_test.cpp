@@ -14,6 +14,7 @@
 #include <test/jtx/txflags.h>
 #include <test/jtx/vault.h>
 
+#include <xrpl/basics/Buffer.h>
 #include <xrpl/basics/Number.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/strHex.h>
@@ -188,7 +189,7 @@ private:
                 loanSetFee);
             STTx local = *tx.stx;
             auto counterpartySig = local.getFieldObject(sfCounterpartySignature);
-            auto badPubKey = counterpartySig.getFieldVL(sfSigningPubKey);
+            Buffer badPubKey(counterpartySig.getFieldVL(sfSigningPubKey));
             badPubKey[20] ^= 0xAA;
             counterpartySig.setFieldVL(sfSigningPubKey, badPubKey);
             local.setFieldObject(sfCounterpartySignature, counterpartySig);

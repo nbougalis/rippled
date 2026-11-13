@@ -104,10 +104,10 @@ deserializeManifest(Slice s, beast::Journal journal)
 
         auto const pk = st.getFieldVL(sfPublicKey);
 
-        if (!publicKeyType(makeSlice(pk)))
+        if (!publicKeyType(pk))
             return std::nullopt;
 
-        PublicKey const masterKey = PublicKey(makeSlice(pk));
+        PublicKey const masterKey = PublicKey(pk);
         std::uint32_t const seq = st.getFieldU32(sfSequence);
 
         std::string domain;
@@ -149,10 +149,10 @@ deserializeManifest(Slice s, beast::Journal journal)
 
             auto const spk = st.getFieldVL(sfSigningPubKey);
 
-            if (!publicKeyType(makeSlice(spk)))
+            if (!publicKeyType(spk))
                 return std::nullopt;
 
-            signingKey.emplace(makeSlice(spk));
+            signingKey.emplace(spk);
 
             // The signing and master keys can't be the same
             if (*signingKey == masterKey)
@@ -245,7 +245,10 @@ Manifest::getSignature() const
     st.set(sit);
     if (!get(st, sfSignature))
         return std::nullopt;
-    return st.getFieldVL(sfSignature);
+
+    // The signature has to be copied, because it is owned by a local object.
+    auto const sig = st.getFieldVL(sfSignature);
+    return Blob(sig.begin(), sig.end());
 }
 
 Blob
@@ -254,7 +257,10 @@ Manifest::getMasterSignature() const
     STObject st(sfGeneric);
     SerialIter sit(makeSlice(serialized));
     st.set(sit);
-    return st.getFieldVL(sfMasterSignature);
+
+    // The signature has to be copied, because it is owned by a local object.
+    auto const sig = st.getFieldVL(sfMasterSignature);
+    return Blob(sig.begin(), sig.end());
 }
 
 std::optional<ValidatorToken>

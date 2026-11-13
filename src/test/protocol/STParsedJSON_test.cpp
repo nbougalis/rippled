@@ -542,7 +542,7 @@ class STParsedJSON_test : public beast::unit_test::Suite
             BEAST_EXPECT(obj.object.has_value());
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             BEAST_EXPECT(obj.object->isFieldPresent(sfPublicKey));
-            auto const& blob =
+            auto const blob =
                 obj.object->getFieldVL(sfPublicKey);  // NOLINT(bugprone-unchecked-optional-access)
             BEAST_EXPECT(blob.size() == 4);
             BEAST_EXPECT(blob[0] == 0xDE);
@@ -559,7 +559,7 @@ class STParsedJSON_test : public beast::unit_test::Suite
             BEAST_EXPECT(obj.object.has_value());
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             BEAST_EXPECT(obj.object->isFieldPresent(sfPublicKey));
-            auto const& blob =
+            auto const blob =
                 obj.object->getFieldVL(sfPublicKey);  // NOLINT(bugprone-unchecked-optional-access)
             BEAST_EXPECT(blob.empty());
         }
@@ -572,7 +572,7 @@ class STParsedJSON_test : public beast::unit_test::Suite
             BEAST_EXPECT(obj.object.has_value());
             // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
             BEAST_EXPECT(obj.object->isFieldPresent(sfPublicKey));
-            auto const& blob =
+            auto const blob =
                 obj.object->getFieldVL(sfPublicKey);  // NOLINT(bugprone-unchecked-optional-access)
             BEAST_EXPECT(blob.size() == 4);
             BEAST_EXPECT(blob[0] == 0xDE);

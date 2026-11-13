@@ -20,7 +20,6 @@
 #include <xrpld/app/misc/TxQ.h>
 #include <xrpld/core/Config.h>
 
-#include <xrpl/basics/Blob.h>
 #include <xrpl/basics/Slice.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/unit_test/suite.h>
@@ -1634,8 +1633,7 @@ struct TransactionProposalReservedTicket_test : public beast::unit_test::Suite
                 return;
 
             STObject mutated{*jt.stx};
-            Blob const otherSig = jtOther.stx->getFieldVL(sfTxnSignature);
-            mutated.at(sfTxnSignature) = makeSlice(otherSig);
+            mutated.at(sfTxnSignature) = jtOther.stx->getFieldVL(sfTxnSignature);
             auto const stx = rebuilt(mutated);
 
             env.app().getOpenLedger().modify([&](OpenView& view, beast::Journal j) {
