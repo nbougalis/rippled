@@ -122,7 +122,7 @@ public:
         return *this;
     }
 
-    STVar(STVar&& other)
+    STVar(STVar&& other) noexcept
     {
         if (other.onHeap())
         {
@@ -136,7 +136,7 @@ public:
     }
 
     STVar&
-    operator=(STVar&& rhs)
+    operator=(STVar&& rhs) noexcept
     {
         if (&rhs != this) [[likely]]
         {
@@ -179,9 +179,13 @@ public:
     get(this auto&& self)
     {
         if constexpr (std::is_const_v<std::remove_reference_t<decltype(self)>>)
+        {
             return std::as_const(*self.p_);
+        }
         else
+        {
             return *self.p_;
+        }
     }
 
     [[nodiscard]] auto&
@@ -248,6 +252,19 @@ private:
         }
         else
         {
+            // Moving an STVar relocates an object held in its internal
+            // buffer using the move constructor of T. Since the STVar's
+            // move operations are noexcept, the program would terminate
+            // if that constructor were to throw. Note that a type which
+            // declares a copy constructor and no move constructor will
+            // be moved by copying, and fails this check unless its copy
+            // constructor is noexcept.
+            //
+            // Objects on the heap are never moved: the pointer is.
+            static_assert(
+                std::is_nothrow_move_constructible_v<T>,
+                "Types held in the internal buffer must be nothrow move constructible");
+
             p_ = std::construct_at(reinterpret_cast<T*>(d_), std::forward<Args>(args)...);
         }
     }
