@@ -14,7 +14,7 @@
 #include <test/jtx/txflags.h>
 #include <test/jtx/vault.h>
 
-#include <xrpl/basics/Buffer.h>
+#include <xrpl/basics/Blob.h>
 #include <xrpl/basics/Number.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/strHex.h>
@@ -36,6 +36,7 @@
 #include <xrpl/protocol/jss.h>
 #include <xrpl/tx/transactors/lending/LoanSet.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
@@ -187,20 +188,49 @@ private:
                 set(borrower, brokerInfo.brokerID, debtMaximumRequest),
                 Sig(sfCounterpartySignature, lender),
                 loanSetFee);
-            STTx local = *tx.stx;
-            auto counterpartySig = local.getFieldObject(sfCounterpartySignature);
-            Buffer badPubKey(counterpartySig.getFieldVL(sfSigningPubKey));
-            badPubKey[20] ^= 0xAA;
-            counterpartySig.setFieldVL(sfSigningPubKey, badPubKey);
-            local.setFieldObject(sfCounterpartySignature, counterpartySig);
-            json::Value jvResult;
-            jvResult[jss::tx_blob] = strHex(local.getSerializer().slice());
-            auto res = env.rpc("json", "submit", to_string(jvResult))["result"];
-            BEAST_EXPECT(
-                res[jss::error] == "invalidTransaction" && !res.isMember(jss::error_code) &&
-                res[jss::error_message].isNull() &&
-                res[jss::error_exception] ==
-                    "fails local checks: Counterparty: Invalid signature.");
+
+            // The public key that the counterparty signed with.
+            Blob const pubKey = [&] {
+                auto const sig = tx.stx->getFieldObject(sfCounterpartySignature);
+                auto const key = sig.getFieldVL(sfSigningPubKey);
+                return Blob(key.begin(), key.end());
+            }();
+
+            // Replace the counterparty's public key, leaving the signature
+            // as is, and check that the transaction is rejected.
+            auto const submitWith = [&](Blob const& badPubKey) {
+                STTx local = *tx.stx;
+                auto counterpartySig = local.getFieldObject(sfCounterpartySignature);
+                counterpartySig.setFieldVL(sfSigningPubKey, badPubKey);
+                local.setFieldObject(sfCounterpartySignature, counterpartySig);
+                json::Value jvResult;
+                jvResult[jss::tx_blob] = strHex(local.getSerializer().slice());
+                auto res = env.rpc("json", "submit", to_string(jvResult))["result"];
+                BEAST_EXPECT(
+                    res[jss::error] == "invalidTransaction" && !res.isMember(jss::error_code) &&
+                    res[jss::error_message].isNull() &&
+                    res[jss::error_exception] ==
+                        "fails local checks: Counterparty: Invalid signature.");
+            };
+
+            // Corrupt every byte of the key, one at a time.
+            for (std::size_t i = 0; i != pubKey.size(); ++i)
+            {
+                Blob bad = pubKey;
+                bad[i] ^= 0xAA;
+                submitWith(bad);
+            }
+
+            // A key that is one byte too short. Note that an empty key is
+            // not tested: it selects multi-signing, which fails differently.
+            submitWith(Blob(pubKey.begin(), pubKey.end() - 1));
+
+            // A key that is one byte too long.
+            {
+                Blob bad = pubKey;
+                bad.push_back(0x00);
+                submitWith(bad);
+            }
         });
 
         // preclaim:
