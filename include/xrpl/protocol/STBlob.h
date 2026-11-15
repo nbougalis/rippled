@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 namespace xrpl {
@@ -23,7 +24,14 @@ public:
     using value_type = Slice;
 
     STBlob() = default;
-    STBlob(STBlob const& rhs);
+
+    STBlob(STBlob const&) = default;
+    STBlob&
+    operator=(STBlob const&) = default;
+
+    STBlob(STBlob&&) noexcept = default;
+    STBlob&
+    operator=(STBlob&&) noexcept = default;
 
     STBlob(SField const& f, void const* data, std::size_t size);
     STBlob(SField const& f, Buffer&& b);
@@ -71,11 +79,6 @@ private:
 
     friend class detail::STVar;
 };
-
-inline STBlob::STBlob(STBlob const& rhs)
-    : STBase(rhs), CountedObject<STBlob>(rhs), value_(rhs.data(), rhs.size())
-{
-}
 
 inline STBlob::STBlob(SField const& f, void const* data, std::size_t size)
     : STBase(f), value_(data, size)
@@ -127,5 +130,10 @@ STBlob::setValue(Buffer&& b)
 {
     value_ = std::move(b);
 }
+
+// An STVar that holds an STBlob in its internal buffer relocates it using
+// the move constructor, so that must neither allocate nor throw.
+static_assert(std::is_nothrow_move_constructible_v<STBlob>);
+static_assert(std::is_nothrow_move_assignable_v<STBlob>);
 
 }  // namespace xrpl
