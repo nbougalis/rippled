@@ -4,7 +4,6 @@
 #include <xrpl/basics/CountedObject.h>
 #include <xrpl/basics/Number.h>
 #include <xrpl/basics/Slice.h>
-#include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/utility/instrumentation.h>
@@ -42,7 +41,7 @@ namespace xrpl {
 
 class STArray;
 
-inline void
+[[noreturn]] inline void
 throwFieldNotFound(SField const& field)
 {
     Throw<std::runtime_error>("Field not found: " + field.getName());
@@ -68,18 +67,18 @@ throwFieldNotFound(SField const& field)
 class STObject : public STBase, public CountedObject<STObject>
 {
     // Proxy value for a STBase derived class
-    template <class T>
+    template <typename T>
     class Proxy;
-    template <class T>
+    template <typename T>
     class ValueProxy;
-    template <class T>
+    template <typename T>
     class OptionalProxy;
 
     struct Transform
     {
         explicit Transform() = default;
 
-        using argument_type = detail::STVar;
+        // using argument_type = detail::STVar;
         using result_type = STBase;
 
         STBase const&
@@ -92,9 +91,8 @@ class STObject : public STBase, public CountedObject<STObject>
     SOTemplate const* type_{};
 
 public:
-    using iterator = boost::transform_iterator<Transform, STObject::ListType::const_iterator>;
+    using iterator = boost::transform_iterator<Transform, ListType::const_iterator>;
 
-    ~STObject() override = default;
     STObject(STObject const&) = default;
 
     template <typename F>
@@ -173,31 +171,10 @@ public:
     add(Serializer& s) const override;
 
     [[nodiscard]] std::string
-    getFullText() const override
-    {
-        std::string ret;
-
-        if (getFName().hasName())
-        {
-            ret = getFName().getName();
-            ret += " = {";
-        }
-        else
-        {
-            ret = "{";
-        }
-
-        ret += rangeToString(v_, [](detail::STVar const& object) { return object->getFullText(); });
-
-        return ret + "}";
-    }
+    getFullText() const override;
 
     [[nodiscard]] std::string
-    getText() const override
-    {
-        return "{" +
-            rangeToString(v_, [](detail::STVar const& object) { return object->getText(); }) + "}";
-    }
+    getText() const override;
 
     // TODO(tom): options should be an enum.
     [[nodiscard]] json::Value getJson(JsonOptions = JsonOptions::Values::None) const override;
@@ -208,7 +185,7 @@ public:
     [[nodiscard]] Serializer
     getSerializer() const;
 
-    template <class... Args>
+    template <typename... Args>
     std::size_t
     emplaceBack(Args&&... args);
 
@@ -324,7 +301,7 @@ public:
      * @return The value of the specified field.
      * @throws STObject::FieldErr if the field is not present.
      */
-    template <class T>
+    template <typename T>
     T::value_type
     operator[](TypedField<T> const& f) const;
 
@@ -337,7 +314,7 @@ public:
      * @return std::nullopt if the field is not present, else the value of
      *    the specified field.
      */
-    template <class T>
+    template <typename T>
     std::optional<std::decay_t<typename T::value_type>>
     operator[](OptionaledField<T> const& of) const;
 
@@ -349,7 +326,7 @@ public:
      * @return A modifiable reference to the value of the specified field.
      * @throws STObject::FieldErr if the field is not present.
      */
-    template <class T>
+    template <typename T>
     ValueProxy<T>
     operator[](TypedField<T> const& f);
 
@@ -363,7 +340,7 @@ public:
      *     reference to the value of the specified field. Returns
      *     std::nullopt if the field is not present.
      */
-    template <class T>
+    template <typename T>
     OptionalProxy<T>
     operator[](OptionaledField<T> const& of);
 
@@ -375,7 +352,7 @@ public:
      * @return The value of the specified field.
      * @throws STObject::FieldErr if the field is not present.
      */
-    template <class T>
+    template <typename T>
     [[nodiscard]] T::value_type
     at(TypedField<T> const& f) const;
 
@@ -388,7 +365,7 @@ public:
      * @return std::nullopt if the field is not present, else the value of
      *    the specified field.
      */
-    template <class T>
+    template <typename T>
     [[nodiscard]] std::optional<std::decay_t<typename T::value_type>>
     at(OptionaledField<T> const& of) const;
 
@@ -400,7 +377,7 @@ public:
      * @return A modifiable reference to the value of the specified field.
      * @throws STObject::FieldErr if the field is not present.
      */
-    template <class T>
+    template <typename T>
     ValueProxy<T>
     at(TypedField<T> const& f);
 
@@ -414,7 +391,7 @@ public:
      *     reference to the value of the specified field. Returns
      *     std::nullopt if the field is not present.
      */
-    template <class T>
+    template <typename T>
     OptionalProxy<T>
     at(OptionaledField<T> const& of);
 
@@ -469,9 +446,12 @@ public:
     void
     setFieldObject(SField const& field, STObject const& v);
 
-    template <class Tag>
+    template <typename Tag>
     void
-    setFieldH160(SField const& field, BaseUInt<160, Tag> const& v);
+    setFieldH160(SField const& field, BaseUInt<160, Tag> const& v)
+    {
+        peekField<STUInt160>(field).setValue(v);
+    }
 
     STObject&
     peekFieldObject(SField const& field);
@@ -508,23 +488,43 @@ private:
         WithAllFields = true,
     };
 
+    // Returns the field, or nullptr if it is an optional field that
+    // is not present. Throws if the object cannot hold the field or
+    // if the field has the wrong type.
+    template <typename T>
+    [[nodiscard]] T const*
+    peekAtTypedField(SField const& field) const
+    {
+        STBase const* rf = peekAtPField(field);
+
+        if (!rf)
+            throwFieldNotFound(field);
+
+        if (rf->getSType() == STI_NOTPRESENT)
+            return nullptr;
+
+        if (T const* cf = dynamic_cast<T const*>(rf))
+            return cf;
+
+        Throw<std::runtime_error>("Wrong field type");
+    }
+
     void
     add(Serializer& s, WhichFields whichFields) const;
 
-    // Sort the entries in an STObject into the order that they will be
-    // serialized.  Note: they are not sorted into pointer value order, they
-    // are sorted by SField::fieldCode.
-    static std::vector<STBase const*>
-    getSortedFields(STObject const& objToSort, WhichFields whichFields);
-
     // Implementation for getting (most) fields that return by value.
     //
-    // The remove_cv and remove_reference are necessitated by the STBitString
-    // types.  Their value() returns by const ref.  We return those types
-    // by value.
+    // The value() of some types, such as STBitString, returns a const
+    // reference. std::remove_cvref_t ensures that we return by value.
     template <typename T, typename V = std::remove_cvref_t<decltype(std::declval<T>().value())>>
-    V
-    getFieldByValue(SField const& field) const;
+    [[nodiscard]] V
+    getFieldByValue(SField const& field) const
+    {
+        if (auto const* cf = peekAtTypedField<T>(field))
+            return cf->value();
+
+        return V();  // optional field not present
+    }
 
     // Implementations for getting (most) fields that return by const reference.
     //
@@ -532,20 +532,36 @@ private:
     // obvious to return.  So we insist on having the call provide an
     // 'empty' value we return in that circumstance.
     template <typename T, typename V>
-    V const&
-    getFieldByConstRef(SField const& field, V const& empty) const;
+    [[nodiscard]] V const&
+    getFieldByConstRef(SField const& field, V const& empty) const
+    {
+        if (auto const* cf = peekAtTypedField<T>(field))
+            return *cf;
+
+        // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
+        return empty;
+    }
 
     // Implementation for setting most fields with a setValue() method.
     template <typename T, typename V>
+        requires(!std::is_lvalue_reference_v<V>)
     void
-    setFieldUsingSetValue(SField const& field, V value);
+    setFieldUsingSetValue(SField const& field, V value)
+    {
+        peekField<T>(field).setValue(std::move(value));
+    }
 
     // Implementation for setting fields using assignment
     template <typename T>
     void
-    setFieldUsingAssignment(SField const& field, T const& value);
+    setFieldUsingAssignment(SField const& field, T const& value)
+    {
+        peekField<T>(field) = value;
+    }
 
-    // Implementation for peeking STObjects and STArrays
+    // Returns a mutable reference to the field, making it present (with a
+    // default value) if it is not. Throws if the object cannot hold the
+    // field or if the field has the wrong type.
     template <typename T>
     T&
     peekField(SField const& field);
@@ -560,7 +576,7 @@ private:
 
 //------------------------------------------------------------------------------
 
-template <class T>
+template <typename T>
 class STObject::Proxy
 {
 public:
@@ -591,7 +607,7 @@ protected:
     [[nodiscard]] T const*
     find() const;
 
-    template <class U>
+    template <typename U>
     void
     assign(U&& u);
 };
@@ -609,13 +625,13 @@ concept IsArithmeticST = !IsArithmeticValueUnit<U> && IsArithmeticNumber<Value>;
 template <typename U>
 concept IsArithmetic = IsArithmeticNumber<U> || IsArithmeticST<U> || IsArithmeticValueUnit<U>;
 
-template <class T, class U>
+template <typename T, class U>
 concept Addable = requires(T t, U u) { t = t + u; };
 template <typename T, typename U>
 concept IsArithmeticCompatible =
     IsArithmetic<typename T::value_type> && Addable<typename T::value_type, U>;
 
-template <class T>
+template <typename T>
 class STObject::ValueProxy : public Proxy<T>
 {
 private:
@@ -629,7 +645,7 @@ public:
     // Write-through proxy: assignment sets the referenced field to the given
     // value, so it intentionally takes the assigned value rather than a
     // ValueProxy.
-    template <class U>
+    template <typename U>
     // NOLINTNEXTLINE(misc-unconventional-assign-operator)
     ValueProxy&
     operator=(U&& u)
@@ -662,7 +678,7 @@ private:
     ValueProxy(STObject* st, TypedField<T> const* f);
 };
 
-template <class T>
+template <typename T>
 class STObject::OptionalProxy : public Proxy<T>
 {
 private:
@@ -739,7 +755,7 @@ public:
     OptionalProxy&
     operator=(OptionalType const& v);
 
-    template <class U>
+    template <typename U>
     OptionalProxy&
     operator=(U&& u)
         requires(std::is_assignable_v<T, U>);
@@ -764,7 +780,7 @@ class STObject::FieldErr : public std::runtime_error
     using std::runtime_error::runtime_error;
 };
 
-template <class T>
+template <typename T>
 STObject::Proxy<T>::Proxy(STObject* st, TypedField<T> const* f) : st_(st), f_(f)
 {
     if (st_->type_ != nullptr)
@@ -780,7 +796,7 @@ STObject::Proxy<T>::Proxy(STObject* st, TypedField<T> const* f) : st_(st), f_(f)
     }
 }
 
-template <class T>
+template <typename T>
 auto
 STObject::Proxy<T>::value() const -> value_type
 {
@@ -798,7 +814,7 @@ STObject::Proxy<T>::value() const -> value_type
     return value_type{};
 }
 
-template <class T>
+template <typename T>
 auto
 STObject::Proxy<T>::operator*() const -> value_type
 {
@@ -809,22 +825,22 @@ STObject::Proxy<T>::operator*() const -> value_type
  * Do not use operator->() unless the field is required, or you've checked that
  * it's set.
  */
-template <class T>
+template <typename T>
 T const*
 STObject::Proxy<T>::operator->() const
 {
     return this->find();
 }
 
-template <class T>
+template <typename T>
 inline T const*
 STObject::Proxy<T>::find() const
 {
     return dynamic_cast<T const*>(st_->peekAtPField(*f_));
 }
 
-template <class T>
-template <class U>
+template <typename T>
+template <typename U>
 void
 STObject::Proxy<T>::assign(U&& u)
 {
@@ -848,8 +864,8 @@ STObject::Proxy<T>::assign(U&& u)
 
 //------------------------------------------------------------------------------
 
-template <class T>
-template <class U>
+template <typename T>
+template <typename U>
 // NOLINTNEXTLINE(misc-unconventional-assign-operator)
 STObject::ValueProxy<T>&
 STObject::ValueProxy<T>::operator=(U&& u)
@@ -869,7 +885,7 @@ STObject::ValueProxy<T>::operator+=(U const& u)
     return *this;
 }
 
-template <class T>
+template <typename T>
 template <IsArithmetic U>
     requires IsArithmeticCompatible<T, U>
 STObject::ValueProxy<T>&
@@ -879,42 +895,42 @@ STObject::ValueProxy<T>::operator-=(U const& u)
     return *this;
 }
 
-template <class T>
+template <typename T>
 STObject::ValueProxy<T>::
 operator value_type() const
 {
     return this->value();
 }
 
-template <class T>
+template <typename T>
 STObject::ValueProxy<T>::ValueProxy(STObject* st, TypedField<T> const* f) : Proxy<T>(st, f)
 {
 }
 
 //------------------------------------------------------------------------------
 
-template <class T>
+template <typename T>
 STObject::OptionalProxy<T>::
 operator bool() const noexcept
 {
     return engaged();
 }
 
-template <class T>
+template <typename T>
 STObject::OptionalProxy<T>::
 operator typename STObject::OptionalProxy<T>::OptionalType() const
 {
     return optionalValue();
 }
 
-template <class T>
+template <typename T>
 STObject::OptionalProxy<T>::OptionalType
 STObject::OptionalProxy<T>::operator~() const
 {
     return optionalValue();
 }
 
-template <class T>
+template <typename T>
 auto
 STObject::OptionalProxy<T>::operator=(std::nullopt_t const&) -> OptionalProxy&
 {
@@ -922,7 +938,7 @@ STObject::OptionalProxy<T>::operator=(std::nullopt_t const&) -> OptionalProxy&
     return *this;
 }
 
-template <class T>
+template <typename T>
 auto
 STObject::OptionalProxy<T>::operator=(
     OptionalType&& v)  // NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved)
@@ -939,7 +955,7 @@ STObject::OptionalProxy<T>::operator=(
     return *this;
 }
 
-template <class T>
+template <typename T>
 auto
 STObject::OptionalProxy<T>::operator=(OptionalType const& v) -> OptionalProxy&
 {
@@ -954,8 +970,8 @@ STObject::OptionalProxy<T>::operator=(OptionalType const& v) -> OptionalProxy&
     return *this;
 }
 
-template <class T>
-template <class U>
+template <typename T>
+template <typename U>
 STObject::OptionalProxy<T>&
 STObject::OptionalProxy<T>::operator=(U&& u)
     requires(std::is_assignable_v<T, U>)
@@ -964,19 +980,19 @@ STObject::OptionalProxy<T>::operator=(U&& u)
     return *this;
 }
 
-template <class T>
+template <typename T>
 STObject::OptionalProxy<T>::OptionalProxy(STObject* st, TypedField<T> const* f) : Proxy<T>(st, f)
 {
 }
 
-template <class T>
+template <typename T>
 bool
 STObject::OptionalProxy<T>::engaged() const noexcept
 {
     return this->style_ == SoeDefault || this->find() != nullptr;
 }
 
-template <class T>
+template <typename T>
 void
 STObject::OptionalProxy<T>::disengage()
 {
@@ -992,7 +1008,7 @@ STObject::OptionalProxy<T>::disengage()
     }
 }
 
-template <class T>
+template <typename T>
 auto
 STObject::OptionalProxy<T>::optionalValue() const -> OptionalType
 {
@@ -1001,7 +1017,7 @@ STObject::OptionalProxy<T>::optionalValue() const -> OptionalType
     return this->value();
 }
 
-template <class T>
+template <typename T>
 STObject::OptionalProxy<T>::value_type
 STObject::OptionalProxy<T>::valueOr(value_type val) const
 {
@@ -1070,7 +1086,7 @@ STObject::getSerializer() const
     return s;
 }
 
-template <class... Args>
+template <typename... Args>
 inline std::size_t
 STObject::emplaceBack(Args&&... args)
 {
@@ -1108,35 +1124,35 @@ STObject::getPIndex(int offset)
     return &v_[offset].get();
 }
 
-template <class T>
+template <typename T>
 T::value_type
 STObject::operator[](TypedField<T> const& f) const
 {
     return at(f);
 }
 
-template <class T>
+template <typename T>
 std::optional<std::decay_t<typename T::value_type>>
 STObject::operator[](OptionaledField<T> const& of) const
 {
     return at(of);
 }
 
-template <class T>
+template <typename T>
 inline auto
 STObject::operator[](TypedField<T> const& f) -> ValueProxy<T>
 {
     return at(f);
 }
 
-template <class T>
+template <typename T>
 inline auto
 STObject::operator[](OptionaledField<T> const& of) -> OptionalProxy<T>
 {
     return at(of);
 }
 
-template <class T>
+template <typename T>
 [[nodiscard]] T::value_type
 STObject::at(TypedField<T> const& f) const
 {
@@ -1168,7 +1184,7 @@ STObject::at(TypedField<T> const& f) const
     return kDV;
 }
 
-template <class T>
+template <typename T>
 [[nodiscard]] std::optional<std::decay_t<typename T::value_type>>
 STObject::at(OptionaledField<T> const& of) const
 {
@@ -1196,136 +1212,18 @@ STObject::at(OptionaledField<T> const& of) const
     return u->value();
 }
 
-template <class T>
+template <typename T>
 inline auto
 STObject::at(TypedField<T> const& f) -> ValueProxy<T>
 {
     return ValueProxy<T>(this, &f);
 }
 
-template <class T>
+template <typename T>
 inline auto
 STObject::at(OptionaledField<T> const& of) -> OptionalProxy<T>
 {
     return OptionalProxy<T>(this, of.f);
-}
-
-template <class Tag>
-void
-STObject::setFieldH160(SField const& field, BaseUInt<160, Tag> const& v)
-{
-    STBase* rf = getPField(field, true);
-
-    if (!rf)
-        throwFieldNotFound(field);
-
-    if (rf->getSType() == STI_NOTPRESENT)
-        rf = makeFieldPresent(field);
-
-    if (auto cf = dynamic_cast<STUInt160*>(rf))
-    {
-        cf->setValue(v);
-    }
-    else
-    {
-        Throw<std::runtime_error>("Wrong field type");
-    }
-}
-
-template <typename T, typename V>
-V
-STObject::getFieldByValue(SField const& field) const
-{
-    STBase const* rf = peekAtPField(field);
-
-    if (!rf)
-        throwFieldNotFound(field);
-
-    SerializedTypeID const id = rf->getSType();
-
-    if (id == STI_NOTPRESENT)
-        return V();  // optional field not present
-
-    T const* cf = dynamic_cast<T const*>(rf);
-
-    if (!cf)
-        Throw<std::runtime_error>("Wrong field type");
-
-    return cf->value();
-}
-
-// Implementations for getting (most) fields that return by const reference.
-//
-// If an absent optional field is deserialized we don't have anything
-// obvious to return.  So we insist on having the call provide an
-// 'empty' value we return in that circumstance.
-template <typename T, typename V>
-V const&
-STObject::getFieldByConstRef(SField const& field, V const& empty) const
-{
-    STBase const* rf = peekAtPField(field);
-
-    if (!rf)
-        throwFieldNotFound(field);
-
-    SerializedTypeID const id = rf->getSType();
-
-    if (id == STI_NOTPRESENT)
-    {
-        // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
-        return empty;  // optional field not present
-    }
-
-    T const* cf = dynamic_cast<T const*>(rf);
-
-    if (!cf)
-        Throw<std::runtime_error>("Wrong field type");
-
-    return *cf;
-}
-
-// Implementation for setting most fields with a setValue() method.
-template <typename T, typename V>
-void
-STObject::setFieldUsingSetValue(SField const& field, V value)
-{
-    static_assert(!std::is_lvalue_reference_v<V>);
-
-    STBase* rf = getPField(field, true);
-
-    if (!rf)
-        throwFieldNotFound(field);
-
-    if (rf->getSType() == STI_NOTPRESENT)
-        rf = makeFieldPresent(field);
-
-    T* cf = dynamic_cast<T*>(rf);
-
-    if (!cf)
-        Throw<std::runtime_error>("Wrong field type");
-
-    cf->setValue(std::move(value));
-}
-
-// Implementation for setting fields using assignment
-template <typename T>
-void
-STObject::setFieldUsingAssignment(SField const& field, T const& value)
-{
-    STBase* rf = getPField(field, true);
-
-    if (!rf)
-        throwFieldNotFound(field);
-
-    if (rf->getSType() == STI_NOTPRESENT)
-        rf = makeFieldPresent(field);
-
-    T* cf = dynamic_cast<T*>(rf);
-
-    if (!cf)
-        Throw<std::runtime_error>("Wrong field type");
-
-    (*cf) = value;
 }
 
 // Implementation for peeking STObjects and STArrays
@@ -1341,12 +1239,10 @@ STObject::peekField(SField const& field)
     if (rf->getSType() == STI_NOTPRESENT)
         rf = makeFieldPresent(field);
 
-    T* cf = dynamic_cast<T*>(rf);
+    if (T* cf = dynamic_cast<T*>(rf))
+        return *cf;
 
-    if (!cf)
-        Throw<std::runtime_error>("Wrong field type");
-
-    return *cf;
+    Throw<std::runtime_error>("Wrong field type");
 }
 
 }  // namespace xrpl
