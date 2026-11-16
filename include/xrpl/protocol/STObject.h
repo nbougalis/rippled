@@ -4,7 +4,6 @@
 #include <xrpl/basics/CountedObject.h>
 #include <xrpl/basics/Number.h>
 #include <xrpl/basics/Slice.h>
-#include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/utility/instrumentation.h>
@@ -34,6 +33,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -41,12 +41,6 @@
 namespace xrpl {
 
 class STArray;
-
-inline void
-throwFieldNotFound(SField const& field)
-{
-    Throw<std::runtime_error>("Field not found: " + field.getName());
-}
 
 /**
  * A serialized object that contains a collection of named fields.
@@ -79,7 +73,7 @@ class STObject : public STBase, public CountedObject<STObject>
     {
         explicit Transform() = default;
 
-        using argument_type = detail::STVar;
+        // using argument_type = detail::STVar;
         using result_type = STBase;
 
         STBase const&
@@ -92,9 +86,8 @@ class STObject : public STBase, public CountedObject<STObject>
     SOTemplate const* type_{};
 
 public:
-    using iterator = boost::transform_iterator<Transform, STObject::ListType::const_iterator>;
+    using iterator = boost::transform_iterator<Transform, ListType::const_iterator>;
 
-    ~STObject() override = default;
     STObject(STObject const&) = default;
 
     template <typename F>
@@ -173,31 +166,10 @@ public:
     add(Serializer& s) const override;
 
     [[nodiscard]] std::string
-    getFullText() const override
-    {
-        std::string ret;
-
-        if (getFName().hasName())
-        {
-            ret = getFName().getName();
-            ret += " = {";
-        }
-        else
-        {
-            ret = "{";
-        }
-
-        ret += rangeToString(v_, [](detail::STVar const& object) { return object->getFullText(); });
-
-        return ret + "}";
-    }
+    getFullText() const override;
 
     [[nodiscard]] std::string
-    getText() const override
-    {
-        return "{" +
-            rangeToString(v_, [](detail::STVar const& object) { return object->getText(); }) + "}";
-    }
+    getText() const override;
 
     // TODO(tom): options should be an enum.
     [[nodiscard]] json::Value getJson(JsonOptions = JsonOptions::Values::None) const override;
@@ -245,9 +217,6 @@ public:
 
     [[nodiscard]] int
     getFieldIndex(SField const& field) const;
-
-    [[nodiscard]] SField const&
-    getFieldSType(int index) const;
 
     [[nodiscard]] STBase const&
     peekAtField(SField const& field) const;
@@ -447,7 +416,7 @@ public:
     void
     setFieldVL(SField const& field, Blob const&);
     void
-    setFieldVL(SField const& field, Slice const&);
+    setFieldVL(SField const& field, Slice);
 
     void
     setAccountID(SField const& field, AccountID const&);
@@ -471,7 +440,10 @@ public:
 
     template <class Tag>
     void
-    setFieldH160(SField const& field, BaseUInt<160, Tag> const& v);
+    setFieldH160(SField const& field, BaseUInt<160, Tag> const& v)
+    {
+        peekField<STUInt160>(field).setValue(v);
+    }
 
     STObject&
     peekFieldObject(SField const& field);
@@ -501,6 +473,26 @@ public:
     class FieldErr;
 
 private:
+    // The functions that throw are not templates and are defined out of
+    // line, so that the code which builds the message and the exception
+    // is not repeated in every instantiation of the templates that fail.
+
+    // Throws FieldErr with the given text.
+    [[noreturn]] static void
+    throwFieldError(std::string_view text);
+
+    // Throws FieldErr with the name of the field.
+    [[noreturn]] static void
+    throwFieldError(std::string_view head, SField const& field);
+
+    // Throws std::runtime_error: the field does not hold the expected type.
+    [[noreturn]] static void
+    throwWrongFieldType();
+
+    // Throws std::runtime_error: the object cannot hold the field.
+    [[noreturn]] static void
+    throwFieldNotFound(SField const& field);
+
     enum class WhichFields : bool {
         // These values are carefully chosen to do the right thing if passed
         // to SField::shouldInclude (bool)
@@ -508,23 +500,43 @@ private:
         WithAllFields = true,
     };
 
+    // Returns the field, or nullptr if it is an optional field that
+    // is not present. Throws if the object cannot hold the field or
+    // if the field has the wrong type.
+    template <typename T>
+    [[nodiscard]] T const*
+    peekAtTypedField(SField const& field) const
+    {
+        STBase const* rf = peekAtPField(field);
+
+        if (!rf)
+            throwFieldNotFound(field);
+
+        if (rf->getSType() == STI_NOTPRESENT)
+            return nullptr;
+
+        if (T const* cf = dynamic_cast<T const*>(rf))
+            return cf;
+
+        throwWrongFieldType();
+    }
+
     void
     add(Serializer& s, WhichFields whichFields) const;
 
-    // Sort the entries in an STObject into the order that they will be
-    // serialized.  Note: they are not sorted into pointer value order, they
-    // are sorted by SField::fieldCode.
-    static std::vector<STBase const*>
-    getSortedFields(STObject const& objToSort, WhichFields whichFields);
-
     // Implementation for getting (most) fields that return by value.
     //
-    // The remove_cv and remove_reference are necessitated by the STBitString
-    // types.  Their value() returns by const ref.  We return those types
-    // by value.
+    // The value() of some types, such as STBitString, returns a const
+    // reference. std::remove_cvref_t ensures that we return by value.
     template <typename T, typename V = std::remove_cvref_t<decltype(std::declval<T>().value())>>
-    V
-    getFieldByValue(SField const& field) const;
+    [[nodiscard]] V
+    getFieldByValue(SField const& field) const
+    {
+        if (auto const* cf = peekAtTypedField<T>(field))
+            return cf->value();
+
+        return V();  // optional field not present
+    }
 
     // Implementations for getting (most) fields that return by const reference.
     //
@@ -532,20 +544,36 @@ private:
     // obvious to return.  So we insist on having the call provide an
     // 'empty' value we return in that circumstance.
     template <typename T, typename V>
-    V const&
-    getFieldByConstRef(SField const& field, V const& empty) const;
+    [[nodiscard]] V const&
+    getFieldByConstRef(SField const& field, V const& empty) const
+    {
+        if (auto const* cf = peekAtTypedField<T>(field))
+            return *cf;
+
+        // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
+        return empty;
+    }
 
     // Implementation for setting most fields with a setValue() method.
     template <typename T, typename V>
+        requires(!std::is_lvalue_reference_v<V>)
     void
-    setFieldUsingSetValue(SField const& field, V value);
+    setFieldUsingSetValue(SField const& field, V value)
+    {
+        peekField<T>(field).setValue(std::move(value));
+    }
 
     // Implementation for setting fields using assignment
     template <typename T>
     void
-    setFieldUsingAssignment(SField const& field, T const& value);
+    setFieldUsingAssignment(SField const& field, T const& value)
+    {
+        peekField<T>(field) = value;
+    }
 
-    // Implementation for peeking STObjects and STArrays
+    // Returns a mutable reference to the field, making it present (with a
+    // default value) if it is not. Throws if the object cannot hold the
+    // field or if the field has the wrong type.
     template <typename T>
     T&
     peekField(SField const& field);
@@ -771,7 +799,7 @@ STObject::Proxy<T>::Proxy(STObject* st, TypedField<T> const* f) : st_(st), f_(f)
     {
         // STObject has associated template
         if (!st_->peekAtPField(*f_))
-            Throw<STObject::FieldErr>("Template field error '" + this->f_->getName() + "'");
+            throwFieldError("Template field error", *f_);
         style_ = st_->type_->style(*f_);
     }
     else
@@ -788,13 +816,10 @@ STObject::Proxy<T>::value() const -> value_type
     if (t)
         return t->value();
     if (style_ == SoeInvalid)
-    {
-        Throw<STObject::FieldErr>("Value requested from invalid STObject.");
-    }
+        throwFieldError("Value requested from invalid STObject.");
+
     if (style_ != SoeDefault)
-    {
-        Throw<STObject::FieldErr>("Missing field '" + this->f_->getName() + "'");
-    }
+        throwFieldError("Missing field", *f_);
     return value_type{};
 }
 
@@ -981,7 +1006,7 @@ void
 STObject::OptionalProxy<T>::disengage()
 {
     if (this->style_ == SoeRequired || this->style_ == SoeDefault)
-        Throw<STObject::FieldErr>("Template field error '" + this->f_->getName() + "'");
+        throwFieldError("Template field error", *this->f_);
     if (this->style_ == SoeInvalid)
     {
         this->st_->delField(*this->f_);
@@ -1145,7 +1170,7 @@ STObject::at(TypedField<T> const& f) const
     {
         // This is a free object (no constraints)
         // with no template
-        Throw<STObject::FieldErr>("Missing field: " + f.getName());
+        throwFieldError("Missing field", f);
     }
 
     if (auto const u = dynamic_cast<T const*>(b))
@@ -1156,7 +1181,7 @@ STObject::at(TypedField<T> const& f) const
         b->getSType() == STI_NOTPRESENT, "xrpl::STObject::at(TypedField auto) : type not present");
 
     if (type_->style(f) == SoeOptional)
-        Throw<STObject::FieldErr>("Missing optional field: " + f.getName());
+        throwFieldError("Missing optional field", f);
 
     XRPL_ASSERT(
         type_->style(f) == SoeDefault,
@@ -1210,124 +1235,6 @@ STObject::at(OptionaledField<T> const& of) -> OptionalProxy<T>
     return OptionalProxy<T>(this, of.f);
 }
 
-template <class Tag>
-void
-STObject::setFieldH160(SField const& field, BaseUInt<160, Tag> const& v)
-{
-    STBase* rf = getPField(field, true);
-
-    if (!rf)
-        throwFieldNotFound(field);
-
-    if (rf->getSType() == STI_NOTPRESENT)
-        rf = makeFieldPresent(field);
-
-    if (auto cf = dynamic_cast<STUInt160*>(rf))
-    {
-        cf->setValue(v);
-    }
-    else
-    {
-        Throw<std::runtime_error>("Wrong field type");
-    }
-}
-
-template <typename T, typename V>
-V
-STObject::getFieldByValue(SField const& field) const
-{
-    STBase const* rf = peekAtPField(field);
-
-    if (!rf)
-        throwFieldNotFound(field);
-
-    SerializedTypeID const id = rf->getSType();
-
-    if (id == STI_NOTPRESENT)
-        return V();  // optional field not present
-
-    T const* cf = dynamic_cast<T const*>(rf);
-
-    if (!cf)
-        Throw<std::runtime_error>("Wrong field type");
-
-    return cf->value();
-}
-
-// Implementations for getting (most) fields that return by const reference.
-//
-// If an absent optional field is deserialized we don't have anything
-// obvious to return.  So we insist on having the call provide an
-// 'empty' value we return in that circumstance.
-template <typename T, typename V>
-V const&
-STObject::getFieldByConstRef(SField const& field, V const& empty) const
-{
-    STBase const* rf = peekAtPField(field);
-
-    if (!rf)
-        throwFieldNotFound(field);
-
-    SerializedTypeID const id = rf->getSType();
-
-    if (id == STI_NOTPRESENT)
-    {
-        // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter)
-        return empty;  // optional field not present
-    }
-
-    T const* cf = dynamic_cast<T const*>(rf);
-
-    if (!cf)
-        Throw<std::runtime_error>("Wrong field type");
-
-    return *cf;
-}
-
-// Implementation for setting most fields with a setValue() method.
-template <typename T, typename V>
-void
-STObject::setFieldUsingSetValue(SField const& field, V value)
-{
-    static_assert(!std::is_lvalue_reference_v<V>);
-
-    STBase* rf = getPField(field, true);
-
-    if (!rf)
-        throwFieldNotFound(field);
-
-    if (rf->getSType() == STI_NOTPRESENT)
-        rf = makeFieldPresent(field);
-
-    T* cf = dynamic_cast<T*>(rf);
-
-    if (!cf)
-        Throw<std::runtime_error>("Wrong field type");
-
-    cf->setValue(std::move(value));
-}
-
-// Implementation for setting fields using assignment
-template <typename T>
-void
-STObject::setFieldUsingAssignment(SField const& field, T const& value)
-{
-    STBase* rf = getPField(field, true);
-
-    if (!rf)
-        throwFieldNotFound(field);
-
-    if (rf->getSType() == STI_NOTPRESENT)
-        rf = makeFieldPresent(field);
-
-    T* cf = dynamic_cast<T*>(rf);
-
-    if (!cf)
-        Throw<std::runtime_error>("Wrong field type");
-
-    (*cf) = value;
-}
-
 // Implementation for peeking STObjects and STArrays
 template <typename T>
 T&
@@ -1341,12 +1248,10 @@ STObject::peekField(SField const& field)
     if (rf->getSType() == STI_NOTPRESENT)
         rf = makeFieldPresent(field);
 
-    T* cf = dynamic_cast<T*>(rf);
+    if (T* cf = dynamic_cast<T*>(rf))
+        return *cf;
 
-    if (!cf)
-        Throw<std::runtime_error>("Wrong field type");
-
-    return *cf;
+    throwWrongFieldType();
 }
 
 }  // namespace xrpl
