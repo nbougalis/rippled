@@ -1,114 +1,135 @@
 #pragma once
 
-#include <boost/regex.hpp>
-
+#include <charconv>
 #include <cstdint>
-#include <iomanip>
-#include <ios>
+#include <format>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <string_view>
-#include <tuple>
+#include <system_error>
+#include <utility>
 
 namespace xrpl::rpc {
 
-// CTID stands for Concise Transaction ID.
-//
-// The CTID comes from XLS-15d: Concise Transaction Identifier #34
+// A CTID (Concise Transaction ID) identifies a transaction by where it is,
+// rather than by its hash: the ledger that holds it, its index within that
+// ledger, and the network the ledger belongs to.
 //
 //   https://github.com/XRPLF/XRPL-Standards/discussions/34
 //
-// The Concise Transaction ID provides a way to identify a transaction
-// that includes which network the transaction was submitted to.
 
 /**
- * @brief Encodes ledger sequence, transaction index, and network ID into a CTID
- * string.
+ * The parts of a CTID.
  *
- * @param ledgerSeq  Ledger sequence number (max 0x0FFF'FFFF).
- * @param txnIndex   Transaction index within the ledger (max 0xFFFF).
- * @param networkID  Network identifier (max 0xFFFF).
- * @return Optional CTID string in uppercase hexadecimal, or std::nullopt if
- * inputs are out of range.
+ * A CTID is a 64-bit value: a 4-bit marker, then the ledger sequence in the
+ * rest of the upper 32 bits, then the transaction index and the network ID
+ * in 16 bits each.
  */
-inline std::optional<std::string>
-encodeCTID(uint32_t ledgerSeq, uint32_t txnIndex, uint32_t networkID) noexcept
+struct CTID
 {
-    static constexpr uint32_t kMaxLedgerSeq = 0x0FFF'FFFF;
-    static constexpr uint32_t kMaxTxnIndex = 0xFFFF;
-    static constexpr uint32_t kMaxNetworkId = 0xFFFF;
+    std::uint32_t ledgerSeq;
+    std::uint16_t txnIndex;
+    std::uint16_t networkID;
 
-    if (ledgerSeq > kMaxLedgerSeq || txnIndex > kMaxTxnIndex || networkID > kMaxNetworkId)
+    [[nodiscard]] friend constexpr bool
+    operator==(CTID, CTID) noexcept = default;
+};
+
+namespace ctid {
+
+/** The bits of a CTID that hold the marker. */
+inline constexpr std::uint64_t kMarkerMask = 0xF000'0000'0000'0000;
+
+/** The value of those bits in every CTID. */
+inline constexpr std::uint64_t kMarker = 0xC000'0000'0000'0000;
+
+/** The largest ledger sequence that fits beside the marker. */
+inline constexpr std::uint32_t kMaxLedgerSeq = ~kMarkerMask >> 32;
+
+/**
+ * Encodes a CTID.
+ *
+ * @param ledgerSeq The ledger sequence; at most kMaxLedgerSeq.
+ * @param txnIndex The index of the transaction in the ledger; at most 0xFFFF.
+ * @param networkID The network ID; at most 0xFFFF.
+ * @returns The CTID as 16 uppercase hexadecimal digits, or std::nullopt if
+ *          a value does not fit in the bits the format has for it.
+ */
+[[nodiscard]] inline std::optional<std::string>
+encodeCTID(std::uint32_t ledgerSeq, std::uint32_t txnIndex, std::uint32_t networkID)
+{
+    if (ledgerSeq > kMaxLedgerSeq || !std::in_range<std::uint16_t>(txnIndex) ||
+        !std::in_range<std::uint16_t>(networkID))
         return std::nullopt;
 
-    uint64_t const ctidValue = ((0xC000'0000ULL + static_cast<uint64_t>(ledgerSeq)) << 32) |
-        ((static_cast<uint64_t>(txnIndex) << 16) | networkID);
+    auto const value = kMarker | (std::uint64_t{ledgerSeq} << 32) |
+        (std::uint64_t{txnIndex} << 16) | std::uint64_t{networkID};
 
-    std::stringstream buffer;
-    buffer << std::hex << std::uppercase << std::setfill('0') << std::setw(16) << ctidValue;
-    return buffer.str();
+    // The marker occupies the top four bits and is never zero, so the value
+    // always has 16 hex digits by construction and needs no padding.
+    return std::format("{:X}", value);
 }
 
 /**
- * @brief Decodes a CTID string or integer into its component parts.
+ * Encodes a CTID from its parts.
  *
- * @tparam T  Type of the CTID input (string, string_view, char*, integral).
- * @param ctid  CTID value to decode.
- * @return Optional tuple of (ledgerSeq, txnIndex, networkID), or std::nullopt
- * if invalid.
+ * @param ctid The ledger sequence, transaction index and network ID.
+ * @returns The CTID as 16 uppercase hexadecimal digits, or std::nullopt if
+ *          the ledger sequence is larger than kMaxLedgerSeq.
  */
-template <typename T>
-inline std::optional<std::tuple<uint32_t, uint16_t, uint16_t>>
-decodeCTID(T const ctid) noexcept
+[[nodiscard]] inline std::optional<std::string>
+encodeCTID(CTID ctid)
 {
-    uint64_t ctidValue = 0;
-
-    if constexpr (
-        std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view> ||
-        std::is_same_v<T, char*> || std::is_same_v<T, char const*>)
-    {
-        std::string const ctidString(ctid);
-
-        if (ctidString.size() != 16)
-            return std::nullopt;
-
-        static boost::regex const kHexRegex("^[0-9A-Fa-f]{16}$");
-        if (!boost::regex_match(ctidString, kHexRegex))
-            return std::nullopt;
-
-        try
-        {
-            ctidValue = std::stoull(ctidString, nullptr, 16);
-        }
-        // LCOV_EXCL_START
-        catch (...)
-        {
-            // should be impossible to hit given the length/regex check
-            return std::nullopt;
-        }
-        // LCOV_EXCL_STOP
-    }
-    else if constexpr (std::is_integral_v<T>)
-    {
-        ctidValue = static_cast<uint64_t>(ctid);
-    }
-    else
-    {
-        return std::nullopt;
-    }
-
-    // Validate CTID prefix.
-    static constexpr uint64_t kCtidPrefixMask = 0xF000'0000'0000'0000ULL;
-    static constexpr uint64_t kCtidPrefix = 0xC000'0000'0000'0000ULL;
-    if ((ctidValue & kCtidPrefixMask) != kCtidPrefix)
-        return std::nullopt;
-
-    auto const ledgerSeq = static_cast<uint32_t>((ctidValue >> 32) & 0x0FFF'FFFF);
-    auto const txnIndex = static_cast<uint16_t>((ctidValue >> 16) & 0xFFFF);
-    auto const networkID = static_cast<uint16_t>(ctidValue & 0xFFFF);
-
-    return std::make_tuple(ledgerSeq, txnIndex, networkID);
+    return encodeCTID(ctid.ledgerSeq, ctid.txnIndex, ctid.networkID);
 }
+
+/**
+ * Decodes a CTID given as a number.
+ *
+ * @param ctid The CTID.
+ * @returns The parts of the CTID, or std::nullopt if the value does not
+ *          carry the marker.
+ */
+[[nodiscard]] constexpr std::optional<CTID>
+decodeCTID(std::uint64_t ctid) noexcept
+{
+    if ((ctid & kMarkerMask) != kMarker)
+        return std::nullopt;
+
+    return CTID{
+        .ledgerSeq = static_cast<std::uint32_t>((ctid & ~kMarkerMask) >> 32),
+        .txnIndex = static_cast<std::uint16_t>(ctid >> 16),
+        .networkID = static_cast<std::uint16_t>(ctid)};
+}
+
+/**
+ * Decodes a CTID given as text.
+ *
+ * @param ctid The CTID: exactly 16 hexadecimal digits, in either case.
+ * @returns The parts of the CTID, or std::nullopt if the text is not one.
+ */
+[[nodiscard]] inline std::optional<CTID>
+decodeCTID(std::string_view ctid) noexcept
+{
+    if (ctid.size() != 16)
+        return std::nullopt;
+
+    std::uint64_t value = 0;
+
+    auto const* const last = ctid.data() + ctid.size();
+    auto const [ptr, ec] = std::from_chars(ctid.data(), last, value, 16);
+
+    // Reject text that is not made up of hexadecimal digits only.
+    if (ec != std::errc{} || ptr != last)
+        return std::nullopt;
+
+    return decodeCTID(value);
+}
+
+}  // namespace ctid
+
+// Import the functions into the xrpl::rpc namespace
+using ctid::decodeCTID;
+using ctid::encodeCTID;
 
 }  // namespace xrpl::rpc

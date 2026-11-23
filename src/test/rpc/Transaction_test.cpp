@@ -35,7 +35,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <tuple>
 #include <vector>
 
 namespace xrpl {
@@ -563,15 +562,9 @@ class Transaction_test : public beast::unit_test::Suite
         BEAST_EXPECT(!rpc::encodeCTID(0x0FFF'FFFFUL, 0xFFFFU, 0x1'0000U));
 
         // Test case 5: Valid input values
-        auto const expected51 =
-            std::optional<std::tuple<int32_t, uint16_t, uint16_t>>(std::make_tuple(0, 0, 0));
-        BEAST_EXPECT(rpc::decodeCTID("C000000000000000") == expected51);
-        auto const expected52 =
-            std::optional<std::tuple<int32_t, uint16_t, uint16_t>>(std::make_tuple(1U, 2U, 3U));
-        BEAST_EXPECT(rpc::decodeCTID("C000000100020003") == expected52);
-        auto const expected53 = std::optional<std::tuple<int32_t, uint16_t, uint16_t>>(
-            std::make_tuple(13249191UL, 12911U, 49221U));
-        BEAST_EXPECT(rpc::decodeCTID("C0CA2AA7326FC045") == expected53);
+        BEAST_EXPECT((rpc::decodeCTID("C000000000000000") == rpc::CTID{0, 0, 0}));
+        BEAST_EXPECT((rpc::decodeCTID("C000000100020003") == rpc::CTID{1, 2, 3}));
+        BEAST_EXPECT((rpc::decodeCTID("C0CA2AA7326FC045") == rpc::CTID{13249191, 12911, 49221}));
 
         // Test case 6: ctid not a string or big int
         BEAST_EXPECT(!rpc::decodeCTID(0xCFF));
@@ -590,19 +583,11 @@ class Transaction_test : public beast::unit_test::Suite
 
         // Test case 11: Valid input values
         BEAST_EXPECT(
-            (rpc::decodeCTID(0xCFFF'FFFF'FFFF'FFFFULL) ==
-             std::optional<std::tuple<int32_t, uint16_t, uint16_t>>(
-                 std::make_tuple(0x0FFF'FFFFUL, 0xFFFFU, 0xFFFFU))));
+            (rpc::decodeCTID(0xCFFF'FFFF'FFFF'FFFFULL) == rpc::CTID{0x0FFF'FFFF, 0xFFFF, 0xFFFF}));
+        BEAST_EXPECT((rpc::decodeCTID(0xC000'0000'0000'0000ULL) == rpc::CTID{0, 0, 0}));
+        BEAST_EXPECT((rpc::decodeCTID(0xC000'0001'0002'0003ULL) == rpc::CTID{1, 2, 3}));
         BEAST_EXPECT(
-            (rpc::decodeCTID(0xC000'0000'0000'0000ULL) ==
-             std::optional<std::tuple<int32_t, uint16_t, uint16_t>>(std::make_tuple(0, 0, 0))));
-        BEAST_EXPECT(
-            (rpc::decodeCTID(0xC000'0001'0002'0003ULL) ==
-             std::optional<std::tuple<int32_t, uint16_t, uint16_t>>(std::make_tuple(1U, 2U, 3U))));
-        BEAST_EXPECT(
-            (rpc::decodeCTID(0xC0CA'2AA7'326F'C045ULL) ==
-             std::optional<std::tuple<int32_t, uint16_t, uint16_t>>(
-                 std::make_tuple(1324'9191UL, 12911U, 49221U))));
+            (rpc::decodeCTID(0xC0CA'2AA7'326F'C045ULL) == rpc::CTID{13249191, 12911, 49221}));
 
         // Test case 12: ctid not exactly 16 nibbles
         BEAST_EXPECT(!rpc::decodeCTID(0xC003'FFFF'FFFF'FFF));
@@ -614,6 +599,21 @@ class Transaction_test : public beast::unit_test::Suite
 
         // Test case 14: ctid doesn't start with a C nibble
         BEAST_EXPECT(!rpc::decodeCTID(0xFFFF'FFFF'FFFF'FFFFULL));
+
+        // Test case 15: encoding from the parts
+        BEAST_EXPECT(rpc::encodeCTID(rpc::CTID{1, 2, 3}) == expected13);
+        BEAST_EXPECT(rpc::encodeCTID(rpc::CTID{0x0FFF'FFFF, 0xFFFF, 0xFFFF}) == expected11);
+        BEAST_EXPECT(!rpc::encodeCTID(rpc::CTID{0x1000'0000, 0xFFFF, 0xFFFF}));
+
+        // Test case 16: decoding accepts either case, and what was decoded
+        // encodes back to the same CTID, in upper case
+        for (char const* text : {"C0CA2AA7326FC045", "c0ca2aa7326fc045", "C0ca2AA7326fC045"})
+        {
+            auto const decoded = rpc::decodeCTID(text);
+
+            if (BEAST_EXPECT(decoded.has_value()))
+                BEAST_EXPECT(rpc::encodeCTID(*decoded) == "C0CA2AA7326FC045");
+        }
     }
 
     void
