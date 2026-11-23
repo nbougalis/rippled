@@ -21,6 +21,7 @@
 #include <xrpl/protocol/Serializer.h>
 #include <xrpl/protocol/TER.h>
 #include <xrpl/protocol/TxMeta.h>
+#include <xrpl/protocol/TxMetaBuilder.h>
 #include <xrpl/protocol/XRPAmount.h>
 
 #include <cstddef>
@@ -55,7 +56,7 @@ ApplyStateTable::apply(RawView& to) const
             case Action::Modify:
                 to.rawReplace(sle);
                 break;
-        };
+        }
     }
 }
 
@@ -117,17 +118,11 @@ ApplyStateTable::apply(
     bool isDryRun,
     beast::Journal j)
 {
-    // Build metadata and insert
-    auto const sTx = std::make_shared<Serializer>();
-    tx.add(*sTx);
     std::shared_ptr<Serializer> sMeta;
     std::optional<TxMeta> metadata;
     if (!to.open() || isDryRun)
     {
-        TxMeta meta(tx.getTransactionID(), to.seq());
-
-        meta.setDeliveredAmount(deliver);
-        meta.setParentBatchID(parentBatchId);
+        TxMetaBuilder meta(tx.getTransactionID(), to.seq(), deliver, parentBatchId);
 
         Mods newMod;
         for (auto const& item : items_)
@@ -253,32 +248,33 @@ ApplyStateTable::apply(
             }
         }
 
+        metadata = std::move(meta).build(ter, to.txCount());
+
         if (!isDryRun)
         {
             // add any new modified nodes to the modification set
             for (auto const& mod : newMod)
                 to.rawReplace(mod.second);
-        }
 
-        sMeta = std::make_shared<Serializer>();
-        meta.addRaw(*sMeta, ter, to.txCount());
+            sMeta = std::make_shared<Serializer>();
+            metadata->getAsObject().add(*sMeta);
+        }
 
         // VFALCO For diagnostics do we want to show
         //        metadata even when the base view is open?
-        JLOG(j.trace()) << "metadata " << meta.getJson(JsonOptions::Values::None);
-
-        metadata = std::move(meta);
+        JLOG(j.trace()) << "metadata " << metadata->getJson(JsonOptions::Values::None);
     }
 
     if (!isDryRun)
     {
+        auto const sTx = std::make_shared<Serializer>();
+        tx.add(*sTx);
+
         to.rawTxInsert(tx.getTransactionID(), sTx, sMeta);
         apply(to);
     }
     return metadata;
 }
-
-//---
 
 bool
 ApplyStateTable::exists(ReadView const& base, Keylet const& k) const
@@ -351,7 +347,7 @@ ApplyStateTable::read(ReadView const& base, Keylet const& k) const
         case Action::Insert:
         case Action::Modify:
             break;
-    };
+    }
     if (!k.check(*sle))
         return nullptr;
     return sle;
@@ -385,7 +381,7 @@ ApplyStateTable::peek(ReadView const& base, Keylet const& k)
         case Action::Insert:
         case Action::Modify:
             break;
-    };
+    }
     if (!k.check(*sle))
         return nullptr;
     return sle;
@@ -404,7 +400,7 @@ ApplyStateTable::erase(ReadView const& base, SLE::Ref sle)
     {
         case Action::Erase:
             Throw<std::logic_error>("ApplyStateTable::erase: double erase");
-            break;
+
         case Action::Insert:
             items_.erase(iter);
             break;
@@ -428,7 +424,7 @@ ApplyStateTable::rawErase(ReadView const& base, SLE::Ref sle)
     {
         case Action::Erase:
             Throw<std::logic_error>("ApplyStateTable::rawErase: double erase");
-            break;
+
         case Action::Insert:
             items_.erase(result.first);
             break;
@@ -512,14 +508,14 @@ ApplyStateTable::update(ReadView const& base, SLE::Ref sle)
     {
         case Action::Erase:
             Throw<std::logic_error>("ApplyStateTable::update: erased");
-            break;
+
         case Action::Cache:
             item.first = Action::Modify;
             break;
         case Action::Insert:
         case Action::Modify:
             break;
-    };
+    }
 }
 
 void
@@ -532,7 +528,7 @@ ApplyStateTable::destroyXRP(XRPAmount const& fee)
 
 // Insert this transaction to the SLE's threading list
 void
-ApplyStateTable::threadItem(TxMeta& meta, SLE::Ref sle)
+ApplyStateTable::threadItem(TxMetaBuilder& meta, SLE::Ref sle)
 {
     auto const txID = meta.getTxID();
     auto const ledgerSeq = meta.getLgrSeq();
@@ -562,9 +558,8 @@ ApplyStateTable::threadItem(TxMeta& meta, SLE::Ref sle)
 
     if (!oldPrevTxID.isZero())
     {
-        auto& node = meta.getAffectedNode(sle, sfModifiedNode);
-
-        if (node.getFieldIndex(sfPreviousTxnID) == -1)
+        if (auto& node = meta.getAffectedNode(sle, sfModifiedNode);
+            node.getFieldIndex(sfPreviousTxnID) == -1)
         {
             XRPL_ASSERT(
                 node.getFieldIndex(sfPreviousTxnLgrSeq) == -1,
@@ -627,7 +622,7 @@ ApplyStateTable::getForMod(ReadView const& base, key_type const& key, Mods& mods
 void
 ApplyStateTable::threadTx(
     ReadView const& base,
-    TxMeta& meta,
+    TxMetaBuilder& meta,
     AccountID const& to,
     Mods& mods,
     beast::Journal j)
@@ -646,7 +641,7 @@ ApplyStateTable::threadTx(
 void
 ApplyStateTable::threadOwners(
     ReadView const& base,
-    TxMeta& meta,
+    TxMetaBuilder& meta,
     SLE::ConstRef sle,
     Mods& mods,
     beast::Journal j)

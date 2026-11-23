@@ -1,6 +1,5 @@
 #include <xrpl/protocol/TxMeta.h>
 
-#include <xrpl/basics/Blob.h>
 #include <xrpl/basics/Slice.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/contract.h>
@@ -12,9 +11,8 @@
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STAccount.h>
 #include <xrpl/protocol/STAmount.h>
+#include <xrpl/protocol/STArray.h>
 #include <xrpl/protocol/STBitString.h>
-#include <xrpl/protocol/STInteger.h>
-#include <xrpl/protocol/STLedgerEntry.h>
 #include <xrpl/protocol/STObject.h>
 #include <xrpl/protocol/Serializer.h>
 #include <xrpl/protocol/TER.h>
@@ -24,68 +22,47 @@
 
 #include <cstdint>
 #include <flat_set>
-#include <limits>
+#include <optional>
 #include <stdexcept>
+#include <utility>
 
 namespace xrpl {
 
-TxMeta::TxMeta(UInt256 const& transactionID, std::uint32_t ledger)
+TxMeta::TxMeta(
+    UInt256 const& transactionID,
+    std::uint32_t ledger,
+    std::uint32_t index,
+    TER result,
+    std::optional<STAmount> deliveredAmount,
+    std::optional<UInt256> parentBatchID,
+    STArray nodes)
     : transactionID_(transactionID)
     , ledgerSeq_(ledger)
-    , index_(std::numeric_limits<std::uint32_t>::max())
-    , nodes_(sfAffectedNodes, 32)
+    , index_(index)
+    , result_(result)
+    , deliveredAmount_(std::move(deliveredAmount))
+    , parentBatchID_(parentBatchID)
+    , nodes_(std::move(nodes))
 {
 }
 
 TxMeta::TxMeta(UInt256 const& txid, std::uint32_t ledger, STObject const& obj)
-    : TxMeta(txid, ledger)
+    : TxMeta(
+          txid,
+          ledger,
+          obj.getFieldU32(sfTransactionIndex),
+          TER::fromInt(obj.getFieldU8(sfTransactionResult)),
+          obj[~sfDeliveredAmount],
+          obj[~sfParentBatchID],
+          obj.getFieldArray(sfAffectedNodes))
 {
-    result_ = TER::fromInt(obj.getFieldU8(sfTransactionResult));
-
-    if (!isTesSuccess(*result_) && !isTecClaim(*result_))
+    if (!isTesSuccess(result_) && !isTecClaim(result_))
         Throw<std::runtime_error>("TxMeta::TxMeta : invalid TER result");
-
-    index_ = obj.getFieldU32(sfTransactionIndex);
-
-    // Assignment (as opposed to copy construction) preserves the field name
-    // that nodes_ was constructed with; see STBase::operator=.
-    nodes_ = obj.getFieldArray(sfAffectedNodes);
-
-    setAdditionalFields(obj);
 }
 
 TxMeta::TxMeta(UInt256 const& txid, std::uint32_t ledger, Slice data)
     : TxMeta(txid, ledger, STObject{SerialIter{data}, sfMetadata})
 {
-}
-
-static STObject*
-findAffectedNode(STArray& nodes, UInt256 const& index) noexcept
-{
-    for (auto& n : nodes)
-    {
-        if (n.getFieldH256(sfLedgerIndex) == index)
-            return &n;
-    }
-
-    return nullptr;
-}
-
-void
-TxMeta::setAffectedNode(UInt256 const& node, SField const& type, std::uint16_t nodeType)
-{
-    // make sure the node exists and force its type
-    if (auto obj = findAffectedNode(nodes_, node))
-    {
-        obj->setFName(type);
-        obj->setFieldU16(sfLedgerEntryType, nodeType);
-        return;
-    }
-
-    nodes_.emplaceBack(type, [&](STObject& obj) {
-        obj[sfLedgerIndex] = node;
-        obj[sfLedgerEntryType] = nodeType;
-    });
 }
 
 std::flat_set<AccountID>
@@ -98,7 +75,7 @@ TxMeta::getAffectedAccounts() const
     for (auto const& node : nodes_)
     {
         int const index =
-            node.getFieldIndex((node.getFName() == sfCreatedNode) ? sfNewFields : sfFinalFields);
+            node.getFieldIndex(node.getFName() == sfCreatedNode ? sfNewFields : sfFinalFields);
 
         if (index != -1)
         {
@@ -115,8 +92,8 @@ TxMeta::getAffectedAccounts() const
                             list.insert(sa->value());
                     }
                     else if (
-                        (field.getFName() == sfLowLimit) || (field.getFName() == sfHighLimit) ||
-                        (field.getFName() == sfTakerPays) || (field.getFName() == sfTakerGets))
+                        field.getFName() == sfLowLimit || field.getFName() == sfHighLimit ||
+                        field.getFName() == sfTakerPays || field.getFName() == sfTakerGets)
                     {
                         auto lim = dynamic_cast<STAmount const*>(&field);
                         XRPL_ASSERT(
@@ -126,20 +103,16 @@ TxMeta::getAffectedAccounts() const
 
                         if (lim != nullptr)
                         {
-                            auto const issuer = lim->getIssuer();
-
-                            if (issuer.isNonZero())
+                            if (auto const issuer = lim->getIssuer(); issuer.isNonZero())
                                 list.insert(issuer);
                         }
                     }
                     else if (field.getFName() == sfMPTokenIssuanceID)
                     {
-                        auto mptID = dynamic_cast<STUInt192 const*>(&field);
-                        if (mptID != nullptr)
+                        if (auto mptID = dynamic_cast<STUInt192 const*>(&field))
                         {
-                            auto const issuer = MPTIssue(mptID->value()).getIssuer();
-
-                            if (issuer.isNonZero())
+                            if (auto const issuer = MPTIssue(mptID->value()).getIssuer();
+                                issuer.isNonZero())
                                 list.insert(issuer);
                         }
                     }
@@ -159,7 +132,7 @@ TxMeta::getAffectedMPTs() const
     for (auto const& it : nodes_)
     {
         int const index =
-            it.getFieldIndex((it.getFName() == sfCreatedNode) ? sfNewFields : sfFinalFields);
+            it.getFieldIndex(it.getFName() == sfCreatedNode ? sfNewFields : sfFinalFields);
 
         if (index != -1)
         {
@@ -179,13 +152,13 @@ TxMeta::getAffectedMPTs() const
                 for (auto const& field : *inner)
                 {
                     if (auto mptID = dynamic_cast<STUInt192 const*>(&field);
-                        field.getFName() == sfMPTokenIssuanceID && (mptID != nullptr))
+                        field.getFName() == sfMPTokenIssuanceID && mptID != nullptr)
                     {
                         list.insert(mptID->value());
                     }
                     else if (
                         auto amount = dynamic_cast<STAmount const*>(&field);
-                        (amount != nullptr) && amount->holds<MPTIssue>())
+                        amount != nullptr && amount->holds<MPTIssue>())
                     {
                         list.insert(amount->get<MPTIssue>().getMptID());
                     }
@@ -197,40 +170,11 @@ TxMeta::getAffectedMPTs() const
     return list;
 }
 
-STObject&
-TxMeta::getAffectedNode(std::shared_ptr<SLE> const& node, SField const& type)
-{
-    UInt256 const& index = node->key();
-
-    if (auto ret = findAffectedNode(nodes_, index))
-        return *ret;
-
-    return nodes_.emplaceBack(type, [&](STObject& obj) {
-        obj[sfLedgerIndex] = index;
-        obj[sfLedgerEntryType] = node->getFieldU16(sfLedgerEntryType);
-    });
-}
-
-STObject&
-TxMeta::getAffectedNode(UInt256 const& node)
-{
-    if (auto ret = findAffectedNode(nodes_, node))
-        return *ret;
-
-    // LCOV_EXCL_START
-    UNREACHABLE("xrpl::TxMeta::getAffectedNode(UInt256) : node not found");
-    Throw<std::runtime_error>("Affected node not found");
-    // LCOV_EXCL_STOP
-}
-
 STObject
 TxMeta::getAsObject() const
 {
-    if (!result_)
-        logicError("TxMeta::getAsObject : result not set");
-
     return STObject(sfTransactionMetaData, [&](STObject& md) {
-        md.setFieldU8(sfTransactionResult, checkedCast<std::uint8_t>(TERtoInt(*result_)));
+        md.setFieldU8(sfTransactionResult, checkedCast<std::uint8_t>(TERtoInt(result_)));
         md.setFieldU32(sfTransactionIndex, index_);
         md.emplaceBack(nodes_);
 
@@ -240,25 +184,6 @@ TxMeta::getAsObject() const
         if (parentBatchID_.has_value())
             md.setFieldH256(sfParentBatchID, *parentBatchID_);
     });
-}
-
-void
-TxMeta::addRaw(Serializer& s, TER result, std::uint32_t index)
-{
-    XRPL_ASSERT(
-        isTesSuccess(result) || isTecClaim(result), "xrpl::TxMeta::addRaw : valid TER input");
-
-    if (result_)
-        logicError("TxMeta::addRaw : result already set");
-
-    result_ = result;
-    index_ = index;
-
-    nodes_.sort([](STObject const& o1, STObject const& o2) {
-        return o1[sfLedgerIndex] < o2[sfLedgerIndex];
-    });
-
-    getAsObject().add(s);
 }
 
 }  // namespace xrpl

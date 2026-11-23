@@ -13,6 +13,7 @@
 #include <xrpl/protocol/STTx.h>
 #include <xrpl/protocol/TER.h>
 #include <xrpl/protocol/TxMeta.h>
+#include <xrpl/protocol/TxMetaBuilder.h>
 #include <xrpl/protocol/XRPAmount.h>
 
 #include <cstddef>
@@ -118,18 +119,18 @@ private:
     using Mods = HashMap<key_type, SLE::pointer>;
 
     static void
-    threadItem(TxMeta& meta, SLE::Ref to);
+    threadItem(TxMetaBuilder& meta, SLE::Ref to);
 
     SLE::pointer
     getForMod(ReadView const& base, key_type const& key, Mods& mods, beast::Journal j);
 
     void
-    threadTx(ReadView const& base, TxMeta& meta, AccountID const& to, Mods& mods, beast::Journal j);
+    threadTx(ReadView const& base, TxMetaBuilder& meta, AccountID const& to, Mods& mods, beast::Journal j);
 
     void
     threadOwners(
         ReadView const& base,
-        TxMeta& meta,
+        TxMetaBuilder& meta,
         SLE::ConstRef sle,
         Mods& mods,
         beast::Journal j);
