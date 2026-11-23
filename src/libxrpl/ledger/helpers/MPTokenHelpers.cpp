@@ -1068,7 +1068,7 @@ availableMPTAmount(ReadView const& view, MPTID const& mptID)
 {
     auto const sle = view.read(keylet::mptokenIssuance(mptID));
     if (!sle)
-        Throw<std::runtime_error>(transHuman(tecINTERNAL));
+        Throw<std::runtime_error>(std::string{transHuman(tecINTERNAL)});
     return availableMPTAmount(*sle);
 }
 

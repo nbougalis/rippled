@@ -105,12 +105,12 @@ public:
      * Sorts the affected nodes by key and returns the metadata. Call this
      * once all affected nodes have been recorded; it consumes the builder.
      *
-     * @param result The transaction's result; must be tes or tec.
+     * @param result The transaction's result.
      * @param index The transaction's position within the ledger.
      * @returns The finished metadata.
      */
     [[nodiscard]] TxMeta
-    build(TER result, std::uint32_t index) &&;
+    build(TransactionResult result, std::uint32_t index) &&;
 };
 
 }  // namespace xrpl

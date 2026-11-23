@@ -737,13 +737,61 @@ private:
     void
     processClusterTimer();
 
-    MultiApiJson
+    /**
+     * Builds the JSON that is published for a proposed transaction.
+     *
+     * @param transaction The transaction.
+     * @param ledger The open ledger it was applied to.
+     * @param result The result the engine gave it.
+     * @returns The JSON, for each API version.
+     */
+    [[nodiscard]] MultiApiJson
     transJson(
         std::shared_ptr<STTx const> const& transaction,
-        TER result,
-        bool validated,
         std::shared_ptr<ReadView const> const& ledger,
-        std::optional<std::reference_wrapper<TxMeta const>> meta);
+        TER result);
+
+    /**
+     * Builds the JSON that is published for an accepted or validated
+     * transaction.
+     *
+     * The result is the one recorded in the metadata.  If this program has
+     * no code for it, engine_result and engine_result_message are empty.
+     *
+     * @param transaction The transaction.
+     * @param ledger The ledger that contains it.
+     * @param meta The metadata of the transaction.
+     * @returns The JSON, for each API version.
+     */
+    [[nodiscard]] MultiApiJson
+    transJson(
+        std::shared_ptr<STTx const> const& transaction,
+        std::shared_ptr<ReadView const> const& ledger,
+        TxMeta const& meta);
+
+    /**
+     * Builds the JSON that is published for a transaction.
+     *
+     * The part that the two overloads above have in common.  They work out
+     * the token, code and message, because the result of a proposed
+     * transaction and that of a validated one are of different types.
+     *
+     * @param transaction The transaction.
+     * @param ledger The ledger the transaction is in, or was applied to.
+     * @param meta The metadata of the transaction (nullptr if it is only proposed).
+     * @param code The numeric value of the result.
+     * @param token The token of the result, e.g. "tesSUCCESS".
+     * @param message The human-readable description of the result.
+     * @returns The JSON, for each API version.
+     */
+    [[nodiscard]] MultiApiJson
+    transJsonImpl(
+        std::shared_ptr<STTx const> const& transaction,
+        std::shared_ptr<ReadView const> const& ledger,
+        TxMeta const* meta,
+        int code,
+        std::string_view token,
+        std::string_view message);
 
     void
     pubValidatedTransaction(
@@ -3280,7 +3328,7 @@ NetworkOPsImp::pubProposedTransaction(
     if (transaction->isFlag(tfInnerBatchTxn))
         return;
 
-    MultiApiJson const jvObj = transJson(transaction, result, false, ledger, std::nullopt);
+    MultiApiJson const jvObj = transJson(transaction, ledger, result);
 
     {
         // Hold each locked subscriber alive until after streamLock_ is
@@ -3497,21 +3545,24 @@ NetworkOPsImp::getBookSubscribersCount()
     return total;
 }
 
-// This routine should only be used to publish accepted or validated
-// transactions.
+// Builds the JSON that is published for a transaction.
+//
+// meta is null for a proposed transaction, and points to the transaction's
+// metadata once it is accepted or validated.  token, code and message
+// describe the result; the caller works them out, because the result of a
+// proposed transaction and that of a validated one are of different types.
 MultiApiJson
-NetworkOPsImp::transJson(
+NetworkOPsImp::transJsonImpl(
     std::shared_ptr<STTx const> const& transaction,
-    TER result,
-    bool validated,
     std::shared_ptr<ReadView const> const& ledger,
-    std::optional<std::reference_wrapper<TxMeta const>> meta)
+    TxMeta const* meta,
+    int code,
+    std::string_view token,
+    std::string_view message)
 {
-    json::Value jvObj(json::ValueType::Object);
-    std::string sToken;
-    std::string sHuman;
+    bool const validated = meta != nullptr;
 
-    transResultInfo(result, sToken, sHuman);
+    json::Value jvObj(json::ValueType::Object);
 
     jvObj[jss::type] = "transaction";
     // NOTE jvObj is not a finished object for either API version. After
@@ -3519,10 +3570,10 @@ NetworkOPsImp::transJson(
     // done in a loop, near the end of this function.
     jvObj[jss::transaction] = transaction->getJson(JsonOptions::Values::DisableApiPriorV2, false);
 
-    if (meta)
+    if (meta != nullptr)
     {
-        jvObj[jss::meta] = meta->get().getJson(JsonOptions::Values::None);
-        rpc::insertAllSyntheticInJson(jvObj[jss::meta], *ledger, transaction, meta->get());
+        jvObj[jss::meta] = meta->getJson(JsonOptions::Values::None);
+        rpc::insertAllSyntheticInJson(jvObj[jss::meta], *ledger, transaction, *meta);
     }
 
     // add CTID where the needed data for it exists
@@ -3538,6 +3589,7 @@ NetworkOPsImp::transJson(
             ctid)
             jvObj[jss::ctid] = *ctid;
     }
+
     if (!ledger->open())
         jvObj[jss::ledger_hash] = to_string(ledger->header().hash);
 
@@ -3557,9 +3609,9 @@ NetworkOPsImp::transJson(
     }
 
     jvObj[jss::status] = validated ? "closed" : "proposed";
-    jvObj[jss::engine_result] = sToken;
-    jvObj[jss::engine_result_code] = result;
-    jvObj[jss::engine_result_message] = sHuman;
+    jvObj[jss::engine_result] = token;
+    jvObj[jss::engine_result_code] = code;
+    jvObj[jss::engine_result_message] = message;
 
     if (transaction->getTxnType() == ttOFFER_CREATE)
     {
@@ -3601,6 +3653,33 @@ NetworkOPsImp::transJson(
     return multiObj;
 }
 
+MultiApiJson
+NetworkOPsImp::transJson(
+    std::shared_ptr<STTx const> const& transaction,
+    std::shared_ptr<ReadView const> const& ledger,
+    TER result)
+{
+    return transJsonImpl(
+        transaction, ledger, nullptr, TERtoInt(result), transToken(result), transHuman(result));
+}
+
+MultiApiJson
+NetworkOPsImp::transJson(
+    std::shared_ptr<STTx const> const& transaction,
+    std::shared_ptr<ReadView const> const& ledger,
+    TxMeta const& meta)
+{
+    auto const result = meta.getResult();
+
+    return transJsonImpl(
+        transaction,
+        ledger,
+        &meta,
+        TERtoInt(result),
+        transToken(result, {}),
+        transHuman(result, {}));
+}
+
 void
 NetworkOPsImp::pubValidatedTransaction(
     std::shared_ptr<ReadView const> const& ledger,
@@ -3610,9 +3689,7 @@ NetworkOPsImp::pubValidatedTransaction(
     auto const& stTxn = transaction.getTxn();
 
     // Create two different Json objects, for different API versions
-    auto const metaRef = std::ref(transaction.getMeta());
-    auto const trResult = transaction.getResult();
-    MultiApiJson const jvObj = transJson(stTxn, trResult, true, ledger, metaRef);
+    MultiApiJson const jvObj = transJson(stTxn, ledger, transaction.getMeta());
 
     {
         // Hold each locked subscriber alive until after streamLock_ is
@@ -3850,9 +3927,7 @@ NetworkOPsImp::pubAccountTransaction(
         auto const& stTxn = transaction.getTxn();
 
         // Create two different Json objects, for different API versions
-        auto const metaRef = std::ref(transaction.getMeta());
-        auto const trResult = transaction.getResult();
-        MultiApiJson jvObj = transJson(stTxn, trResult, true, ledger, metaRef);
+        MultiApiJson jvObj = transJson(stTxn, ledger, transaction.getMeta());
 
         for (InfoSub::Ref isrListener : notify)
         {
@@ -3929,7 +4004,7 @@ NetworkOPsImp::pubProposedAccountTransaction(
     if (!notify.empty())
     {
         // Create two different Json objects, for different API versions
-        MultiApiJson const jvObj = transJson(tx, result, false, ledger, std::nullopt);
+        MultiApiJson const jvObj = transJson(tx, ledger, result);
 
         for (InfoSub::Ref isrListener : notify)
         {
@@ -4442,9 +4517,7 @@ NetworkOPsImp::addAccountHistoryJob(SubAccountHistoryInfoWeak subInfo)
                         // LCOV_EXCL_STOP
                     }
 
-                    auto const ref = std::ref(*meta);
-                    auto const trR = meta->getResultTER();
-                    MultiApiJson jvTx = transJson(stTxn, trR, true, curTxLedger, ref);
+                    MultiApiJson jvTx = transJson(stTxn, curTxLedger, *meta);
 
                     jvTx.set(jss::account_history_tx_index, txHistoryIndex--);
                     if (i + 1 == numTxns || txns[i + 1].first->getLedger() != tx->getLedger())

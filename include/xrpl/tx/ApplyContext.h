@@ -107,8 +107,12 @@ public:
 
     /**
      * Apply the transaction result to the base.
+     *
+     * @param result The transaction's result, as it will be recorded.
+     * @returns The metadata, if any was built.
      */
-    std::optional<TxMeta> apply(TER);
+    [[nodiscard]] std::optional<TxMeta>
+    apply(TransactionResult result);
 
     /**
      * Get the number of unapplied changes.

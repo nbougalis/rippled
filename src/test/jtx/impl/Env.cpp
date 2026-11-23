@@ -395,7 +395,7 @@ Env::parseResult(json::Value const& jr)
         auto const& result = jr[jss::result];
         if (result.isMember(jss::engine_result_code))
         {
-            parsed.ter = TER::fromInt(result[jss::engine_result_code].asInt());
+            parsed.ter = knownResult(result[jss::engine_result_code].asInt());
             parsed.rpcCode.emplace(RpcSuccess);
         }
         else
@@ -490,9 +490,8 @@ Env::postconditions(
         (jt.ter && parsed.ter &&
          !test.expect(
              *parsed.ter == *jt.ter,
-             "apply " + locStr + ": Got " + transToken(*parsed.ter) + " (" +
-                 transHuman(*parsed.ter) + "); Expected " + transToken(*jt.ter) + " (" +
-                 transHuman(*jt.ter) + ")"));
+             "apply " + locStr + ": Got " + std::string{transToken(*parsed.ter)} + "; Expected " +
+                 std::string{transToken(*jt.ter)}));
     using namespace std::string_literals;
     bad =
         (jt.rpcCode &&

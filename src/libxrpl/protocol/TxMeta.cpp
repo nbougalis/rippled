@@ -32,7 +32,7 @@ TxMeta::TxMeta(
     UInt256 const& transactionID,
     std::uint32_t ledger,
     std::uint32_t index,
-    TER result,
+    TransactionResult result,
     std::optional<STAmount> deliveredAmount,
     std::optional<UInt256> parentBatchID,
     STArray nodes)
@@ -51,7 +51,7 @@ TxMeta::TxMeta(UInt256 const& txid, std::uint32_t ledger, STObject const& obj)
           txid,
           ledger,
           obj.getFieldU32(sfTransactionIndex),
-          TER::fromInt(obj.getFieldU8(sfTransactionResult)),
+          TransactionResult{obj.getFieldU8(sfTransactionResult)},
           obj[~sfDeliveredAmount],
           obj[~sfParentBatchID],
           obj.getFieldArray(sfAffectedNodes))
@@ -174,7 +174,7 @@ STObject
 TxMeta::getAsObject() const
 {
     return STObject(sfTransactionMetaData, [&](STObject& md) {
-        md.setFieldU8(sfTransactionResult, checkedCast<std::uint8_t>(TERtoInt(result_)));
+        md.setFieldU8(sfTransactionResult, result_.value());
         md.setFieldU32(sfTransactionIndex, index_);
         md.emplaceBack(nodes_);
 

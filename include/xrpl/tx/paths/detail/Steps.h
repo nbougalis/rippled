@@ -495,11 +495,11 @@ class FlowException : public std::runtime_error
 public:
     TER ter;
 
-    FlowException(TER t, std::string const& msg) : std::runtime_error(msg), ter(t)
+    FlowException(TER t, std::string_view msg) : std::runtime_error(std::string{msg}), ter(t)
     {
     }
 
-    explicit FlowException(TER t) : std::runtime_error(transHuman(t)), ter(t)
+    explicit FlowException(TER t) : FlowException(t, transHuman(t))
     {
     }
 };

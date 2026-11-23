@@ -257,10 +257,9 @@ ServerDefinitions::ServerDefinitions() : defs_{json::ValueType::Object}
     // populate TER code names and values
     defs_[jss::TRANSACTION_RESULTS] = json::ValueType::Object;
 
-    for (auto const& [code, terInfo] : transResults())
-    {
-        defs_[jss::TRANSACTION_RESULTS][terInfo.first] = code;
-    }
+    forEachTransResult([&](auto const& info) {
+        defs_[jss::TRANSACTION_RESULTS][std::string{info.token}] = info.value;
+    });
 
     // populate TxType names and values
     defs_[jss::TRANSACTION_TYPES] = json::ValueType::Object;

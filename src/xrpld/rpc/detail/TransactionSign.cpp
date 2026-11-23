@@ -796,14 +796,9 @@ transactionFormatResultImpl(Transaction::pointer tpTrans, unsigned apiVersion)
 
         if (temUNCERTAIN != tpTrans->getResult())
         {
-            std::string sToken;
-            std::string sHuman;
-
-            transResultInfo(tpTrans->getResult(), sToken, sHuman);
-
-            jvResult[jss::engine_result] = sToken;
+            jvResult[jss::engine_result] = transToken(tpTrans->getResult());
             jvResult[jss::engine_result_code] = tpTrans->getResult();
-            jvResult[jss::engine_result_message] = sHuman;
+            jvResult[jss::engine_result_message] = transHuman(tpTrans->getResult());
         }
     }
     catch (std::exception&)

@@ -60,7 +60,7 @@ public:
     apply(
         OpenView& to,
         STTx const& tx,
-        TER ter,
+        TransactionResult result,
         std::optional<STAmount> const& deliver,
         std::optional<UInt256 const> const& parentBatchId,
         bool isDryRun,

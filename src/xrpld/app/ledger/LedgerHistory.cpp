@@ -213,7 +213,7 @@ logMetadataDifference(
         auto const& validNodes = validMetaData->getNodes();
         auto const& builtNodes = builtMetaData->getNodes();
 
-        bool const resultDiff = validMetaData->getResultTER() != builtMetaData->getResultTER();
+        bool const resultDiff = validMetaData->getResult() != builtMetaData->getResult();
 
         bool const indexDiff = validMetaData->getIndex() != builtMetaData->getIndex();
 

@@ -112,7 +112,7 @@ std::optional<TxMeta>
 ApplyStateTable::apply(
     OpenView& to,
     STTx const& tx,
-    TER ter,
+    TransactionResult result,
     std::optional<STAmount> const& deliver,
     std::optional<UInt256 const> const& parentBatchId,
     bool isDryRun,
@@ -248,7 +248,7 @@ ApplyStateTable::apply(
             }
         }
 
-        metadata = std::move(meta).build(ter, to.txCount());
+        metadata = std::move(meta).build(result, to.txCount());
 
         if (!isDryRun)
         {
@@ -273,6 +273,7 @@ ApplyStateTable::apply(
         to.rawTxInsert(tx.getTransactionID(), sTx, sMeta);
         apply(to);
     }
+
     return metadata;
 }
 

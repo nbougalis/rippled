@@ -77,10 +77,10 @@ public:
         return txn_->getTxnType();
     }
 
-    [[nodiscard]] TER
+    [[nodiscard]] TransactionResult
     getResult() const
     {
-        return meta_.getResultTER();
+        return meta_.getResult();
     }
 
     [[nodiscard]] std::uint32_t

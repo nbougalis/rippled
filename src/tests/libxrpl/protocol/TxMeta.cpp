@@ -35,7 +35,7 @@ TEST(TxMeta, build)
     EXPECT_EQ(meta.getTxID(), txID);
     EXPECT_EQ(meta.getLgrSeq(), 5u);
     EXPECT_EQ(meta.getIndex(), 3u);
-    EXPECT_EQ(meta.getResultTER(), tecCLAIM);
+    EXPECT_TRUE(meta.getResult() == tecCLAIM);
     EXPECT_FALSE(meta.getDeliveredAmount().has_value());
 
     auto const& nodes = meta.getNodes();
@@ -52,7 +52,7 @@ TEST(TxMeta, build)
     TxMeta const parsed{txID, 5, s.slice()};
 
     EXPECT_EQ(parsed.getIndex(), 3u);
-    EXPECT_EQ(parsed.getResultTER(), tecCLAIM);
+    EXPECT_TRUE(parsed.getResult() == tecCLAIM);
     EXPECT_TRUE(parsed.getAsObject() == meta.getAsObject());
 }
 

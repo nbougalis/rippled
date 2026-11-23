@@ -1700,7 +1700,9 @@ Transactor::operator()()
 
     // We ran through the invariant checker, which can, in some cases,
     // return a tef error code. Don't apply the transaction in that case.
-    if (!isTecClaim(result) && !isTesSuccess(result))
+    auto const stored = storedResult(result);
+
+    if (!stored)
         return logger(result, false);
 
     std::optional<TxMeta> metadata;
@@ -1722,7 +1724,7 @@ Transactor::operator()()
         ctx_.destroyXRP(fee);
 
     // Once we call apply, we will no longer be able to look at view()
-    metadata = ctx_.apply(result);
+    metadata = ctx_.apply(*stored);
 
     if ((ctx_.flags() & ApplyFlags::DryRun) != ApplyFlags::None)
         return logger(result, false, std::move(metadata));

@@ -49,7 +49,7 @@ public:
     apply(
         OpenView& to,
         STTx const& tx,
-        TER ter,
+        TransactionResult result,
         std::optional<UInt256> parentBatchId,
         bool isDryRun,
         beast::Journal j);

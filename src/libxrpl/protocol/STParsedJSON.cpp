@@ -427,16 +427,15 @@ parseLeaf(
                     {
                         if (field == sfTransactionResult)
                         {
-                            auto ter = transCode(strValue);
+                            auto const stored = storedResult(strValue);
 
-                            if (!ter || TERtoInt(*ter) < kMinValue || TERtoInt(*ter) > kMaxValue)
+                            if (!stored)
                             {
                                 error = outOfRange(jsonName, fieldName);
                                 return ret;
                             }
 
-                            ret = detail::makeStvar<STUInt8>(
-                                field, static_cast<std::uint8_t>(TERtoInt(*ter)));
+                            ret = detail::makeStvar<STUInt8>(field, stored->value());
                         }
                         else
                         {

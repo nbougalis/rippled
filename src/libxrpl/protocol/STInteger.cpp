@@ -23,10 +23,9 @@ specializedText(SField const& field, std::uint32_t value, std::string def)
 {
     if (field == sfTransactionResult)
     {
-        std::string token, human;
-
-        if (transResultInfo(TER::fromInt(checkedCast<int>(value)), token, human))
-            return human;
+        // The field itself is an STI_UINT8, so its value fits std::uint8_t.
+        if (auto const result = knownResult(checkedCast<std::uint8_t>(value)))
+            return std::string{transHuman(*result)};
 
         // LCOV_EXCL_START
         JLOG(debugLog().error()) << "Unknown result code in metadata: " << value;
@@ -35,14 +34,12 @@ specializedText(SField const& field, std::uint32_t value, std::string def)
     else if (field == sfLedgerEntryType)
     {
         if (auto const* item =
-                LedgerFormats::getInstance().findByType(checkedCast<LedgerEntryType>(value));
-            item != nullptr)
+                LedgerFormats::getInstance().findByType(checkedCast<LedgerEntryType>(value)))
             return item->getName();
     }
     else if (field == sfTransactionType)
     {
-        if (auto const* item = TxFormats::getInstance().findByType(checkedCast<TxType>(value));
-            item != nullptr)
+        if (auto const* item = TxFormats::getInstance().findByType(checkedCast<TxType>(value)))
             return item->getName();
     }
     else if (field == sfPermissionValue)
@@ -59,10 +56,9 @@ specializedJson(SField const& field, std::uint32_t value, json::Value def)
 {
     if (field == sfTransactionResult)
     {
-        std::string token, human;
-
-        if (transResultInfo(TER::fromInt(checkedCast<int>(value)), token, human))
-            return token;
+        // The field itself is an STI_UINT8, so its value fits std::uint8_t.
+        if (auto const result = knownResult(checkedCast<std::uint8_t>(value)))
+            return transToken(*result);
 
         // LCOV_EXCL_START
         JLOG(debugLog().error()) << "Unknown result code in metadata: " << value;
@@ -71,14 +67,12 @@ specializedJson(SField const& field, std::uint32_t value, json::Value def)
     else if (field == sfLedgerEntryType)
     {
         if (auto const* item =
-                LedgerFormats::getInstance().findByType(checkedCast<LedgerEntryType>(value));
-            item != nullptr)
+                LedgerFormats::getInstance().findByType(checkedCast<LedgerEntryType>(value)))
             return item->getName();
     }
     else if (field == sfTransactionType)
     {
-        if (auto const* item = TxFormats::getInstance().findByType(checkedCast<TxType>(value));
-            item != nullptr)
+        if (auto const* item = TxFormats::getInstance().findByType(checkedCast<TxType>(value)))
             return item->getName();
     }
     else if (field == sfPermissionValue)

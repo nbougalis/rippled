@@ -26,15 +26,11 @@ canHaveMPTokenIssuanceID(
     if (!serializedTx)
         return false;
 
-    TxType const tt = serializedTx->getTxnType();
-    if (tt != ttMPTOKEN_ISSUANCE_CREATE)
+    if (serializedTx->getTxnType() != ttMPTOKEN_ISSUANCE_CREATE)
         return false;
 
     // if the transaction failed nothing could have been delivered.
-    if (!isTesSuccess(transactionMeta.getResultTER()))
-        return false;
-
-    return true;
+    return transactionMeta.getResult() == tesSUCCESS;
 }
 
 std::optional<MPTID>

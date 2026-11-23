@@ -146,14 +146,9 @@ doSubmit(rpc::JsonContext& context)
 
         if (temUNCERTAIN != transaction->getResult())
         {
-            std::string sToken;
-            std::string sHuman;
-
-            transResultInfo(transaction->getResult(), sToken, sHuman);
-
-            jvResult[jss::engine_result] = sToken;
+            jvResult[jss::engine_result] = transToken(transaction->getResult());
             jvResult[jss::engine_result_code] = transaction->getResult();
-            jvResult[jss::engine_result_message] = sHuman;
+            jvResult[jss::engine_result_message] = transHuman(transaction->getResult());
 
             auto const submitResult = transaction->getSubmitResult();
 

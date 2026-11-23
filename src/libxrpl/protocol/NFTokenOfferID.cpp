@@ -30,7 +30,7 @@ canHaveNFTokenOfferID(
         return false;
 
     // if the transaction failed nothing could have been delivered.
-    if (!isTesSuccess(transactionMeta.getResultTER()))
+    if (!isTesSuccess(transactionMeta.getResult()))
         return false;
 
     return true;

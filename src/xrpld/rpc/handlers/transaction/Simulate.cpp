@@ -256,29 +256,13 @@ simulateTxn(rpc::JsonContext& context, std::shared_ptr<Transaction> transaction)
     bool const isBinaryOutput = context.params.get(jss::binary, false).asBool();
 
     // Convert the TER to human-readable values
-    std::string token;
-    std::string message;
-    if (transResultInfo(result.ter, token, message))
-    {
-        // Engine result
-        jvResult[jss::engine_result] = token;
-        jvResult[jss::engine_result_code] = result.ter;
-        jvResult[jss::engine_result_message] = message;
-    }
-    else
-    {
-        // shouldn't be hit
-        // LCOV_EXCL_START
-        jvResult[jss::engine_result] = "unknown";
-        jvResult[jss::engine_result_code] = result.ter;
-        jvResult[jss::engine_result_message] = "unknown";
-        // LCOV_EXCL_STOP
-    }
+    jvResult[jss::engine_result] = transToken(result.ter);
+    jvResult[jss::engine_result_code] = result.ter;
 
-    if (token == "tesSUCCESS")
-    {
+    if (isTesSuccess(result.ter))
         jvResult[jss::engine_result_message] = "The simulated transaction would have been applied.";
-    }
+    else
+        jvResult[jss::engine_result_message] = transHuman(result.ter);
 
     if (result.metadata)
     {

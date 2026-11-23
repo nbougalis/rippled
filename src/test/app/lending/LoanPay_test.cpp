@@ -762,7 +762,7 @@ private:
             auto const meta = env.meta();
             if (BEAST_EXPECT(meta))
             {
-                BEAST_EXPECT(meta->at(sfTransactionResult) == tecKILLED);
+                BEAST_EXPECT(TransactionResult{meta->at(sfTransactionResult)} == tecKILLED);
             }
 
             // If the transaction had succeeded, the loan would exist
@@ -788,7 +788,7 @@ private:
             auto const meta = env.meta();
             if (BEAST_EXPECT(meta))
             {
-                BEAST_EXPECT(meta->at(sfTransactionResult) == tesSUCCESS);
+                BEAST_EXPECT(TransactionResult{meta->at(sfTransactionResult)} == tesSUCCESS);
             }
 
             // This loan exists

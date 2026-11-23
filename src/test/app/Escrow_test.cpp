@@ -35,6 +35,16 @@
 
 namespace xrpl::test {
 
+namespace {
+
+TransactionResult
+metaResult(jtx::Env& env)
+{
+    return TransactionResult{(*env.meta())[sfTransactionResult]};
+}
+
+}
+
 struct Escrow_test : public beast::unit_test::Suite
 {
     void
@@ -1159,8 +1169,7 @@ struct Escrow_test : public beast::unit_test::Suite
             env(escrow::create(alice, alice, XRP(1000)),
                 escrow::kFinishTime(env.now() + 1s),
                 escrow::kCancelTime(env.now() + 500s));
-            BEAST_EXPECT(
-                (*env.meta())[sfTransactionResult] == static_cast<std::uint8_t>(tesSUCCESS));
+            BEAST_EXPECT(metaResult(env) == tesSUCCESS);
             env.close(5s);
             auto const aa = env.le(keylet::escrow(alice.id(), SeqProxy::rawSequence(aseq)));
             BEAST_EXPECT(aa);
@@ -1176,8 +1185,7 @@ struct Escrow_test : public beast::unit_test::Suite
             env(escrow::create(bruce, bruce, XRP(1000)),
                 escrow::kFinishTime(env.now() + 1s),
                 escrow::kCancelTime(env.now() + 2s));
-            BEAST_EXPECT(
-                (*env.meta())[sfTransactionResult] == static_cast<std::uint8_t>(tesSUCCESS));
+            BEAST_EXPECT(metaResult(env) == tesSUCCESS);
             env.close(5s);
             auto const bb = env.le(keylet::escrow(bruce.id(), SeqProxy::rawSequence(bseq)));
             BEAST_EXPECT(bb);
@@ -1194,8 +1202,7 @@ struct Escrow_test : public beast::unit_test::Suite
             env(escrow::finish(alice, alice, aseq));
             {
                 BEAST_EXPECT(!env.le(keylet::escrow(alice.id(), SeqProxy::rawSequence(aseq))));
-                BEAST_EXPECT(
-                    (*env.meta())[sfTransactionResult] == static_cast<std::uint8_t>(tesSUCCESS));
+                BEAST_EXPECT(metaResult(env) == tesSUCCESS);
 
                 auto const aod = ownerDirEntries(*env.current(), alice);
                 BEAST_EXPECT(std::distance(aod.begin(), aod.end()) == 0);
@@ -1214,8 +1221,7 @@ struct Escrow_test : public beast::unit_test::Suite
             env(escrow::cancel(bruce, bruce, bseq));
             {
                 BEAST_EXPECT(!env.le(keylet::escrow(bruce.id(), SeqProxy::rawSequence(bseq))));
-                BEAST_EXPECT(
-                    (*env.meta())[sfTransactionResult] == static_cast<std::uint8_t>(tesSUCCESS));
+                BEAST_EXPECT(metaResult(env) == tesSUCCESS);
 
                 auto const bod = ownerDirEntries(*env.current(), bruce);
                 BEAST_EXPECT(std::distance(bod.begin(), bod.end()) == 0);
@@ -1233,14 +1239,12 @@ struct Escrow_test : public beast::unit_test::Suite
             auto const bseq = env.seq(bruce);
 
             env(escrow::create(alice, bruce, XRP(1000)), escrow::kFinishTime(env.now() + 1s));
-            BEAST_EXPECT(
-                (*env.meta())[sfTransactionResult] == static_cast<std::uint8_t>(tesSUCCESS));
+            BEAST_EXPECT(metaResult(env) == tesSUCCESS);
             env.close(5s);
             env(escrow::create(bruce, carol, XRP(1000)),
                 escrow::kFinishTime(env.now() + 1s),
                 escrow::kCancelTime(env.now() + 2s));
-            BEAST_EXPECT(
-                (*env.meta())[sfTransactionResult] == static_cast<std::uint8_t>(tesSUCCESS));
+            BEAST_EXPECT(metaResult(env) == tesSUCCESS);
             env.close(5s);
 
             auto const ab = env.le(keylet::escrow(alice.id(), SeqProxy::rawSequence(aseq)));

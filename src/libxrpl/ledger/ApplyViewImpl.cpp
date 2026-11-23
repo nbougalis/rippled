@@ -25,12 +25,12 @@ std::optional<TxMeta>
 ApplyViewImpl::apply(
     OpenView& to,
     STTx const& tx,
-    TER ter,
+    TransactionResult result,
     std::optional<UInt256> parentBatchId,
     bool isDryRun,
     beast::Journal j)
 {
-    return items_.apply(to, tx, ter, deliver_, parentBatchId, isDryRun, j);
+    return items_.apply(to, tx, result, deliver_, parentBatchId, isDryRun, j);
 }
 
 std::size_t

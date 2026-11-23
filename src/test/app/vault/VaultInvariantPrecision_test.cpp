@@ -74,7 +74,7 @@ class VaultInvariantPrecision_test : public VaultPrecisionFixture
                 BEAST_EXPECTS(
                     actual == tesSUCCESS,
                     "amount=" + std::to_string(amount) + " expected tesSUCCESS, got " +
-                        transToken(actual));
+                        std::string{transToken(actual)});
 
                 auto const after = read(env, f);
                 Number const tDelta = after.assetsTotal - before.assetsTotal;
@@ -91,7 +91,7 @@ class VaultInvariantPrecision_test : public VaultPrecisionFixture
                 BEAST_EXPECTS(
                     actual == tecINVARIANT_FAILED,
                     "amount=" + std::to_string(amount) + " expected tecINVARIANT_FAILED, got " +
-                        transToken(actual));
+                        std::string{transToken(actual)});
             }
         }
     }
@@ -292,7 +292,7 @@ class VaultInvariantPrecision_test : public VaultPrecisionFixture
                 BEAST_EXPECTS(
                     actual == tesSUCCESS,
                     "amount=" + std::to_string(amount) + " expected tesSUCCESS, got " +
-                        transToken(actual));
+                        std::string{transToken(actual)});
 
                 auto const after = read(env, f);
                 BEAST_EXPECT(
@@ -304,7 +304,7 @@ class VaultInvariantPrecision_test : public VaultPrecisionFixture
                 BEAST_EXPECTS(
                     actual == tecINVARIANT_FAILED,
                     "amount=" + std::to_string(amount) + " expected tecINVARIANT_FAILED, got " +
-                        transToken(actual));
+                        std::string{transToken(actual)});
             }
         }
     }
@@ -369,7 +369,7 @@ class VaultInvariantPrecision_test : public VaultPrecisionFixture
                 BEAST_EXPECTS(
                     actual == tesSUCCESS,
                     "amount=" + std::to_string(amount) + " expected tesSUCCESS, got " +
-                        transToken(actual));
+                        std::string{transToken(actual)});
             }
             else
             {
@@ -380,7 +380,8 @@ class VaultInvariantPrecision_test : public VaultPrecisionFixture
                     BEAST_EXPECTS(
                         actual == tecINVARIANT_FAILED,
                         "pre-fix amount=" + std::to_string(amount) +
-                            " expected tecINVARIANT_FAILED, got " + transToken(actual));
+                            " expected tecINVARIANT_FAILED, got " +
+                            std::string{transToken(actual)});
                 }
                 // For other amounts pre-fix, we accept any outcome; the
                 // interesting property is only asserted for the known-failing
@@ -443,7 +444,7 @@ class VaultInvariantPrecision_test : public VaultPrecisionFixture
                 BEAST_EXPECTS(
                     actual == tesSUCCESS,
                     "amount=" + std::to_string(amount) + " expected tesSUCCESS, got " +
-                        transToken(actual));
+                        std::string{transToken(actual)});
             }
             else
             {
@@ -454,7 +455,7 @@ class VaultInvariantPrecision_test : public VaultPrecisionFixture
                     BEAST_EXPECTS(
                         actual == tecINVARIANT_FAILED,
                         "pre-fix amount=" + std::to_string(amount) +
-                            " expected tecINVARIANT_FAILED, got " + transToken(actual));
+                            " expected tecINVARIANT_FAILED, got " + std::string{transToken(actual)});
                 }
             }
         }

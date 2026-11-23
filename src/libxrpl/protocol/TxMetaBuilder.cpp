@@ -116,11 +116,8 @@ TxMetaBuilder::getAffectedNode(UInt256 const& key)
 }
 
 TxMeta
-TxMetaBuilder::build(TER result, std::uint32_t index) &&
+TxMetaBuilder::build(TransactionResult result, std::uint32_t index) &&
 {
-    XRPL_ASSERT(
-        isTesSuccess(result) || isTecClaim(result), "xrpl::TxMetaBuilder::build : valid TER input");
-
     nodes_.sort([](STObject const& o1, STObject const& o2) {
         return o1[sfLedgerIndex] < o2[sfLedgerIndex];
     });

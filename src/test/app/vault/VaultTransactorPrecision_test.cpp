@@ -133,7 +133,7 @@ class VaultTransactorPrecision_test : public VaultPrecisionFixture
 
             BEAST_EXPECTS(
                 env.ter() == tecPRECISION_LOSS,
-                std::string{"expected tecPRECISION_LOSS, got "} + transToken(env.ter()));
+                "expected tecPRECISION_LOSS, got " + std::string{transToken(env.ter())});
 
             auto const after = read(env, f);
             BEAST_EXPECT(after.assetsTotal == before.assetsTotal);
@@ -237,7 +237,7 @@ class VaultTransactorPrecision_test : public VaultPrecisionFixture
 
         BEAST_EXPECTS(
             env.ter() == tecINSUFFICIENT_FUNDS,
-            std::string{"expected tecINSUFFICIENT_FUNDS, got "} + transToken(env.ter()));
+            "expected tecINSUFFICIENT_FUNDS, got " + std::string{transToken(env.ter())});
     }
 
     void

@@ -167,7 +167,7 @@ private:
                         BEAST_EXPECTS(
                             result.error() == tecPRECISION_LOSS,
                             std::string(c.name) + ": expected tecPRECISION_LOSS, got " +
-                                transToken(result.error()));
+                                std::string{transToken(result.error())});
                     }
                     continue;
                 }
@@ -182,7 +182,7 @@ private:
                 if (!BEAST_EXPECTS(
                         result.has_value(),
                         std::string(c.name) + ": expected success (" + expected.getText() +
-                            "), got " + transToken(result.error())))
+                            "), got " + std::string{transToken(result.error())}))
                 {
                     continue;
                 }

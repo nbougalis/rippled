@@ -37,7 +37,7 @@ class TxMeta
     UInt256 transactionID_;
     std::uint32_t ledgerSeq_;
     std::uint32_t index_;
-    TER result_;
+    TransactionResult result_;
 
     std::optional<STAmount> deliveredAmount_;
     std::optional<UInt256> parentBatchID_;
@@ -62,7 +62,7 @@ class TxMeta
         UInt256 const& transactionID,
         std::uint32_t ledger,
         std::uint32_t index,
-        TER result,
+        TransactionResult result,
         std::optional<STAmount> deliveredAmount,
         std::optional<UInt256> parentBatchID,
         STArray nodes);
@@ -95,19 +95,10 @@ public:
     }
 
     /**
-     * The result code as an integer, as it appears in the metadata.
+     * The result of the transaction, as the metadata records it.
      */
-    [[nodiscard]] int
+    [[nodiscard]] TransactionResult
     getResult() const
-    {
-        return TERtoInt(result_);
-    }
-
-    /**
-     * The result code.
-     */
-    [[nodiscard]] TER
-    getResultTER() const
     {
         return result_;
     }

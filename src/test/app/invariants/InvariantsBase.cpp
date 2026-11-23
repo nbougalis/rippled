@@ -150,7 +150,8 @@ InvariantsBase::doInvariantCheck(
         terActual = transactor->checkInvariants(terActual, fee, Transactor::InvariantScope::Full);
         expect(
             terExpect == terActual,
-            "expected: " + transToken(terExpect) + " got: " + transToken(terActual),
+            "expected: " + std::string{transToken(terExpect)} +
+                " got: " + std::string{transToken(terActual)},
             loc.file_name(),
             loc.line());
         auto const messages = sink.messages().str();

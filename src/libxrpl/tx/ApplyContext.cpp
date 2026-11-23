@@ -50,10 +50,15 @@ ApplyContext::discard()
 }
 
 std::optional<TxMeta>
-ApplyContext::apply(TER ter)
+ApplyContext::apply(TransactionResult result)
 {
     return viewRef_.get().apply(
-        base_, tx, ter, parentBatchId_, (flags_ & ApplyFlags::DryRun) != ApplyFlags::None, journal);
+        base_,
+        tx,
+        result,
+        parentBatchId_,
+        (flags_ & ApplyFlags::DryRun) != ApplyFlags::None,
+        journal);
 }
 
 void
