@@ -18,9 +18,7 @@
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/KeyType.h>
 #include <xrpl/protocol/TxFlags.h>
@@ -836,7 +834,7 @@ static constexpr TxnTestData kTxnTestArray[] = {
     "tx_json": {
         "Account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
         "Amount": "1000000000",
-        "Destination": "rnUy2SHTrB9DubsPmkJZUXTf5FcNDGrYEA",
+        "Destination": "rnUy2SHTrB9DubsPmkJZUXTf5FcNDGrYEA"
     }
 })",
         {
@@ -1699,7 +1697,7 @@ static constexpr TxnTestData kTxnTestArray[] = {
         "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
         "Fee": 50,
         "Sequence": 0,
-        "SigningPubKey": "",
+        "SigningPubKey": ""
     }
 })",
         {
@@ -2049,7 +2047,7 @@ static constexpr TxnTestData kTxnTestArray[] = {
             }
         ],
         "Sequence": 0,
-        "SigningPubKey": "",
+        "SigningPubKey": ""
     }
 })",
         {
@@ -2719,7 +2717,7 @@ static constexpr TxnTestData kTxnTestArray[] = {
         "Sequence": 0,
         "SigningPubKey": "",
         "TransactionType": "Payment",
-        "DomainID": "invalid",
+        "DomainID": "invalid"
     }
 })",
         {
@@ -2981,7 +2979,7 @@ public:
 
         {
             json::Value req;
-            json::Reader().parse(R"({ "fee_mult_max" : 1, "tx_json" : { } } )", req);
+            json::load(R"({ "fee_mult_max" : 1, "tx_json" : { } } )", req);
             json::Value const result = checkFee(
                 req,
                 Role::ADMIN,
@@ -2998,7 +2996,7 @@ public:
 
         {
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 "{ \"fee_mult_max\" : 3, \"fee_div_max\" : 2, "
                 "\"tx_json\" : { } } ",
                 req);
@@ -3018,7 +3016,7 @@ public:
 
         {
             json::Value req;
-            json::Reader().parse(R"({ "fee_mult_max" : 0, "tx_json" : { } } )", req);
+            json::load(R"({ "fee_mult_max" : 0, "tx_json" : { } } )", req);
             json::Value const result = checkFee(
                 req,
                 Role::ADMIN,
@@ -3039,7 +3037,7 @@ public:
             // 3/6 = 1/2, but use the bigger number make sure
             // we're dividing.
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 "{ \"fee_mult_max\" : 3, \"fee_div_max\" : 6, "
                 "\"tx_json\" : { } } ",
                 req);
@@ -3061,7 +3059,7 @@ public:
 
         {
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 "{ \"fee_mult_max\" : 0, \"fee_div_max\" : 2, "
                 "\"tx_json\" : { } } ",
                 req);
@@ -3083,7 +3081,7 @@ public:
 
         {
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 "{ \"fee_mult_max\" : 10, \"fee_div_max\" : 0, "
                 "\"tx_json\" : { } } ",
                 req);
@@ -3141,7 +3139,7 @@ public:
         {
             // high mult, no tx
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 R"({
                 "fee_mult_max" : 1000,
                 "tx_json" : { }
@@ -3163,7 +3161,7 @@ public:
         {
             // low mult, no tx
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 R"({
                 "fee_mult_max" : 5,
                 "tx_json" : { }
@@ -3191,7 +3189,7 @@ public:
         {
             // high mult, 4 txs
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 R"({
                 "fee_mult_max" : 1000,
                 "tx_json" : { }
@@ -3214,7 +3212,7 @@ public:
         {
             // low mult, 4 tx
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 R"({
                 "fee_mult_max" : 5,
                 "tx_json" : { }
@@ -3239,7 +3237,7 @@ public:
         {
             // different low mult, 4 tx
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 R"({
                 "fee_mult_max" : 1000,
                 "fee_div_max" : 3,
@@ -3265,7 +3263,7 @@ public:
         {
             // high mult, 4 tx
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 R"({
                 "fee_mult_max" : 8000,
                 "fee_div_max" : 3,
@@ -3289,7 +3287,7 @@ public:
         {
             // negative mult
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 R"({
                 "fee_mult_max" : -5,
                 "tx_json" : { }
@@ -3314,7 +3312,7 @@ public:
         {
             // negative div
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 R"({
                 "fee_div_max" : -2,
                 "tx_json" : { }
@@ -3339,7 +3337,7 @@ public:
         {
             // negative mult & div
             json::Value req;
-            json::Reader().parse(
+            json::load(
                 R"({
                 "fee_mult_max" : -2,
                 "fee_div_max" : -3,
@@ -3377,7 +3375,8 @@ public:
                 result[jss::tx_json].isMember(jss::Fee) && result[jss::tx_json][jss::Fee] == "10");
             BEAST_EXPECT(
                 result[jss::tx_json].isMember(jss::Sequence) &&
-                result[jss::tx_json][jss::Sequence].isConvertibleTo(json::ValueType::UInt));
+                (result[jss::tx_json][jss::Sequence].isInt() ||
+                 result[jss::tx_json][jss::Sequence].isUInt()));
         }
 
         {
@@ -3404,7 +3403,8 @@ public:
                 result[jss::tx_json][jss::Fee] == "7813");
             BEAST_EXPECT(
                 result[jss::tx_json].isMember(jss::Sequence) &&
-                result[jss::tx_json][jss::Sequence].isConvertibleTo(json::ValueType::UInt));
+                (result[jss::tx_json][jss::Sequence].isInt() ||
+                 result[jss::tx_json][jss::Sequence].isUInt()));
 
             env.close();
         }
@@ -3430,7 +3430,8 @@ public:
                 result[jss::tx_json].isMember(jss::Fee) && result[jss::tx_json][jss::Fee] == "47");
             BEAST_EXPECT(
                 result[jss::tx_json].isMember(jss::Sequence) &&
-                result[jss::tx_json][jss::Sequence].isConvertibleTo(json::ValueType::UInt));
+                (result[jss::tx_json][jss::Sequence].isInt() ||
+                 result[jss::tx_json][jss::Sequence].isUInt()));
         }
 
         {
@@ -3462,7 +3463,8 @@ public:
                 result[jss::tx_json][jss::Fee] == "6806");
             BEAST_EXPECT(
                 result[jss::tx_json].isMember(jss::Sequence) &&
-                result[jss::tx_json][jss::Sequence].isConvertibleTo(json::ValueType::UInt));
+                (result[jss::tx_json][jss::Sequence].isInt() ||
+                 result[jss::tx_json][jss::Sequence].isUInt()));
         }
     }
 
@@ -3565,7 +3567,7 @@ public:
             for (auto const& txnTest : kTxnTestArray)
             {
                 json::Value req;
-                json::Reader().parse(txnTest.json, req);
+                json::load(txnTest.json, req);
                 if (rpc::containsError(req))
                     Throw<std::runtime_error>("Internal JSONRPC_test error.  Bad test JSON.");
 

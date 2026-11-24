@@ -9,8 +9,7 @@
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/HashPrefix.h>
 #include <xrpl/protocol/PublicKey.h>
 #include <xrpl/protocol/SField.h>
@@ -282,10 +281,9 @@ loadValidatorToken(std::vector<std::string> const& blob, beast::Journal journal)
 
         tokenStr = base64Decode(tokenStr);
 
-        json::Reader r;
         json::Value token;
 
-        if (r.parse(tokenStr, token))
+        if (json::load(tokenStr, token))
         {
             auto const m = token.get("manifest", json::Value{});
             auto const k = token.get("validation_secret_key", json::Value{});

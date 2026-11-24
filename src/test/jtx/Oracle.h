@@ -7,8 +7,7 @@
 #include <test/jtx/ter.h>
 
 #include <xrpl/basics/chrono.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 
 #include <chrono>
@@ -187,7 +186,7 @@ public:
     friend std::ostream&
     operator<<(std::ostream& strm, Oracle const& oracle)
     {
-        strm << oracle.ledgerEntry().toStyledString();
+        strm << toStyledString(oracle.ledgerEntry());
         return strm;
     }
 };

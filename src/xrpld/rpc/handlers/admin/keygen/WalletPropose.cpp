@@ -4,7 +4,7 @@
 #include <xrpld/rpc/detail/RPCHelpers.h>
 
 #include <xrpl/basics/strHex.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/KeyType.h>

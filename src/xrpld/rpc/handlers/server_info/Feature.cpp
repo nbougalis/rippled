@@ -4,7 +4,7 @@
 #include <xrpld/rpc/Role.h>
 
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/AmendmentTable.h>
 #include <xrpl/ledger/View.h>
 #include <xrpl/protocol/ErrorCodes.h>

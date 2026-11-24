@@ -5,7 +5,7 @@
 #include <xrpld/rpc/detail/SpecBridge.hpp>
 
 #include <xrpl/basics/Slice.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/protocol/AccountID.h>

@@ -19,7 +19,7 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/entries/FeeSettingsEntry.h>
 #include <xrpl/nodestore/Database.h>
 #include <xrpl/nodestore/NodeObject.h>

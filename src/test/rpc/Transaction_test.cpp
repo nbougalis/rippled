@@ -15,8 +15,7 @@
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/core/NetworkIDService.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Feature.h>
@@ -61,9 +60,9 @@ class Transaction_test : public beast::unit_test::Suite
 
         char const* command = jss::tx.cStr();
         char const* binary = jss::binary.cStr();
-        char const* notFound = rpc::getErrorInfo(RpcTxnNotFound).token;
-        char const* invalid = rpc::getErrorInfo(RpcInvalidLgrRange).token;
-        char const* excessive = rpc::getErrorInfo(RpcExcessiveLgrRange).token;
+        auto const notFound = rpc::getErrorInfo(RpcTxnNotFound).token;
+        auto const invalid = rpc::getErrorInfo(RpcInvalidLgrRange).token;
+        auto const excessive = rpc::getErrorInfo(RpcExcessiveLgrRange).token;
 
         Env env{*this, features};
         auto const alice = Account("alice");
@@ -309,9 +308,9 @@ class Transaction_test : public beast::unit_test::Suite
 
         char const* command = jss::tx.cStr();
         char const* binary = jss::binary.cStr();
-        char const* notFound = rpc::getErrorInfo(RpcTxnNotFound).token;
-        char const* invalid = rpc::getErrorInfo(RpcInvalidLgrRange).token;
-        char const* excessive = rpc::getErrorInfo(RpcExcessiveLgrRange).token;
+        auto const notFound = rpc::getErrorInfo(RpcTxnNotFound).token;
+        auto const invalid = rpc::getErrorInfo(RpcInvalidLgrRange).token;
+        auto const excessive = rpc::getErrorInfo(RpcExcessiveLgrRange).token;
 
         Env env{*this, makeNetworkConfig(11111)};
         uint32_t const netID = env.app().getNetworkIDService().getNetworkID();

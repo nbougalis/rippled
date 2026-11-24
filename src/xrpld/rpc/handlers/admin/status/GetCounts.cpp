@@ -6,8 +6,7 @@
 
 #include <xrpl/basics/CountedObject.h>
 #include <xrpl/basics/UptimeClock.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/nodestore/Database.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/server/NetworkOPs.h>

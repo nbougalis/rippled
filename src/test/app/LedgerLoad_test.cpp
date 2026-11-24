@@ -12,8 +12,7 @@
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/core/StartUpType.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/jss.h>
 

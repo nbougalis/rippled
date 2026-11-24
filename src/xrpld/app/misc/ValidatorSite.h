@@ -6,7 +6,7 @@
 
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <boost/asio.hpp>
 

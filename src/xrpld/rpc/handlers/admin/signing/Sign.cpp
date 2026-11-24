@@ -3,7 +3,7 @@
 #include <xrpld/rpc/Role.h>
 #include <xrpld/rpc/detail/TransactionSign.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/resource/Fees.h>

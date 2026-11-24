@@ -15,7 +15,7 @@
 #include <xrpl/consensus/Consensus.h>
 #include <xrpl/consensus/ConsensusParms.h>
 #include <xrpl/consensus/ConsensusTypes.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/CanonicalTXSet.h>
 #include <xrpl/protocol/Protocol.h>
 #include <xrpl/protocol/PublicKey.h>

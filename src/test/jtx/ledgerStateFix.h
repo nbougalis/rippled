@@ -3,7 +3,7 @@
 #include <test/jtx/Account.h>
 
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 /**
  * LedgerStateFix operations.

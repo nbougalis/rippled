@@ -19,9 +19,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Feature.h>
@@ -324,7 +322,7 @@ public:
 
         json::Value bobj[4];
         for (int i = 0; i < 4; ++i)
-            json::Reader{}.parse(gBobAccountObjects[i], bobj[i]);
+            BEAST_EXPECT(json::load(gBobAccountObjects[i], bobj[i]));
 
         // test 'unstepped'
         // i.e. request account objects without explicit limit/marker paging

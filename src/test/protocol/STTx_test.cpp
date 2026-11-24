@@ -5,7 +5,7 @@
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/hash/uhash.h>
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/to_string.h>  // IWYU pragma: keep
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/HashPrefix.h>
 #include <xrpl/protocol/KeyType.h>

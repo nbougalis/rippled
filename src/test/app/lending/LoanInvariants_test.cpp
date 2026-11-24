@@ -13,7 +13,7 @@
 
 #include <xrpl/basics/Number.h>
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/helpers/LendingHelpers.h>
 #include <xrpl/ledger/helpers/VaultHelpers.h>
 #include <xrpl/protocol/Asset.h>

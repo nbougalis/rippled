@@ -5,7 +5,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/nodestore/Backend.h>
 #include <xrpl/nodestore/NodeObject.h>
 #include <xrpl/nodestore/Scheduler.h>

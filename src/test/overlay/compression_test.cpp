@@ -21,7 +21,7 @@
 #include <xrpl/beast/net/IPAddress.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/HashPrefix.h>
 #include <xrpl/protocol/KeyType.h>
 #include <xrpl/protocol/LedgerHeader.h>

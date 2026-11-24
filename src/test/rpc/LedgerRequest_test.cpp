@@ -6,7 +6,7 @@
 #include <test/jtx/envconfig.h>
 
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/jss.h>
@@ -265,7 +265,7 @@ public:
                 "C7";
             jvParams[jss::ledger_index] = "1";
             auto const result =
-                env.rpc("json", "ledger_request", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "ledger_request", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(result[jss::status] == "error");
             BEAST_EXPECT(result[jss::error] == "invalidParams");
             BEAST_EXPECT(result[jss::error_code] == RpcInvalidParams);
@@ -279,7 +279,7 @@ public:
             json::Value jvParams;
             jvParams[jss::ledger_index] = "index";
             auto const result =
-                env.rpc("json", "ledger_request", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "ledger_request", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(result[jss::status] == "error");
             BEAST_EXPECT(result[jss::error] == "invalidParams");
             BEAST_EXPECT(result[jss::error_code] == RpcInvalidParams);

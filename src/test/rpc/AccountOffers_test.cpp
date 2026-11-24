@@ -9,8 +9,7 @@
 #include <test/jtx/pay.h>
 
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/jss.h>
@@ -65,7 +64,7 @@ public:
         json::Value jvParams;
         jvParams[jss::account] = bob.human();
         jvParams[jss::limit] = 1u;
-        auto const jrrL = env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+        auto const jrrL = env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
         auto const& jroL = jrrL[jss::offers];
         BEAST_EXPECT(checkMarker(jrrL));
         // 9u is the expected size, since one account object is a trustline
@@ -129,7 +128,7 @@ public:
             jvParams[jss::account] = bob.human();
             jvParams[jss::limit] = 1u;
             auto const jrrL1 =
-                env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
             auto const& jroL1 = jrrL1[jss::offers];
             // there is a difference in the validation of the limit param
             // between admin and non-admin requests. with admin requests, the
@@ -145,7 +144,7 @@ public:
                 // second item...with previous marker passed
                 jvParams[jss::marker] = jrrL1[jss::marker];
                 auto const jrrL2 =
-                    env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                    env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
                 auto const& jroL2 = jrrL2[jss::offers];
                 BEAST_EXPECT(checkMarker(jrrL2));
                 BEAST_EXPECT(checkArraySize(jroL2, 1u));
@@ -155,7 +154,7 @@ public:
                 jvParams[jss::marker] = jrrL2[jss::marker];
                 jvParams[jss::limit] = 10u;
                 auto const jrrL3 =
-                    env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                    env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
                 auto const& jroL3 = jrrL3[jss::offers];
                 BEAST_EXPECT(!jrrL3.isMember(jss::marker));
                 BEAST_EXPECT(checkArraySize(jroL3, 1u));
@@ -172,7 +171,7 @@ public:
             jvParams[jss::account] = bob.human();
             jvParams[jss::limit] = 0u;
             auto const jrr =
-                env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::error] == "invalidParams");
             BEAST_EXPECT(jrr[jss::error_code] == RpcInvalidParams);
             BEAST_EXPECT(jrr[jss::error_message] == "Invalid field 'limit'.");
@@ -227,7 +226,7 @@ public:
             json::Value jvParams;
             jvParams[jss::account] = "";
             auto const jrr =
-                env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::status] == "error");
             BEAST_EXPECT(jrr[jss::error] == "actMalformed");
             BEAST_EXPECT(jrr[jss::error_code] == RpcActMalformed);
@@ -251,7 +250,7 @@ public:
             jvParams[jss::account] = bob.human();
             jvParams[jss::limit] = "0";  // NOT an integer
             auto const jrr =
-                env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::status] == "error");
             BEAST_EXPECT(jrr[jss::error] == "invalidParams");
             BEAST_EXPECT(jrr[jss::error_code] == RpcInvalidParams);
@@ -264,12 +263,12 @@ public:
             jvParams[jss::account] = bob.human();
             jvParams[jss::marker] = "NOT_A_MARKER";
             auto const jrr =
-                env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::status] == "error");
             BEAST_EXPECT(jrr[jss::error] == "invalidParams");
             BEAST_EXPECT(jrr[jss::error_code] == RpcInvalidParams);
             BEAST_EXPECTS(
-                jrr[jss::error_message] == "Invalid field 'marker'.", jrr.toStyledString());
+                jrr[jss::error_message] == "Invalid field 'marker'.", toStyledString(jrr));
         }
 
         {
@@ -278,7 +277,7 @@ public:
             jvParams[jss::account] = bob.human();
             jvParams[jss::marker] = 1;
             auto const jrr =
-                env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::status] == "error");
             BEAST_EXPECT(jrr[jss::error] == "invalidParams");
             BEAST_EXPECT(jrr[jss::error_code] == RpcInvalidParams);
@@ -291,7 +290,7 @@ public:
             jvParams[jss::account] = bob.human();
             jvParams[jss::ledger_index] = 10u;
             auto const jrr =
-                env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::status] == "error");
             BEAST_EXPECT(jrr[jss::error] == "lgrNotFound");
             BEAST_EXPECT(jrr[jss::error_code] == RpcLgrNotFound);
@@ -304,7 +303,7 @@ public:
             jvParams[jss::account] = "";
             jvParams[jss::limit] = "0";
             auto const jrr =
-                env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::error] == "invalidParams");
             BEAST_EXPECT(jrr[jss::error_code] == RpcInvalidParams);
             BEAST_EXPECT(jrr[jss::error_message] == "Invalid field 'limit', not unsigned integer.");
@@ -316,7 +315,7 @@ public:
             jvParams[jss::account] = Account("bogus").human();
             jvParams[jss::limit] = "0";
             auto const jrr =
-                env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::error] == "invalidParams");
             BEAST_EXPECT(jrr[jss::error_code] == RpcInvalidParams);
             BEAST_EXPECT(jrr[jss::error_message] == "Invalid field 'limit', not unsigned integer.");
@@ -329,7 +328,7 @@ public:
             jvParams[jss::ledger_index] = 10u;
             jvParams[jss::marker] = "NOT_A_MARKER";
             auto const jrr =
-                env.rpc("json", "account_offers", jvParams.toStyledString())[jss::result];
+                env.rpc("json", "account_offers", toStyledString(jvParams))[jss::result];
             BEAST_EXPECT(jrr[jss::error] == "invalidParams");
             BEAST_EXPECT(jrr[jss::error_code] == RpcInvalidParams);
             BEAST_EXPECT(jrr[jss::error_message] == "Invalid field 'marker'.");

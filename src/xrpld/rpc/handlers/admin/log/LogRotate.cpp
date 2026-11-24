@@ -4,7 +4,7 @@
 
 #include <xrpl/basics/Log.h>
 #include <xrpl/core/PerfLog.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 namespace xrpl {
 

@@ -2,7 +2,7 @@
 
 #include <xrpld/rpc/detail/JsonFieldView.hpp>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <rpcspec/Concepts.hpp>
 

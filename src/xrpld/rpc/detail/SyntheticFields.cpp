@@ -3,7 +3,7 @@
 #include <xrpld/rpc/DeliveredAmount.h>
 #include <xrpld/rpc/MPTokenIssuanceID.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/NFTokenID.h>
 #include <xrpl/protocol/NFTokenOfferID.h>
 

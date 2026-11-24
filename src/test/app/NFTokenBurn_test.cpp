@@ -14,9 +14,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/OpenView.h>
 #include <xrpl/protocol/Feature.h>
@@ -127,19 +125,19 @@ class NFTokenBurn_test : public beast::unit_test::Suite
 
                     if (vol == Volume::Noisy)
                     {
-                        std::cout << i.toStyledString() << std::endl;
+                        std::cout << toStyledString(i) << std::endl;
                     }
                     else
                     {
                         if (tokenCount > 0)
                         {
-                            std::cout << "first: " << i[sfNFTokens.jsonName][0u].toStyledString()
+                            std::cout << "first: " << toStyledString(i[sfNFTokens.jsonName][0u])
                                       << std::endl;
                         }
                         if (tokenCount > 1)
                         {
                             std::cout << "last: "
-                                      << i[sfNFTokens.jsonName][tokenCount - 1].toStyledString()
+                                      << toStyledString(i[sfNFTokens.jsonName][tokenCount - 1])
                                       << std::endl;
                         }
                     }

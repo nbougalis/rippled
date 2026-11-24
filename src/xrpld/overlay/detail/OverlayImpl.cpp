@@ -36,7 +36,7 @@
 #include <xrpl/config/BasicConfig.h>
 #include <xrpl/config/Constants.h>
 #include <xrpl/core/HashRouter.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/peerfinder/Config.h>
 #include <xrpl/peerfinder/Slot.h>
 #include <xrpl/peerfinder/make_Manager.h>

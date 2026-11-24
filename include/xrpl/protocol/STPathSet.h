@@ -5,7 +5,7 @@
 #include <xrpl/basics/enum_bitops.h>
 #include <xrpl/beast/hash/hash_append.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/PathAsset.h>
 #include <xrpl/protocol/SField.h>

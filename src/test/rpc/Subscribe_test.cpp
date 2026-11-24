@@ -28,8 +28,7 @@
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/config/Constants.h>
 #include <xrpl/core/NetworkIDService.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Feature.h>
@@ -924,7 +923,7 @@ public:
                 jv[jss::books][0u][jss::taker_gets][jss::currency] = "XRP";
                 jv[jss::books][0u][jss::taker] = 1;
                 auto const jr = wsc->invoke(method, jv)[jss::result];
-                BEAST_EXPECTS(jr[jss::error] == "actMalformed", jr.toStyledString());
+                BEAST_EXPECTS(jr[jss::error] == "actMalformed", toStyledString(jr));
                 BEAST_EXPECT(jr[jss::error_code] == RpcActMalformed);
                 BEAST_EXPECT(jr[jss::error_message] == "Account malformed.");
             }
@@ -939,7 +938,7 @@ public:
                 jv[jss::books][0u][jss::taker_gets][jss::currency] = "XRP";
                 jv[jss::books][0u][jss::taker] = "not_an_account";
                 auto const jr = wsc->invoke(method, jv)[jss::result];
-                BEAST_EXPECTS(jr[jss::error] == "actMalformed", jr.toStyledString());
+                BEAST_EXPECTS(jr[jss::error] == "actMalformed", toStyledString(jr));
                 BEAST_EXPECT(jr[jss::error_code] == RpcActMalformed);
                 BEAST_EXPECT(jr[jss::error_message] == "Account malformed.");
             }
@@ -954,7 +953,7 @@ public:
                 jv[jss::books][0u][jss::taker_gets][jss::currency] = "XRP";
                 jv[jss::books][0u][jss::taker] = Account{"alice"}.human() + "DEAD";
                 auto const jr = wsc->invoke(method, jv)[jss::result];
-                BEAST_EXPECTS(jr[jss::error] == "actMalformed", jr.toStyledString());
+                BEAST_EXPECTS(jr[jss::error] == "actMalformed", toStyledString(jr));
                 BEAST_EXPECT(jr[jss::error_code] == RpcActMalformed);
                 BEAST_EXPECT(jr[jss::error_message] == "Account malformed.");
             }

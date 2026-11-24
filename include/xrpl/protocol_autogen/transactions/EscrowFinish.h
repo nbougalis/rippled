@@ -6,7 +6,7 @@
 #include <xrpl/protocol/jss.h>
 #include <xrpl/protocol_autogen/TransactionBase.h>
 #include <xrpl/protocol_autogen/TransactionBuilderBase.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <stdexcept>
 #include <optional>

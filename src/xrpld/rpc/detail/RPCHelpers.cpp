@@ -418,7 +418,7 @@ chooseLedgerEntryType(json::Value const& params)
     if (params.isMember(jss::type))
     {
         static constexpr auto kTypes =
-            std::to_array<std::tuple<char const*, char const*, LedgerEntryType>>({
+            std::to_array<std::tuple<std::string_view, std::string_view, LedgerEntryType>>({
 #pragma push_macro("LEDGER_ENTRY")
 #undef LEDGER_ENTRY
 

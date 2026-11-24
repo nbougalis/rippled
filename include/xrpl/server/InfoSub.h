@@ -3,7 +3,7 @@
 #include <xrpl/basics/CountedObject.h>
 #include <xrpl/basics/UnorderedContainers.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Book.h>
 #include <xrpl/protocol/ErrorCodes.h>

@@ -8,8 +8,7 @@
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/beast/utility/PropertyStream.h>
 #include <xrpl/json/JsonPropertyStream.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/peerfinder/Types.h>
 #include <xrpl/peerfinder/detail/Tuning.h>
 

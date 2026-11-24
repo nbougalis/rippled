@@ -5,7 +5,7 @@
 #include <test/jtx/JTx.h>
 
 #include <xrpl/basics/strHex.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/Keylet.h>
 #include <xrpl/protocol/SField.h>

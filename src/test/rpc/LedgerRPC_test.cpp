@@ -19,8 +19,7 @@
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/config/Constants.h>
 #include <xrpl/core/NetworkIDService.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/TER.h>
@@ -187,11 +186,13 @@ class LedgerRPC_test : public beast::unit_test::Suite
         }
 
         {
-            // Request a ledger with a very large (double) sequence.
-            auto const ret = env.rpc("json", "ledger", "{ \"ledger_index\" : 2e15 }");
-            BEAST_EXPECT(ret[jss::error] == "invalidParams");
-            BEAST_EXPECT(ret[jss::error_code] == RpcInvalidParams);
-            BEAST_EXPECT(ret[jss::error_message] == "Invalid parameters.");
+            // Request a ledger with a very large (double) sequence. The
+            // value reaches the server as a double, which is not a valid
+            // ledger index.
+            auto const ret = env.rpc("json", "ledger", "{ \"ledger_index\" : 2e15 }")[jss::result];
+            BEAST_EXPECT(rpc::containsError(ret));
+            BEAST_EXPECT(
+                ret[jss::error_message] == "Invalid field 'ledger_index', not string or number.");
         }
 
         {
@@ -352,13 +353,13 @@ class LedgerRPC_test : public beast::unit_test::Suite
         };
 
         auto const findOffer = [](json::Value const& txs, bool mpt) -> json::Value const* {
-            for (auto i = 0u; i < txs.size(); ++i)
+            for (auto const& entry : txs)
             {
-                auto const& tx = txs[i].isMember(jss::tx_json) ? txs[i][jss::tx_json] : txs[i];
+                auto const& tx = entry.isMember(jss::tx_json) ? entry[jss::tx_json] : entry;
                 if (tx[jss::TransactionType] == jss::OfferCreate &&
                     tx[jss::TakerGets].isMember(jss::mpt_issuance_id) == mpt)
                 {
-                    return &txs[i];
+                    return &entry;
                 }
             }
             return nullptr;

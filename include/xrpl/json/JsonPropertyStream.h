@@ -1,7 +1,7 @@
 #pragma once
 
 #include <xrpl/beast/utility/PropertyStream.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <string>
 #include <vector>

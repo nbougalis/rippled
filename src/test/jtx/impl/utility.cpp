@@ -7,7 +7,7 @@
 #include <xrpl/basics/contract.h>
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ErrorCodes.h>
@@ -106,11 +106,12 @@ fillSeq(json::Value& jv, ReadView const& view)
 json::Value
 cmdToJSONRPC(std::vector<std::string> const& args, beast::Journal j, unsigned int apiVersion)
 {
-    json::Value jv = json::Value(json::ValueType::Object);
-    auto const paramsObj = rpcCmdToJson(args, jv, apiVersion, j);
+    auto const paramsObj = [&]() {
+        json::Value tmp{json::ValueType::Object};
+        return rpcCmdToJson(args, tmp, apiVersion, j);
+    }();
 
-    // Re-use jv to return our formatted result.
-    jv.clear();
+    json::Value jv;
 
     // Allow parser to rewrite method.
     jv[jss::method] = paramsObj.isMember(jss::method) ? paramsObj[jss::method].asString() : args[0];

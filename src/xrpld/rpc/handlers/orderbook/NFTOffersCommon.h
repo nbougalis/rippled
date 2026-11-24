@@ -4,7 +4,7 @@
 #include <xrpld/rpc/detail/SpecBridge.hpp>
 
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Keylet.h>
 #include <xrpl/protocol/STLedgerEntry.h>
 

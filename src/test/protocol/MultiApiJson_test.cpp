@@ -1,5 +1,5 @@
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/MultiApiJson.h>
 

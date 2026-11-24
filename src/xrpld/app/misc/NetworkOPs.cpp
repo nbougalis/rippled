@@ -63,9 +63,7 @@
 #include <xrpl/crypto/RFC1751.h>
 #include <xrpl/crypto/csprng.h>
 #include <xrpl/git/Git.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/AcceptedLedgerTx.h>
 #include <xrpl/ledger/AmendmentTable.h>
 #include <xrpl/ledger/ApplyView.h>
@@ -1133,21 +1131,22 @@ private:
 
 //------------------------------------------------------------------------------
 
-static std::array<char const*, 5> const kStateNames{
-    {"disconnected", "connected", "syncing", "tracking", "full"},
-};
+static constexpr std::array<json::StaticString, 5> kStateNames{
+    {json::StaticString("disconnected"),
+     json::StaticString("connected"),
+     json::StaticString("syncing"),
+     json::StaticString("tracking"),
+     json::StaticString("full")}};
 
-std::array<char const*, 5> const NetworkOPsImp::kStates = kStateNames;
+std::array<char const*, 5> const NetworkOPsImp::kStates = {
+    {kStateNames[0].cStr(),
+     kStateNames[1].cStr(),
+     kStateNames[2].cStr(),
+     kStateNames[3].cStr(),
+     kStateNames[4].cStr()}};
 
 std::array<json::StaticString const, 5> const NetworkOPsImp::StateAccounting::kStates = {
-    {
-        json::StaticString(kStateNames[0]),
-        json::StaticString(kStateNames[1]),
-        json::StaticString(kStateNames[2]),
-        json::StaticString(kStateNames[3]),
-        json::StaticString(kStateNames[4]),
-    },
-};
+    {kStateNames[0], kStateNames[1], kStateNames[2], kStateNames[3], kStateNames[4]}};
 
 static auto const kGenesisAccountId =
     calcAccountID(generateKeyPair(KeyType::Secp256k1, generateSeed("masterpassphrase")).first);
@@ -2135,7 +2134,7 @@ NetworkOPsImp::checkLastClosedLedger(Overlay::PeerSequence const& peerList, UInt
     // Determine preferred last closed ledger
 
     auto& validations = registry_.get().getValidations();
-    JLOG(journal_.debug()) << "ValidationTrie " << json::Compact(validations.getJsonTrie());
+    JLOG(journal_.debug()) << "ValidationTrie " << validations.getJsonTrie();
 
     // Will rely on peer LCL if no trusted validations exist
     HashMap<UInt256, std::uint32_t> peerCounts;
@@ -3641,7 +3640,7 @@ NetworkOPsImp::transJsonImpl(
 
             if constexpr (Version > 1)
             {
-                jvTx[jss::tx_json] = jvTx.removeMember(jss::transaction);
+                jvTx[jss::tx_json] = jvTx.removeMember(jss::transaction).value_or(json::Value{});
                 jvTx[jss::hash] = hash;
             }
             else

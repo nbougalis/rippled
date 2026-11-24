@@ -5,7 +5,7 @@
 #include <xrpl/basics/chrono.h>
 #include <xrpl/beast/hash/hash_append.h>
 #include <xrpl/consensus/ConsensusProposal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/HashPrefix.h>
 #include <xrpl/protocol/PublicKey.h>
 #include <xrpl/protocol/UintTypes.h>

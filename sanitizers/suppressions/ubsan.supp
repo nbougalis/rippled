@@ -187,7 +187,7 @@ unsigned-integer-overflow:shamap/SHAMap.cpp
 unsigned-integer-overflow:protocol/Permissions.cpp
 unsigned-integer-overflow:protocol/tokens.cpp
 unsigned-integer-overflow:basics/base64.cpp
-unsigned-integer-overflow:json/json_value.cpp
+unsigned-integer-overflow:json/value.cpp
 unsigned-integer-overflow:app/misc/NetworkOPs.cpp
 unsigned-integer-overflow:rpc/detail/Role.cpp
 unsigned-integer-overflow:tx/transactors/oracle/OracleSet.cpp

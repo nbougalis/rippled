@@ -3,10 +3,7 @@
 
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STAmount.h>
@@ -33,8 +30,7 @@ class STParsedJSON_test : public beast::unit_test::Suite
     static bool
     parseJSONString(std::string const& json, json::Value& to)
     {
-        json::Reader reader;
-        return reader.parse(json, to) && to.isObject();
+        return json::load(json, to) && to.isObject();
     }
 
     void

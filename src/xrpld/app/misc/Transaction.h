@@ -5,7 +5,7 @@
 #include <xrpl/basics/RangeSet.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Protocol.h>
 #include <xrpl/protocol/STBase.h>

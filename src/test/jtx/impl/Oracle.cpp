@@ -8,8 +8,7 @@
 #include <xrpl/basics/Number.h>
 #include <xrpl/basics/chrono.h>
 #include <xrpl/basics/strHex.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/SField.h>

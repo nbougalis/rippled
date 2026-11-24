@@ -13,9 +13,7 @@
 
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/SField.h>
@@ -107,13 +105,13 @@ class FixNFTokenPageLinks_test : public beast::unit_test::Suite
             json::Value const& acctObjs = resp[jss::result][jss::account_objects];
 
             int pageCount = 0;
-            for (json::UInt i = 0; i < acctObjs.size(); ++i)
+            for (auto const& acctObj : acctObjs)
             {
                 if (BEAST_EXPECT(
-                        acctObjs[i].isMember(sfNFTokens.jsonName) &&
-                        acctObjs[i][sfNFTokens.jsonName].isArray()))
+                        acctObj.isMember(sfNFTokens.jsonName) &&
+                        acctObj[sfNFTokens.jsonName].isArray()))
                 {
-                    BEAST_EXPECT(acctObjs[i][sfNFTokens.jsonName].size() == 32);
+                    BEAST_EXPECT(acctObj[sfNFTokens.jsonName].size() == 32);
                     ++pageCount;
                 }
             }

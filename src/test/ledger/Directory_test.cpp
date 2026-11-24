@@ -18,8 +18,7 @@
 #include <xrpl/basics/random.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/core/ServiceRegistry.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/Sandbox.h>
 #include <xrpl/ledger/helpers/DirectoryHelpers.h>
@@ -434,7 +433,7 @@ struct Directory_test : public beast::unit_test::Suite
         {
             auto const jrr = ledgerData(env);
             auto const& jstate = jrr[jss::state];
-            BEAST_EXPECTS(checkArraySize(jstate, 2), jrr.toStyledString());
+            BEAST_EXPECTS(checkArraySize(jstate, 2), toStyledString(jrr));
             for (auto const& directory : jstate)
             {
                 BEAST_EXPECT(directory["LedgerEntryType"] == jss::DirectoryNode);  // sanity check
@@ -462,7 +461,7 @@ struct Directory_test : public beast::unit_test::Suite
         {
             auto const jrr = ledgerData(env);
             auto const& jstate = jrr[jss::state];
-            BEAST_EXPECTS(checkArraySize(jstate, 3), jrr.toStyledString());
+            BEAST_EXPECTS(checkArraySize(jstate, 3), toStyledString(jrr));
             for (auto const& directory : jstate)
             {
                 BEAST_EXPECT(directory["LedgerEntryType"] == jss::DirectoryNode);  // sanity check

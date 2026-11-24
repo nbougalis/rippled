@@ -3,7 +3,7 @@
 #include <xrpld/app/main/Application.h>  // IWYU pragma: keep
 #include <xrpld/rpc/Context.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ApiVersion.h>
 
 #include <rpcspec/Errors.hpp>

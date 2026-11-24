@@ -7,7 +7,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/clock/abstract_clock.h>
 #include <xrpl/beast/insight/Collector.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/Ledger.h>
 #include <xrpl/protocol/RippleLedgerHash.h>
 

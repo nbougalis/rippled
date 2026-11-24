@@ -21,7 +21,7 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/core/HashRouter.h>
 #include <xrpl/core/LoadEvent.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/peerfinder/Slot.h>
 #include <xrpl/peerfinder/Types.h>
 #include <xrpl/protocol/Protocol.h>

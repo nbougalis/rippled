@@ -3,7 +3,7 @@
 #include <test/jtx/Account.h>
 #include <test/jtx/tags.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/jss.h>
 

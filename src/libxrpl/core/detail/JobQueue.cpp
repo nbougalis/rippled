@@ -13,7 +13,7 @@
 #include <xrpl/core/JobTypes.h>
 #include <xrpl/core/LoadEvent.h>
 #include <xrpl/core/PerfLog.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <algorithm>
 #include <array>

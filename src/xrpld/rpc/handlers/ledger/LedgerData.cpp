@@ -8,7 +8,7 @@
 #include <xrpld/rpc/detail/Tuning.h>
 
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Indexes.h>
@@ -90,9 +90,9 @@ doLedgerData(rpc::JsonContext& context)
     auto [rpcStatus, type] = rpc::chooseLedgerEntryType(params);
     if (rpcStatus)
     {
-        jvResult.clear();
-        rpc::injectSpecError(jvResult, rpcStatus);
-        return jvResult;
+        json::Value ret;
+        rpc::injectSpecError(ret, rpcStatus);
+        return ret;
     }
     json::Value& nodes = jvResult[jss::state];
     if (nodes.type() == json::ValueType::Null)

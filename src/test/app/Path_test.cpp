@@ -29,8 +29,7 @@
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/ErrorCodes.h>
@@ -926,7 +925,7 @@ public:
             Json("{\"" + sfQualityOut.fieldName + "\": 1400000000}"));
 
         json::Value jv;
-        json::Reader().parse(
+        json::load(
             R"({
                 "Balance" : {
                     "currency" : "USD",
@@ -970,7 +969,7 @@ public:
         env.trust(Account("alice")["USD"](1000), "bob");
 
         json::Value jv;
-        json::Reader().parse(
+        json::load(
             R"({
                 "Balance" : {
                     "currency" : "USD",
@@ -1018,7 +1017,7 @@ public:
         env.trust(Account("bob")["USD"](0), "alice");
 
         json::Value jv;
-        json::Reader().parse(
+        json::load(
             R"({
                 "Balance" :
                 {

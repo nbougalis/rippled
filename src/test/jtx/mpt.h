@@ -16,7 +16,7 @@
 #include <xrpl/basics/contract.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/core/ServiceRegistry.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Asset.h>
 #include <xrpl/protocol/ConfidentialTransfer.h>

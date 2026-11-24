@@ -3,7 +3,7 @@
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/core/Job.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <chrono>
 #include <cstdint>

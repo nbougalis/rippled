@@ -9,8 +9,7 @@
 #include <xrpl/consensus/ConsensusParms.h>
 #include <xrpl/consensus/ConsensusProposal.h>
 #include <xrpl/consensus/ConsensusTypes.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/LedgerTiming.h>
 
 #include <algorithm>
@@ -1119,10 +1118,10 @@ Consensus<Adaptor>::checkLedger(std::unique_ptr<std::stringstream> const& clog)
         std::stringstream ss;
         ss << "View of consensus changed during " << to_string(phase_)
            << " mode=" << to_string(mode_.get()) << ", " << prevLedgerID_ << " to " << netLgr
-           << ", " << json::Compact{previousLedger_.getJson()} << ". ";
+           << ", " << previousLedger_.getJson() << ". ";
         JLOG(j_.warn()) << ss.str();
         CLOG(clog) << ss.str();
-        CLOG(clog) << "State on consensus change " << json::Compact{getJson(true)} << ". ";
+        CLOG(clog) << "State on consensus change " << getJson(true) << ". ";
         handleWrongLedger(netLgr, clog);
     }
     else if (previousLedger_.id() != prevLedgerID_)
@@ -1744,13 +1743,12 @@ Consensus<Adaptor>::haveConsensus(std::unique_ptr<std::stringstream> const& clog
             // amount of time.
 
             ss << "Consensus time has expired in round " << establishCounter_
-               << "; continue until round " << kMinimumCounter << ". "
-               << json::Compact{getJson(false)};
+               << "; continue until round " << kMinimumCounter << ". " << getJson(false);
             JLOG(j_.error()) << ss.str();
             CLOG(clog) << ss.str() << ". ";
             return false;
         }
-        ss << "Consensus expired. " << json::Compact{getJson(true)};
+        ss << "Consensus expired. " << getJson(true);
         JLOG(j_.error()) << ss.str();
         CLOG(clog) << ss.str() << ". ";
         leaveConsensus(clog);
@@ -1760,8 +1758,8 @@ Consensus<Adaptor>::haveConsensus(std::unique_ptr<std::stringstream> const& clog
     if (result_->state == ConsensusState::MovedOn)
     {
         JLOG(j_.error()) << "Unable to reach consensus";
-        JLOG(j_.error()) << json::Compact{getJson(true)};
-        CLOG(clog) << "Unable to reach consensus " << json::Compact{getJson(true)} << ". ";
+        JLOG(j_.error()) << getJson(true);
+        CLOG(clog) << "Unable to reach consensus " << getJson(true) << ". ";
     }
 
     CLOG(clog) << "Consensus has been reached. ";

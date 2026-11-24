@@ -4,7 +4,7 @@
 
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Book.h>
 #include <xrpl/protocol/ErrorCodes.h>

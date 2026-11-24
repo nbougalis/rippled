@@ -4,7 +4,7 @@
 #include <test/jtx/Env.h>
 #include <test/jtx/JTx.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/jss.h>
 

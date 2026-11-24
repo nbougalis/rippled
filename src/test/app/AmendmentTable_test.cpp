@@ -12,7 +12,7 @@
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/config/BasicConfig.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/AmendmentTable.h>
 #include <xrpl/ledger/View.h>
 #include <xrpl/protocol/Feature.h>

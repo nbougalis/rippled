@@ -5,12 +5,13 @@
 #include <xrpld/rpc/detail/Handler.h>
 
 #include <xrpl/beast/net/IPEndpoint.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/RPCErr.h>
 #include <xrpl/protocol/SystemParameters.h>
 #include <xrpl/protocol/jss.h>
 
+#include <cstdint>
 #include <string>
 
 namespace xrpl {
@@ -31,31 +32,20 @@ doConnect(rpc::JsonContext& context)
     if (!context.params.isMember(jss::ip))
         return rpc::missingFieldError(jss::ip);
 
-    if (context.params.isMember(jss::port) &&
-        !context.params[jss::port].isConvertibleTo(json::ValueType::Int))
-    {
+    auto const port =
+        json::toInteger<std::uint16_t>(context.params.get(jss::port, kDefaultPeerPort));
+
+    if (!port || *port == 0)
         return rpcError(RpcInvalidParams);
-    }
-
-    int iPort = 0;
-
-    if (context.params.isMember(jss::port))
-    {
-        iPort = context.params[jss::port].asInt();
-    }
-    else
-    {
-        iPort = kDefaultPeerPort;
-    }
 
     auto const ipStr = context.params[jss::ip].asString();
     auto const ip = beast::ip::Endpoint::fromString(ipStr);
 
     if (!isUnspecified(ip))
-        context.app.getOverlay().connect(ip.atPort(iPort));
+        context.app.getOverlay().connect(ip.atPort(*port));
 
     return rpc::makeObjectValue(
-        "attempting connection to IP:" + ipStr + " port: " + std::to_string(iPort));
+        "attempting connection to IP:" + ipStr + " port: " + std::to_string(*port));
 }
 
 }  // namespace xrpl

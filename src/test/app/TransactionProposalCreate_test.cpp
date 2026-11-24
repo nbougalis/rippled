@@ -23,7 +23,7 @@
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/OpenView.h>
 #include <xrpl/ledger/helpers/ProposalHelpers.h>
 #include <xrpl/protocol/AccountID.h>

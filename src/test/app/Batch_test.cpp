@@ -39,8 +39,7 @@
 #include <xrpl/config/BasicConfig.h>
 #include <xrpl/config/Constants.h>
 #include <xrpl/core/HashRouter.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/OpenView.h>
 #include <xrpl/protocol/AccountID.h>
@@ -2813,7 +2812,7 @@ class Batch_test : public beast::unit_test::Suite
                     jrr[jss::error_exception] ==
                         "fails local checks: Batch inner transactions are never "
                         "considered validly signed.",
-                pretty(jrr),
+                toStyledString(jrr),
                 __FILE__,
                 line);
             env.close();

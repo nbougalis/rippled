@@ -1,7 +1,7 @@
 #include <xrpl/protocol/ErrorCodes.h>
 
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 
 #include <array>

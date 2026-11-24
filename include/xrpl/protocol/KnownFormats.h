@@ -10,6 +10,8 @@
 #include <cstddef>
 #include <forward_list>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -34,13 +36,11 @@ public:
     {
     public:
         Item(
-            char const* name,
+            std::string_view name,
             KeyType type,
             std::vector<SOElement> uniqueFields,
             std::vector<SOElement> commonFields)
-            : soTemplate_(std::move(uniqueFields), std::move(commonFields))
-            , name_(name)
-            , type_(type)
+            : name(name), soTemplate_(std::move(uniqueFields), std::move(commonFields)), type_(type)
         {
             // Verify that KeyType is appropriate.
             static_assert(
@@ -51,10 +51,10 @@ public:
         /**
          * Retrieve the name of the format.
          */
-        [[nodiscard]] std::string const&
+        [[nodiscard]] std::string
         getName() const
         {
-            return name_;
+            return std::string(name);
         }
 
         /**
@@ -72,9 +72,16 @@ public:
             return soTemplate_;
         }
 
+        /**
+         * The name of the format.
+         *
+         * @note The storage this refers to must outlive the item; in practice
+         *       format names are string literals.
+         */
+        std::string_view const name;
+
     private:
         SOTemplate soTemplate_;
-        std::string const name_;
         KeyType const type_;
     };
 
@@ -108,13 +115,13 @@ public:
      * @return      The type.
      */
     [[nodiscard]] KeyType
-    findTypeByName(std::string const& name) const
+    findTypeByName(std::string_view name) const
     {
         if (auto const result = findByName(name))
             return result->getType();
+
         Throw<std::runtime_error>(
-            name_ + ": Unknown format name '" +
-            name.substr(0, std::min(name.size(), std::size_t(32))) + "'");
+            name_ + ": Unknown format name '" + std::string(name.substr(0, 32)) + "'");
     }
 
     /**
@@ -147,12 +154,11 @@ protected:
      * Retrieve a format based on its name.
      */
     [[nodiscard]] Item const*
-    findByName(std::string const& name) const
+    findByName(std::string_view name) const
     {
-        auto const itr = names_.find(name);
-        if (itr == names_.end())
-            return nullptr;
-        return itr->second;
+        if (auto const itr = names_.find(name); itr != names_.end())
+            return itr->second;
+        return nullptr;
     }
 
     /**
@@ -166,7 +172,7 @@ protected:
      * @return The created format.
      */
     Item const&
-    add(char const* name,
+    add(std::string_view name,
         KeyType type,
         std::vector<SOElement> uniqueFields,
         std::vector<SOElement> commonFields = {})
@@ -174,14 +180,14 @@ protected:
         if (auto const item = findByType(type))
         {
             logicError(
-                std::string("Duplicate key for item '") + name + "': already maps to " +
-                item->getName());
+                std::string("Duplicate key for item '") + std::string(name) +
+                "': already maps to " + item->getName());
         }
 
-        formats_.emplace_front(name, type, std::move(uniqueFields), std::move(commonFields));
-        Item const& item{formats_.front()};
+        auto const& item =
+            formats_.emplace_front(name, type, std::move(uniqueFields), std::move(commonFields));
 
-        names_[name] = &item;
+        names_[item.name] = &item;
         types_[type] = &item;
 
         return item;
@@ -195,7 +201,7 @@ private:
     // based container is appropriate.  But we don't need searchability.
     std::forward_list<Item> formats_{};
 
-    boost::container::flat_map<std::string, Item const*> names_{};
+    boost::container::flat_map<std::string_view, Item const*> names_{};
     boost::container::flat_map<KeyType, Item const*> types_{};
     friend Derived;
 };

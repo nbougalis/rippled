@@ -7,8 +7,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/AmendmentTable.h>
 #include <xrpl/ledger/View.h>
 #include <xrpl/protocol/ErrorCodes.h>
@@ -324,7 +323,7 @@ class Feature_test : public beast::unit_test::Suite
                 "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCD"
                 "EF";
             auto const result = env.rpc("json", "feature", to_string(params))[jss::result];
-            BEAST_EXPECTS(result[jss::error] == "badFeature", result.toStyledString());
+            BEAST_EXPECTS(result[jss::error] == "badFeature", toStyledString(result));
             BEAST_EXPECT(result[jss::error_code] == RpcBadFeature);
             BEAST_EXPECT(result[jss::error_message] == "Feature unknown or invalid.");
         }

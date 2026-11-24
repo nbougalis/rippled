@@ -2,7 +2,7 @@
 #include <test/jtx/did.h>
 
 #include <xrpl/basics/strHex.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/jss.h>

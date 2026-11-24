@@ -12,8 +12,7 @@
 #include <xrpl/basics/chrono.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/digest.h>
 #include <xrpl/protocol/jss.h>
 
@@ -387,9 +386,8 @@ ValidatorSite::parseJsonResponse(
     std::scoped_lock<std::mutex> const& sitesLock)
 {
     json::Value const body = [&res, siteIdx, this] {
-        json::Reader r;
         json::Value body;
-        if (!r.parse(res, body))
+        if (!json::load(res, body))
         {
             JLOG(j_.warn()) << "Unable to parse JSON response from  "
                             << sites_[siteIdx].activeResource->uri;

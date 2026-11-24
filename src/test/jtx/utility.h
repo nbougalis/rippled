@@ -3,7 +3,7 @@
 #include <test/jtx/Account.h>
 
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/protocol/HashPrefix.h>
 #include <xrpl/protocol/SField.h>

@@ -27,8 +27,7 @@
 #include <xrpl/basics/chrono.h>
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/ErrorCodes.h>
@@ -50,6 +49,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace xrpl::test {
@@ -61,21 +61,21 @@ class AccountTx_test : public beast::unit_test::Suite
     struct NodeSanity
     {
         int const index;
-        json::StaticString const& txType;
-        boost::container::flat_set<std::string> created;
-        boost::container::flat_set<std::string> deleted;
-        boost::container::flat_set<std::string> modified;
+        json::StaticString txType;
+        boost::container::flat_set<std::string_view> created;
+        boost::container::flat_set<std::string_view> deleted;
+        boost::container::flat_set<std::string_view> modified;
 
         NodeSanity(
             int idx,
-            json::StaticString const& t,
-            std::initializer_list<char const*> c,
-            std::initializer_list<char const*> d,
-            std::initializer_list<char const*> m)
+            json::StaticString t,
+            std::initializer_list<std::string_view> c,
+            std::initializer_list<std::string_view> d,
+            std::initializer_list<std::string_view> m)
             : index(idx), txType(t)
         {
-            auto const buildSet = [](auto&& init) {
-                boost::container::flat_set<std::string> r;
+            auto buildSet = [](auto&& init) {
+                boost::container::flat_set<std::string_view> r;
                 r.reserve(init.size());
                 for (auto&& s : init)
                     r.insert(s);
@@ -96,26 +96,26 @@ class AccountTx_test : public beast::unit_test::Suite
         BEAST_EXPECT(txNode[jss::tx][sfTransactionType.jsonName].asString() == sane.txType);
 
         // Make sure all of the expected node types are present.
-        boost::container::flat_set<std::string> createdNodes;
-        boost::container::flat_set<std::string> deletedNodes;
-        boost::container::flat_set<std::string> modifiedNodes;
+        boost::container::flat_set<std::string_view> createdNodes;
+        boost::container::flat_set<std::string_view> deletedNodes;
+        boost::container::flat_set<std::string_view> modifiedNodes;
 
         for (json::Value const& metaNode : txNode[jss::meta][sfAffectedNodes.jsonName])
         {
             if (metaNode.isMember(sfCreatedNode.jsonName))
             {
                 createdNodes.insert(
-                    metaNode[sfCreatedNode.jsonName][sfLedgerEntryType.jsonName].asString());
+                    metaNode[sfCreatedNode.jsonName][sfLedgerEntryType.jsonName].asStringView());
             }
             else if (metaNode.isMember(sfDeletedNode.jsonName))
             {
                 deletedNodes.insert(
-                    metaNode[sfDeletedNode.jsonName][sfLedgerEntryType.jsonName].asString());
+                    metaNode[sfDeletedNode.jsonName][sfLedgerEntryType.jsonName].asStringView());
             }
             else if (metaNode.isMember(sfModifiedNode.jsonName))
             {
                 modifiedNodes.insert(
-                    metaNode[sfModifiedNode.jsonName][sfLedgerEntryType.jsonName].asString());
+                    metaNode[sfModifiedNode.jsonName][sfLedgerEntryType.jsonName].asStringView());
             }
             else
             {

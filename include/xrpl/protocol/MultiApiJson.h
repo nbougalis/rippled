@@ -1,13 +1,14 @@
 #pragma once
 
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ApiVersion.h>
 
 #include <array>
 #include <concepts>
 #include <cstdlib>
 #include <functional>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -59,7 +60,7 @@ struct MultiApiJson
     }
 
     void
-    set(char const* key, auto const& v)
+    set(std::string_view key, auto const& v)
         requires std::constructible_from<json::Value, decltype(v)>
     {
         for (auto& a : this->val)
@@ -69,7 +70,7 @@ struct MultiApiJson
     enum class IsMemberResult : int { None = 0, Some, All };
 
     [[nodiscard]] IsMemberResult
-    isMember(char const* key) const
+    isMember(std::string_view key) const
     {
         int count = 0;
         for (auto& a : this->val)

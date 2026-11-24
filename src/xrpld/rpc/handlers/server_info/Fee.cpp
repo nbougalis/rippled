@@ -3,7 +3,7 @@
 #include <xrpld/rpc/Context.h>
 
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 
 namespace xrpl {

@@ -9,7 +9,7 @@
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/utility/Zero.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Batch.h>
 #include <xrpl/protocol/HashPrefix.h>

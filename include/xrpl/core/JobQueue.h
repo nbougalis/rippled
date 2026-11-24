@@ -7,7 +7,7 @@
 #include <xrpl/core/ClosureCounter.h>
 #include <xrpl/core/JobTypes.h>
 #include <xrpl/core/detail/Workers.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 // Include only the specific Boost.Coroutine2 headers actually used here.
 // Avoid `boost/coroutine2/all.hpp` because it transitively pulls in

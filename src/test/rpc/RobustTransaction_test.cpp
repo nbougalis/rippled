@@ -7,7 +7,7 @@
 
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/core/JobQueue.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/Seed.h>
 #include <xrpl/protocol/jss.h>

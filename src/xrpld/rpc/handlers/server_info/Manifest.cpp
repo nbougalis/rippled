@@ -4,7 +4,7 @@
 #include <xrpld/rpc/Context.h>
 
 #include <xrpl/basics/base64.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/PublicKey.h>
 #include <xrpl/protocol/jss.h>

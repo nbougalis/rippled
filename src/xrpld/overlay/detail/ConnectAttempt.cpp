@@ -12,8 +12,7 @@
 #include <xrpl/beast/net/IPAddressConversion.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/peerfinder/Config.h>
 #include <xrpl/peerfinder/Slot.h>
 #include <xrpl/protocol/PublicKey.h>
@@ -373,14 +372,13 @@ ConnectAttempt::processResponse()
     if (response_.result() == boost::beast::http::status::service_unavailable)
     {
         json::Value json;
-        json::Reader r;
         std::string s;
         s.reserve(boost::asio::buffer_size(response_.body().data()));
         for (auto const buffer : response_.body().data())
         {
             s.append(static_cast<char const*>(buffer.data()), boost::asio::buffer_size(buffer));
         }
-        auto const success = r.parse(s, json);
+        auto const success = json::load(s, json);
         if (success)
         {
             if (json.isObject() && json.isMember("peer-ips"))

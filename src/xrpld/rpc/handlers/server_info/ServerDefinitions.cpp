@@ -4,8 +4,7 @@
 
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/LedgerFormats.h>
 #include <xrpl/protocol/SField.h>
@@ -357,7 +356,7 @@ ServerDefinitions::ServerDefinitions() : defs_{json::ValueType::Object}
 
     // generate hash
     {
-        std::string const out = json::FastWriter().write(defs_);
+        std::string const out = toCompactString(defs_);
         defsHash_ = xrpl::sha512Half(xrpl::Slice{out.data(), out.size()});
         defs_[jss::hash] = to_string(defsHash_);
     }

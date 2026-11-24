@@ -6,7 +6,7 @@
 
 #include <xrpl/beast/insight/Collector.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/resource/Consumer.h>
 #include <xrpl/server/InfoSub.h>

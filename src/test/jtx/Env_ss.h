@@ -3,7 +3,7 @@
 #include <test/jtx/Env.h>
 #include <test/jtx/JTx.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <source_location>
 #include <utility>

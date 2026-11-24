@@ -2,7 +2,7 @@
 
 // NOLINTBEGIN(readability-identifier-naming)
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <algorithm>
 #include <array>

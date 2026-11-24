@@ -26,8 +26,7 @@
 #include <xrpl/beast/utility/Zero.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/ServiceRegistry.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/ErrorCodes.h>
@@ -1325,8 +1324,7 @@ struct PayChan_test : public beast::unit_test::Suite
         forAllApiVersions([&, this](unsigned apiVersion) {
             testcase("PayChan Channel_Auth RPC Api " + std::to_string(apiVersion));
             args[jss::api_version] = apiVersion;
-            auto const rs =
-                env.rpc("json", "channel_authorize", args.toStyledString())[jss::result];
+            auto const rs = env.rpc("json", "channel_authorize", toStyledString(args))[jss::result];
             auto const error = apiVersion < 2u ? "invalidParams" : "badKeyType";
             auto const errorCode = apiVersion < 2u ? RpcInvalidParams : RpcBadKeyType;
             auto const errorMessage =
@@ -1502,7 +1500,7 @@ struct PayChan_test : public beast::unit_test::Suite
                 args[jss::passphrase] = "passphrase_can_be_anything";
 
                 auto const ra =
-                    env.rpc("json", "channel_authorize", args.toStyledString())[jss::result];
+                    env.rpc("json", "channel_authorize", toStyledString(args))[jss::result];
                 BEAST_EXPECT(ra[jss::error] == "invalidParams");
                 BEAST_EXPECT(ra[jss::error_code] == RpcInvalidParams);
                 BEAST_EXPECT(ra[jss::error_message] == "Invalid parameters.");
@@ -1516,7 +1514,7 @@ struct PayChan_test : public beast::unit_test::Suite
                 args[jss::signature] = sig;
 
                 auto const rv =
-                    env.rpc("json", "channel_verify", args.toStyledString())[jss::result];
+                    env.rpc("json", "channel_verify", toStyledString(args))[jss::result];
                 BEAST_EXPECT(rv[jss::error] == "invalidParams");
                 BEAST_EXPECT(rv[jss::error_code] == RpcInvalidParams);
                 BEAST_EXPECT(rv[jss::error_message] == "Invalid parameters.");
@@ -1621,7 +1619,7 @@ struct PayChan_test : public beast::unit_test::Suite
                 args[jss::amount] = "2000";
                 args[jss::key_type] = "secp256k1";
                 args[jss::passphrase] = "passphrase_can_be_anything";
-                rs = env.rpc("json", "channel_authorize", args.toStyledString())[jss::result];
+                rs = env.rpc("json", "channel_authorize", toStyledString(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
                 BEAST_EXPECT(rs[jss::error_code] == RpcInvalidParams);
                 BEAST_EXPECT(rs[jss::error_message] == "Missing field 'channel_id'.");
@@ -1632,7 +1630,7 @@ struct PayChan_test : public beast::unit_test::Suite
                 args[jss::channel_id] = chan1Str;
                 args[jss::key_type] = "secp256k1";
                 args[jss::passphrase] = "passphrase_can_be_anything";
-                rs = env.rpc("json", "channel_authorize", args.toStyledString())[jss::result];
+                rs = env.rpc("json", "channel_authorize", toStyledString(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
                 BEAST_EXPECT(rs[jss::error_code] == RpcInvalidParams);
                 BEAST_EXPECT(rs[jss::error_message] == "Missing field 'amount'.");
@@ -1643,7 +1641,7 @@ struct PayChan_test : public beast::unit_test::Suite
                 args[jss::amount] = "2000";
                 args[jss::channel_id] = chan1Str;
                 args[jss::passphrase] = "passphrase_can_be_anything";
-                rs = env.rpc("json", "channel_authorize", args.toStyledString())[jss::result];
+                rs = env.rpc("json", "channel_authorize", toStyledString(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
                 BEAST_EXPECT(rs[jss::error_code] == RpcInvalidParams);
                 BEAST_EXPECT(rs[jss::error_message] == "Missing field 'secret'.");
@@ -1656,7 +1654,7 @@ struct PayChan_test : public beast::unit_test::Suite
                 args[jss::key_type] = "secp256k1";
                 args[jss::passphrase] = "passphrase_can_be_anything";
                 args[jss::seed] = "seed can be anything";
-                rs = env.rpc("json", "channel_authorize", args.toStyledString())[jss::result];
+                rs = env.rpc("json", "channel_authorize", toStyledString(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "invalidParams");
                 BEAST_EXPECT(rs[jss::error_code] == RpcInvalidParams);
                 BEAST_EXPECT(
@@ -1671,7 +1669,7 @@ struct PayChan_test : public beast::unit_test::Suite
                 args[jss::channel_id] = chan1Str + "1";
                 args[jss::key_type] = "secp256k1";
                 args[jss::passphrase] = "passphrase_can_be_anything";
-                rs = env.rpc("json", "channel_authorize", args.toStyledString())[jss::result];
+                rs = env.rpc("json", "channel_authorize", toStyledString(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "channelMalformed");
                 BEAST_EXPECT(rs[jss::error_code] == RpcChannelMalformed);
                 BEAST_EXPECT(rs[jss::error_message] == "Payment channel is malformed.");
@@ -1683,7 +1681,7 @@ struct PayChan_test : public beast::unit_test::Suite
                 args[jss::channel_id] = chan1Str;
                 args[jss::key_type] = "secp256k1";
                 args[jss::passphrase] = "passphrase_can_be_anything";
-                rs = env.rpc("json", "channel_authorize", args.toStyledString())[jss::result];
+                rs = env.rpc("json", "channel_authorize", toStyledString(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "channelAmtMalformed");
                 BEAST_EXPECT(rs[jss::error_code] == RpcChannelAmtMalformed);
                 BEAST_EXPECT(rs[jss::error_message] == "Payment channel amount is malformed.");
@@ -1695,7 +1693,7 @@ struct PayChan_test : public beast::unit_test::Suite
                 args[jss::channel_id] = chan1Str;
                 args[jss::key_type] = "secp256k1";
                 args[jss::passphrase] = "passphrase_can_be_anything";
-                rs = env.rpc("json", "channel_authorize", args.toStyledString())[jss::result];
+                rs = env.rpc("json", "channel_authorize", toStyledString(args))[jss::result];
                 BEAST_EXPECT(rs[jss::error] == "channelAmtMalformed");
                 BEAST_EXPECT(rs[jss::error_code] == RpcChannelAmtMalformed);
                 BEAST_EXPECT(rs[jss::error_message] == "Payment channel amount is malformed.");

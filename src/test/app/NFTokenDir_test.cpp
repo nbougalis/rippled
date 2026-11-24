@@ -11,9 +11,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Feature.h>
 #include <xrpl/protocol/Indexes.h>
 #include <xrpl/protocol/SField.h>
@@ -63,39 +61,36 @@ class NFTokenDir_test : public beast::unit_test::Suite
                 std::cout << "No ledger state found!" << std::endl;
                 return;
             }
-            json::Value& state = jrr[jss::result][jss::state];
+            json::Value const& state = jrr[jss::result][jss::state];
             if (!state.isArray())
             {
                 std::cout << "Ledger state is not array!" << std::endl;
                 return;
             }
-            for (json::UInt i = 0; i < state.size(); ++i)
+            for (auto const& page : state)
             {
-                if (state[i].isMember(sfNFTokens.jsonName) &&
-                    state[i][sfNFTokens.jsonName].isArray())
+                if (page.isMember(sfNFTokens.jsonName) && page[sfNFTokens.jsonName].isArray())
                 {
-                    std::uint32_t const tokenCount = state[i][sfNFTokens.jsonName].size();
-                    std::cout << tokenCount << " NFtokens in page "
-                              << state[i][jss::index].asString() << std::endl;
+                    std::uint32_t const tokenCount = page[sfNFTokens.jsonName].size();
+                    std::cout << tokenCount << " NFtokens in page " << page[jss::index].asString()
+                              << std::endl;
 
                     if (vol == Volume::Noisy)
                     {
-                        std::cout << state[i].toStyledString() << std::endl;
+                        std::cout << toStyledString(page) << std::endl;
                     }
                     else
                     {
                         if (tokenCount > 0)
                         {
-                            std::cout
-                                << "first: " << state[i][sfNFTokens.jsonName][0u].toStyledString()
-                                << std::endl;
+                            std::cout << "first: " << toStyledString(page[sfNFTokens.jsonName][0u])
+                                      << std::endl;
                         }
                         if (tokenCount > 1)
                         {
-                            std::cout
-                                << "last: "
-                                << state[i][sfNFTokens.jsonName][tokenCount - 1].toStyledString()
-                                << std::endl;
+                            std::cout << "last: "
+                                      << toStyledString(page[sfNFTokens.jsonName][tokenCount - 1])
+                                      << std::endl;
                         }
                     }
                 }
@@ -926,9 +921,9 @@ class NFTokenDir_test : public beast::unit_test::Suite
 
                     if (result.isMember(jss::account_objects))
                     {
-                        json::Value& someOffers = result[jss::account_objects];
-                        for (std::size_t i = 0; i < someOffers.size(); ++i)
-                            ownedNftOffers.append(someOffers[i]);
+                        json::Value const& someOffers = result[jss::account_objects];
+                        for (auto const& someOffer : someOffers)
+                            ownedNftOffers.append(someOffer);
                     }
                 }
             } while (!marker.empty());
@@ -999,9 +994,9 @@ class NFTokenDir_test : public beast::unit_test::Suite
 
                 if (result.isMember(jss::account_nfts))
                 {
-                    json::Value& someNFTs = result[jss::account_nfts];
-                    for (std::size_t i = 0; i < someNFTs.size(); ++i)
-                        ownedNFTs.append(someNFTs[i]);
+                    json::Value const& someNFTs = result[jss::account_nfts];
+                    for (auto const& someNFT : someNFTs)
+                        ownedNFTs.append(someNFT);
                 }
             }
         } while (!marker.empty());

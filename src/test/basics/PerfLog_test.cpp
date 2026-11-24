@@ -8,8 +8,7 @@
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobTypes.h>
 #include <xrpl/core/PerfLog.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/jss.h>
 
@@ -503,7 +502,7 @@ public:
             }
 
             json::Value parsedLastLine;
-            json::Reader().parse(lastLine, parsedLastLine);
+            json::load(lastLine, parsedLastLine);
             if (!BEAST_EXPECT(!rpc::containsError(parsedLastLine)))
             {
                 // Avoid cascade of failures
@@ -823,7 +822,7 @@ public:
             }
 
             json::Value parsedLastLine;
-            json::Reader().parse(lastLine, parsedLastLine);
+            json::load(lastLine, parsedLastLine);
             if (!BEAST_EXPECT(!rpc::containsError(parsedLastLine)))
             {
                 // Avoid cascade of failures
@@ -954,7 +953,7 @@ public:
             }
 
             json::Value parsedLastLine;
-            json::Reader().parse(lastLine, parsedLastLine);
+            json::load(lastLine, parsedLastLine);
             if (!BEAST_EXPECT(!rpc::containsError(parsedLastLine)))
             {
                 // Avoid cascade of failures

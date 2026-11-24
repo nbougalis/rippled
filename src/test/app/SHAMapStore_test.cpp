@@ -19,7 +19,7 @@
 #include <xrpl/config/BasicConfig.h>
 #include <xrpl/config/Constants.h>
 #include <xrpl/core/JobQueue.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/nodestore/Backend.h>
 #include <xrpl/nodestore/Manager.h>
 #include <xrpl/nodestore/detail/DatabaseRotatingImp.h>

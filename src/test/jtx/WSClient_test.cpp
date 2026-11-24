@@ -3,7 +3,7 @@
 #include <test/jtx/amount.h>
 
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <chrono>
 

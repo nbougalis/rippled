@@ -6,7 +6,7 @@
 
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/StringUtilities.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/jss.h>

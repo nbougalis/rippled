@@ -3,8 +3,7 @@
 #include <xrpl/basics/Log.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/consensus/ConsensusParms.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 
 #include <boost/container/flat_map.hpp>
 
@@ -330,14 +329,14 @@ DisputedTx<Tx, NodeId>::updateVote(int percentTime, bool proposing, ConsensusPar
         JLOG(j_.info()) << "No change (" << (ourVote_ ? "YES" : "NO") << ") on " << tx_.id()
                         << " : weight " << weight << ", percent " << percentTime
                         << ", round(s) with this vote: " << currentVoteCounter_;
-        JLOG(j_.debug()) << json::Compact{getJson()};
+        JLOG(j_.debug()) << getJson();
         return false;
     }
 
     currentVoteCounter_ = 0;
     ourVote_ = newPosition;
     JLOG(j_.debug()) << "We now vote " << (ourVote_ ? "YES" : "NO") << " on " << tx_.id();
-    JLOG(j_.debug()) << json::Compact{getJson()};
+    JLOG(j_.debug()) << getJson();
     return true;
 }
 

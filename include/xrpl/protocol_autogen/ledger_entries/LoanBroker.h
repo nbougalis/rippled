@@ -6,7 +6,7 @@
 #include <xrpl/protocol/jss.h>
 #include <xrpl/protocol_autogen/LedgerEntryBase.h>
 #include <xrpl/protocol_autogen/LedgerEntryBuilderBase.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <stdexcept>
 #include <optional>

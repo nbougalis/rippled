@@ -66,9 +66,7 @@
 #include <xrpl/core/PerfLog.h>
 #include <xrpl/core/StartUpType.h>
 #include <xrpl/crypto/csprng.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/AmendmentTable.h>
 #include <xrpl/ledger/Ledger.h>
 #include <xrpl/ledger/OpenView.h>
@@ -128,6 +126,7 @@
 #include <functional>
 #include <ios>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -1461,10 +1460,9 @@ ApplicationImp::setup(boost::program_options::variables_map const& cmdline)
     //
     for (auto const& cmd : config_->section(Sections::kRpcStartup).lines())
     {
-        json::Reader jrReader;
         json::Value jvCommand;
 
-        if (!jrReader.parse(cmd, jvCommand))
+        if (!json::load(cmd, jvCommand))
         {
             JLOG(journal_.fatal())
                 << "Couldn't parse entry in [" << Sections::kRpcStartup << "]: '" << cmd;
@@ -1784,10 +1782,12 @@ ApplicationImp::loadLedgerFromFile(std::string const& name)
             return nullptr;
         }
 
-        json::Reader reader;
+        std::string const contents{
+            std::istreambuf_iterator<char>{ledgerFile}, std::istreambuf_iterator<char>{}};
+
         json::Value jLedger;
 
-        if (!reader.parse(ledgerFile, jLedger))
+        if (!json::load(contents, jLedger))
         {
             JLOG(journal_.fatal()) << "Unable to parse ledger JSON";
             return nullptr;
@@ -1850,10 +1850,8 @@ ApplicationImp::loadLedgerFromFile(std::string const& name)
             seq, closeTime, Rules{config_->features}, config_->fees.toFees(), nodeFamily_);
         loadLedger->setTotalDrops(totalDrops);
 
-        for (json::UInt index = 0; index < ledger.get().size(); ++index)
+        for (json::Value& entry : ledger.get())
         {
-            json::Value& entry = ledger.get()[index];
-
             if (!entry.isObjectOrNull())
             {
                 JLOG(journal_.fatal()) << "Invalid entry in ledger";
@@ -1870,7 +1868,7 @@ ApplicationImp::loadLedgerFromFile(std::string const& name)
 
             entry.removeMember(jss::index);
 
-            STParsedJSONObject stp("sle", ledger.get()[index]);
+            STParsedJSONObject stp("sle", entry);
 
             if (!stp.object || uIndex.isZero())
             {

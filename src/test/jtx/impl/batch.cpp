@@ -8,8 +8,7 @@
 #include <xrpl/basics/Number.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/basics/strHex.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/Batch.h>
 #include <xrpl/protocol/Protocol.h>
 #include <xrpl/protocol/PublicKey.h>
@@ -112,7 +111,7 @@ Sig::operator()(Env& env, JTx& jt) const
     }
     catch (ParseError const&)
     {
-        env.test.log << pretty(jt.jv) << std::endl;
+        env.test.log << toStyledString(jt.jv) << std::endl;
         throw;
     }
     STTx const& stx = STTx{std::move(*st)};
@@ -151,7 +150,7 @@ Msig::operator()(Env& env, JTx& jt) const
     }
     catch (ParseError const&)
     {
-        env.test.log << pretty(jt.jv) << std::endl;
+        env.test.log << toStyledString(jt.jv) << std::endl;
         throw;
     }
     STTx const& stx = STTx{std::move(*st)};

@@ -4,8 +4,7 @@
 #include <xrpld/rpc/handlers/admin/keygen/WalletPropose.h>
 
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/PublicKey.h>

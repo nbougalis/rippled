@@ -8,7 +8,7 @@
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/basics/safe_cast.h>
 #include <xrpl/basics/strHex.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/RPCErr.h>
 #include <xrpl/protocol/STTx.h>

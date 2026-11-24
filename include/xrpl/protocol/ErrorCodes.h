@@ -1,6 +1,6 @@
 #pragma once
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <string>
 
@@ -175,25 +175,22 @@ namespace rpc {
 struct ErrorInfo
 {
     // Default ctor needed to produce an empty std::array during constexpr eval.
-    constexpr ErrorInfo()
-        : code(RpcUnknown), token("unknown"), message("An unknown error code."), httpStatus(200)
-    {
-    }
+    constexpr ErrorInfo() = default;
 
-    constexpr ErrorInfo(ErrorCodeI code, char const* token, char const* message)
-        : code(code), token(token), message(message), httpStatus(200)
-    {
-    }
-
-    constexpr ErrorInfo(ErrorCodeI code, char const* token, char const* message, int httpStatus)
+    template <std::size_t N, std::size_t M>
+    consteval ErrorInfo(
+        ErrorCodeI code,
+        char const (&token)[N],
+        char const (&message)[M],
+        int httpStatus = 200)
         : code(code), token(token), message(message), httpStatus(httpStatus)
     {
     }
 
-    ErrorCodeI code;
-    json::StaticString token;
-    json::StaticString message;
-    int httpStatus;
+    ErrorCodeI code = RpcUnknown;
+    json::StaticString token{"unknown"};
+    json::StaticString message{"An unknown error code."};
+    int httpStatus = 200;
 };
 
 /**

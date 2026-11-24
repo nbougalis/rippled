@@ -20,11 +20,7 @@
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
 #include <xrpl/json/Output.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/BuildInfo.h>
 #include <xrpl/protocol/ErrorCodes.h>
@@ -339,19 +335,18 @@ ServerHandler::onWSMessage(
     std::vector<boost::asio::const_buffer> const& buffers)
 {
     json::Value jv;
-    auto const size = boost::asio::buffer_size(buffers);
-    if (size > rpc::tuning::kMaxRequestSize || !json::Reader{}.parse(jv, buffers) || !jv.isObject())
+
+    if (boost::asio::buffer_size(buffers) > rpc::tuning::kMaxRequestSize ||
+        !json::load(buffersToString(buffers), jv) || !jv.isObject())
     {
         json::Value jvResult(json::ValueType::Object);
         jvResult[jss::type] = jss::error;
         jvResult[jss::error] = "jsonInvalid";
         jvResult[jss::value] = buffersToString(buffers);
-        boost::beast::multi_buffer sb;
-        json::stream(jvResult, [&sb](auto const p, auto const n) {
-            sb.commit(boost::asio::buffer_copy(sb.prepare(n), boost::asio::buffer(p, n)));
-        });
         JLOG(journal_.trace()) << "Websocket sending '" << jvResult << "'";
-        session->send(std::make_shared<StreambufWSMsg<decltype(sb)>>(std::move(sb)));
+        session->send(
+            std::make_shared<StreambufWSMsg<boost::beast::multi_buffer>>(
+                json::save<boost::beast::multi_buffer>(jvResult)));
         session->complete();
         return;
     }
@@ -503,7 +498,7 @@ ServerHandler::processSession(
         // LCOV_EXCL_START
         jr[jss::result] = rpc::makeError(RpcInternal);
         JLOG(journal_.error()) << "Exception while processing WS: " << ex.what() << "\n"
-                               << "Input JSON: " << json::Compact{json::Value{jv}};
+                               << "Input JSON: " << json::Value{jv};
         // LCOV_EXCL_STOP
     }
 
@@ -613,19 +608,31 @@ ServerHandler::processRequest(
 {
     auto const rpcJ = app_.getJournal("RPC");
 
+    if (request.size() > rpc::tuning::kMaxRequestSize)
+    {
+        httpReply(400, "Unable to parse request: request is too large.", output, rpcJ);
+        return;
+    }
+
     json::Value jsonOrig;
     {
-        json::Reader reader;
-        if ((request.size() > rpc::tuning::kMaxRequestSize) || !reader.parse(request, jsonOrig) ||
-            !jsonOrig || !jsonOrig.isObject())
+        std::string error;
+
+        auto ret = json::load(request, error);
+
+        if (ret && !ret->isObject())
         {
-            httpReply(
-                400,
-                "Unable to parse request: " + reader.getFormattedErrorMessages(),
-                output,
-                rpcJ);
+            error = "An object was expected.";
+            ret.reset();
+        }
+
+        if (!ret)
+        {
+            httpReply(400, "Unable to parse request: " + error, output, rpcJ);
             return;
         }
+
+        jsonOrig = std::move(*ret);
     }
 
     bool batch = false;
@@ -887,9 +894,8 @@ ServerHandler::processRequest(
         {
             // LCOV_EXCL_START
             result = rpc::makeError(RpcInternal);
-            JLOG(journal_.error())
-                << "Internal error : " << ex.what()
-                << " when processing request: " << json::Compact{json::Value{params}};
+            JLOG(journal_.error()) << "Internal error : " << ex.what()
+                                   << " when processing request: " << json::Value{params};
             // LCOV_EXCL_STOP
         }
 

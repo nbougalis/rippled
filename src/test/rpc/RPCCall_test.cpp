@@ -8,8 +8,7 @@
 #include <xrpld/rpc/detail/Handler.h>
 
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/jss.h>
 
@@ -554,7 +553,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "params" : [
       {
          "api_version" : %API_VER%,
-         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
       }
     ]
     })",
@@ -1235,7 +1234,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "params" : [
       {
          "api_version" : %API_VER%,
-         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
       }
     ]
     })",
@@ -1984,7 +1983,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "can_delete",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -2890,7 +2889,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "feature",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -2997,7 +2996,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "fetch_info",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -3061,7 +3060,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "params" : [
       {
          "api_version" : %API_VER%,
-         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+         "account" : "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
       }
     ]
     })",
@@ -3267,7 +3266,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "get_counts",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -3590,21 +3589,17 @@ static RPCCallTestData const kRpcCallTestArray[] = {
             R"({"jsonrpc":"2.0","ripplerpc":"2.0","id":"A1","method":"call_1",})",
         },
         RPCCallTestData::Exception::NoException,
+        // Nothing is recovered from a document that fails to parse, so the
+        // error cannot echo the id, jsonrpc or ripplerpc members of the request.
         R"({
-    "id" : "A1",
-    "jsonrpc" : "2.0",
     "method" : "json2",
     "params" : [
       {
          "error" : "invalidParams",
          "error_code" : 31,
-         "error_message" : "Invalid parameters.",
-         "id" : "A1",
-         "jsonrpc" : "2.0",
-         "ripplerpc" : "2.0"
+         "error_message" : "Invalid parameters."
       }
-    ],
-    "ripplerpc" : "2.0"
+    ]
     })",
     },
     {
@@ -3857,7 +3852,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "ledger",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -4027,7 +4022,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "ledger_closed",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -4060,7 +4055,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "ledger_current",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -4319,7 +4314,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "log_level",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -4496,7 +4491,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "logrotate",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -4712,7 +4707,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "peers",
     "params" : [
        {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
        }
     ]
     })",
@@ -4863,7 +4858,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "ping",
     "params" : [
        {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
        }
     ]
     })",
@@ -4898,7 +4893,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "print",
     "params" : [
        {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
        }
     ]
     })",
@@ -4949,7 +4944,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "random",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -5662,7 +5657,6 @@ static RPCCallTestData const kRpcCallTestArray[] = {
          "error" : "invalidParams",
          "error_code" : 31,
          "error_message" : "Invalid parameters."
-         }
       }
     ]
     })",
@@ -5681,7 +5675,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "server_info",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -5726,7 +5720,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "server_info",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -5745,7 +5739,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "server_state",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -5790,7 +5784,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "server_state",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -5809,7 +5803,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "stop",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -6261,7 +6255,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "unl_list",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -6296,7 +6290,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "validation_create",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -6346,7 +6340,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "version",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -6381,7 +6375,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "wallet_propose",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -6595,7 +6589,7 @@ static RPCCallTestData const kRpcCallTestArray[] = {
     "method" : "unknown_command",
     "params" : [
       {
-         "api_version" : %API_VER%,
+         "api_version" : %API_VER%
       }
     ]
     })",
@@ -6687,7 +6681,12 @@ public:
             }
 
             json::Value exp;
-            json::Reader{}.parse(updateAPIVersionString(expVersioned, apiVersion), exp);
+            if (std::strlen(expVersioned) != 0)
+            {
+                BEAST_EXPECTS(
+                    json::load(updateAPIVersionString(expVersioned, apiVersion), exp),
+                    rpcCallTest.description);
+            }
 
             // Lambda to remove the "params[0u]:error_code" field if present.
             // Error codes are not expected to be stable between releases.

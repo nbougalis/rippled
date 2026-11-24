@@ -3,7 +3,7 @@
 #include <xrpld/rpc/Role.h>
 
 #include <xrpl/beast/net/IPAddressConversion.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/server/InfoSub.h>
 #include <xrpl/server/WSSession.h>
 
@@ -52,15 +52,12 @@ public:
     void
     send(json::Value const& jv, bool) override
     {
-        auto const sp = ws_.lock();
-        if (!sp)
-            return;
-        boost::beast::multi_buffer sb;
-        json::stream(jv, [&](void const* data, std::size_t n) {
-            sb.commit(boost::asio::buffer_copy(sb.prepare(n), boost::asio::buffer(data, n)));
-        });
-        auto const m = std::make_shared<StreambufWSMsg<decltype(sb)>>(std::move(sb));
-        sp->send(m);
+        if (auto sp = ws_.lock())
+        {
+            sp->send(
+                std::make_shared<StreambufWSMsg<boost::beast::multi_buffer>>(
+                    json::toMultiBuffer(jv)));
+        }
     }
 };
 

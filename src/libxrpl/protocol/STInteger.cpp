@@ -2,7 +2,7 @@
 
 #include <xrpl/basics/Log.h>
 #include <xrpl/basics/safe_cast.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/LedgerFormats.h>
 #include <xrpl/protocol/Permissions.h>
 #include <xrpl/protocol/SField.h>

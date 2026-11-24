@@ -8,8 +8,7 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/config/BasicConfig.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/nodestore/Backend.h>
 #include <xrpl/nodestore/NodeObject.h>
 #include <xrpl/nodestore/Scheduler.h>

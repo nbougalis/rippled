@@ -2,8 +2,7 @@
 
 #include <xrpld/rpc/detail/JsonObjectView.hpp>
 
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/jss.h>
 
@@ -39,7 +38,7 @@ makeParams()
     })JSON";
 
     json::Value params;
-    EXPECT_TRUE(json::Reader{}.parse(kParams, params));
+    EXPECT_TRUE(json::load(kParams, params));
 
     return params;
 }

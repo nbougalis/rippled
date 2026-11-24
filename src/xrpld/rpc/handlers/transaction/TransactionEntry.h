@@ -3,7 +3,7 @@
 #include <xrpld/rpc/Context.h>
 #include <xrpld/rpc/detail/SpecBridge.hpp>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/protocol/STObject.h>
 #include <xrpl/protocol/STTx.h>

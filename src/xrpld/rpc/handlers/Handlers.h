@@ -2,7 +2,7 @@
 
 #include <xrpld/rpc/handlers/ledger/Ledger.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 namespace xrpl {
 

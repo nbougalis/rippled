@@ -32,8 +32,7 @@
 #include <xrpl/beast/utility/Zero.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/ServiceRegistry.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/OpenView.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/ErrorCodes.h>
@@ -2590,7 +2589,7 @@ class NFTokenBaseUtil_test : public beast::unit_test::Suite
         }();
 
         // Verify that the returned NFTs match what we sent.
-        json::Value& nfts = aliceNFTs[jss::result][jss::account_nfts];
+        json::Value const& nfts = aliceNFTs[jss::result][jss::account_nfts];
         if (!BEAST_EXPECT(nfts.size() == entries.size()))
             return;
 
@@ -2598,8 +2597,8 @@ class NFTokenBaseUtil_test : public beast::unit_test::Suite
         // as entries.
         std::vector<json::Value> sortedNFTs;
         sortedNFTs.reserve(nfts.size());
-        for (std::size_t i = 0; i < nfts.size(); ++i)
-            sortedNFTs.push_back(nfts[i]);
+        for (auto const& nft : nfts)
+            sortedNFTs.push_back(nft);
         std::ranges::sort(
             sortedNFTs,
 
@@ -4697,9 +4696,9 @@ class NFTokenBaseUtil_test : public beast::unit_test::Suite
 
                     if (expect(result.isMember(jss::offers), "expected \"offers\"", __FILE__, line))
                     {
-                        json::Value& someOffers = result[jss::offers];
-                        for (std::size_t i = 0; i < someOffers.size(); ++i)
-                            allOffers.append(someOffers[i]);
+                        json::Value const& someOffers = result[jss::offers];
+                        for (auto const& someOffer : someOffers)
+                            allOffers.append(someOffer);
                     }
                 }
             } while (!marker.empty());

@@ -21,7 +21,7 @@
 
 #include <xrpl/basics/StringUtilities.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ApiVersion.h>
 
 #include <rpcspec/Errors.hpp>

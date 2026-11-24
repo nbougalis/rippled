@@ -8,7 +8,7 @@
 #include <xrpl/basics/Log.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/RPCErr.h>

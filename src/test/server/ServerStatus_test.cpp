@@ -9,9 +9,7 @@
 #include <xrpl/beast/test/yield_to.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/server/LoadFeeTrack.h>
@@ -749,10 +747,10 @@ class ServerStatus_test : public beast::unit_test::Suite, public beast::test::En
                 return json::ValueType::Object;
 
             json::Value resp;
-            json::Reader jr;
-            if (!BEAST_EXPECT(jr.parse(
-                    boost::lexical_cast<std::string>(boost::beast::make_printable(sb.data())),
-                    resp)))
+            if (!BEAST_EXPECT(
+                    json::load(
+                        boost::lexical_cast<std::string>(boost::beast::make_printable(sb.data())),
+                        resp)))
                 return json::ValueType::Object;
             sb.consume(sb.size());
             return resp;
@@ -1058,9 +1056,10 @@ class ServerStatus_test : public beast::unit_test::Suite, public beast::test::En
         boost::system::error_code ec;
         {
             boost::beast::http::response<boost::beast::http::string_body> resp;
+            // An empty object parses, so it is rejected for its missing method.
             doHTTPRequest(env, yield, false, resp, ec, "{}");
             BEAST_EXPECT(resp.result() == boost::beast::http::status::bad_request);
-            BEAST_EXPECT(resp.body() == "Unable to parse request: \r\n");
+            BEAST_EXPECT(resp.body() == "Null method\r\n");
         }
 
         {
@@ -1078,7 +1077,7 @@ class ServerStatus_test : public beast::unit_test::Suite, public beast::test::En
             jv.append("invalid");
             doHTTPRequest(env, yield, false, resp, ec, to_string(jv));
             BEAST_EXPECT(resp.result() == boost::beast::http::status::bad_request);
-            BEAST_EXPECT(resp.body() == "Unable to parse request: \r\n");
+            BEAST_EXPECT(resp.body() == "Unable to parse request: An object was expected.\r\n");
         }
 
         {
@@ -1089,7 +1088,7 @@ class ServerStatus_test : public beast::unit_test::Suite, public beast::test::En
             jv.append(j);
             doHTTPRequest(env, yield, false, resp, ec, to_string(jv));
             BEAST_EXPECT(resp.result() == boost::beast::http::status::bad_request);
-            BEAST_EXPECT(resp.body() == "Unable to parse request: \r\n");
+            BEAST_EXPECT(resp.body() == "Unable to parse request: An object was expected.\r\n");
         }
 
         {

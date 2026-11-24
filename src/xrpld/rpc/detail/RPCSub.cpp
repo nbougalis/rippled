@@ -8,8 +8,7 @@
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
 #include <xrpl/core/ServiceRegistry.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>  // IWYU pragma: keep
+#include <xrpl/json/json.h>
 #include <xrpl/server/InfoSub.h>
 
 #include <boost/asio/io_context.hpp>

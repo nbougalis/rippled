@@ -9,8 +9,7 @@
 #include <xrpl/basics/Number.h>
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/contract.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>  // IWYU pragma: keep
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/Asset.h>
@@ -398,14 +397,14 @@ public:
     operator<<(std::ostream& s, AMM const& amm)
     {
         if (auto const res = amm.ammRpcInfo())
-            s << res.toStyledString();
+            s << toStyledString(res);
         return s;
     }
 
     std::string
     operator[](AccountID const& lp) const
     {
-        return ammRpcInfo(lp).toStyledString();
+        return toStyledString(ammRpcInfo(lp));
     }
 
     json::Value

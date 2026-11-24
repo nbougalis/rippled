@@ -6,7 +6,7 @@
 
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/chrono.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/helpers/ProposalHelpers.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/STLedgerEntry.h>

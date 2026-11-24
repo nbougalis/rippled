@@ -2,7 +2,7 @@
 
 #include <test/jtx/Account.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 namespace xrpl::test::jtx {
 

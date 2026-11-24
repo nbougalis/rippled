@@ -13,8 +13,7 @@
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobTypes.h>
 #include <xrpl/core/PerfLog.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/nodestore/Database.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/server/NetworkOPs.h>
@@ -114,7 +113,7 @@ PerfLogImp::Counters::countersJson() const
         totalRpc.errored += value.errored;
         p[jss::duration_us] = std::to_string(value.duration.count());
         totalRpc.duration += value.duration;
-        rpcobj[json::StaticString{label.asCString()}] = p;
+        rpcobj[label.view()] = p;
     }
 
     if (totalRpc.started != 0u)
@@ -209,9 +208,7 @@ PerfLogImp::Counters::currentJson() const
     for (auto const& m : methods)
     {
         json::Value methodobj(json::ValueType::Object);
-        // A key of rpc, per methods' declaration, so borrowed as above.
-        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage)
-        methodobj[jss::method] = json::StaticString{m.first.data()};
+        methodobj[jss::method] = json::Value{m.first};
         methodobj[jss::duration_us] =
             std::to_string(std::chrono::duration_cast<Microseconds>(present - m.second).count());
         methodsArray.append(methodobj);
@@ -309,7 +306,7 @@ PerfLogImp::report()
     report[jss::current_activities] = counters_.currentJson();
     app_.getOPs().stateAccounting(report);
 
-    logFile_ << json::Compact{std::move(report)} << std::endl;
+    logFile_ << report << std::endl;
 }
 
 PerfLogImp::PerfLogImp(

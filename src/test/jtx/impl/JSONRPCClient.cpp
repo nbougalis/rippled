@@ -7,9 +7,7 @@
 #include <xrpl/basics/contract.h>
 #include <xrpl/config/BasicConfig.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/server/Port.h>
 
@@ -199,9 +197,8 @@ public:
             writeAndRead();
         }
 
-        json::Reader jr;
         json::Value jv;
-        jr.parse(bufferString(res.body().data()), jv);
+        json::load(bufferString(res.body().data()), jv);
         if (jv["result"].isMember("error"))
             jv["error"] = jv["result"]["error"];
         if (jv["result"].isMember("status"))

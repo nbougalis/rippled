@@ -1,6 +1,6 @@
 #include <xrpl/core/PeerReservationTable.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/PublicKey.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/protocol/tokens.h>

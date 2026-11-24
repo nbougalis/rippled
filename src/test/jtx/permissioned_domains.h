@@ -5,7 +5,7 @@
 #include <test/jtx/deposit.h>
 
 #include <xrpl/basics/base_uint.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/STObject.h>
 

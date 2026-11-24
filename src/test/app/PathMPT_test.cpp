@@ -23,7 +23,7 @@
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ApiVersion.h>
 #include <xrpl/protocol/ErrorCodes.h>
@@ -271,7 +271,7 @@ public:
             usd(-1),
             std::optional<STAmount>(usd(10).value()),
             std::optional<PathAsset>(usd.mpt()));
-        BEAST_EXPECTS(!result.isMember(jss::error), result.toStyledString());
+        BEAST_EXPECTS(!result.isMember(jss::error), toStyledString(result));
 
         auto const& alternatives = result[jss::alternatives];
         if (BEAST_EXPECT(alternatives.size() == 1))

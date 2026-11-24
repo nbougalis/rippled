@@ -1,7 +1,7 @@
 #pragma once
 
 #include <xrpl/basics/safe_cast.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <cstdint>
 #include <map>
@@ -160,10 +160,10 @@ public:
         PrivateAccessTagT,
         SerializedTypeID tid,
         int fv,
-        char const* fn,
+        json::StaticString fn,
         int meta = kSmdDefault,
         IsSigning signing = IsSigning::Yes);
-    explicit SField(PrivateAccessTagT, int fc, char const* fn);
+    explicit SField(PrivateAccessTagT, int fc, json::StaticString fn);
 
     static SField const&
     getField(int fieldCode);

@@ -39,8 +39,7 @@
 #include <xrpl/core/HashRouter.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/PerfLog.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/Ledger.h>
 #include <xrpl/peerfinder/Slot.h>
 #include <xrpl/peerfinder/Types.h>

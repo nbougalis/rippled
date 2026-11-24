@@ -33,7 +33,7 @@
 #include <xrpl/core/JobQueue.h>
 #include <xrpl/core/NetworkIDService.h>
 #include <xrpl/core/ServiceRegistry.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/net/HTTPClient.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/Asset.h>
@@ -517,9 +517,9 @@ Env::postconditions(
         bad;
     if (bad)
     {
-        test.log << pretty(jt.jv) << std::endl;
+        test.log << toStyledString(jt.jv) << std::endl;
         if (jr)
-            test.log << pretty(jr) << std::endl;
+            test.log << toStyledString(jr) << std::endl;
         // Don't check postconditions if
         // we didn't get the expected result.
         return;
@@ -528,7 +528,7 @@ Env::postconditions(
     {
         if (trace_ > 0)
             --trace_;
-        test.log << pretty(jt.jv) << std::endl;
+        test.log << toStyledString(jt.jv) << std::endl;
     }
     for (auto const& f : jt.require)
         f(*this);
@@ -629,7 +629,7 @@ Env::autofill(JTx& jt)
     catch (ParseError const&)
     {
         if (!parseFailureExpected_)
-            test.log << "parse failure:\n" << pretty(jv) << std::endl;
+            test.log << "parse failure:\n" << toStyledString(jv) << std::endl;
         throw;
     }
 }
@@ -646,7 +646,7 @@ Env::st(JTx const& jt)
     }
     catch (jtx::ParseError const&)
     {
-        test.log << "Exception: ParseError\n" << pretty(jt.jv) << std::endl;
+        test.log << "Exception: ParseError\n" << toStyledString(jt.jv) << std::endl;
         throw;
     }
 
@@ -672,7 +672,7 @@ Env::ust(JTx const& jt)
     }
     catch (jtx::ParseError const&)
     {
-        test.log << "Exception: ParseError\n" << pretty(jt.jv) << std::endl;
+        test.log << "Exception: ParseError\n" << toStyledString(jt.jv) << std::endl;
         throw;
     }
 

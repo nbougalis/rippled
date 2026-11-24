@@ -5,7 +5,7 @@
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobTypes.h>
 #include <xrpl/core/PerfLog.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <boost/asio/ip/host_name.hpp>
 

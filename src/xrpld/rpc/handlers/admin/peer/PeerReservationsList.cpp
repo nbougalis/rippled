@@ -2,7 +2,7 @@
 #include <xrpld/rpc/handlers/Handlers.h>
 
 #include <xrpl/core/PeerReservationTable.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 
 namespace xrpl {

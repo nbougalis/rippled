@@ -8,7 +8,7 @@
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/core/JobQueue.h>
-#include <xrpl/json/to_string.h>  // IWYU pragma: keep
+#include <xrpl/json/json.h>
 #include <xrpl/server/LoadFeeTrack.h>
 #include <xrpl/server/NetworkOPs.h>
 

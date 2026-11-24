@@ -9,8 +9,7 @@
 #include <xrpl/basics/Number.h>
 #include <xrpl/basics/contract.h>
 #include <xrpl/basics/safe_cast.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/helpers/AMMHelpers.h>
 #include <xrpl/ledger/helpers/TokenHelpers.h>
 #include <xrpl/protocol/AMMCore.h>
@@ -819,7 +818,7 @@ AMM::submit(
     std::optional<Ter> const& ter)
 {
     if (log_)
-        std::cout << jv.toStyledString();
+        std::cout << toStyledString(jv);
     if (msig_)
     {
         if (seq && ter)

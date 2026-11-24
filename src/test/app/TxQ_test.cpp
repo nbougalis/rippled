@@ -33,8 +33,7 @@
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/View.h>
 #include <xrpl/protocol/AccountID.h>
@@ -3285,7 +3284,7 @@ public:
             BEAST_EXPECT(
                 serverInfo.isMember(jss::result) && serverInfo[jss::result].isMember(jss::info));
             auto const& info = serverInfo[jss::result][jss::info];
-            BEAST_EXPECT(info.isMember(jss::load_factor) && info[jss::load_factor] == 1);
+            BEAST_EXPECT(info.isMember(jss::load_factor) && info[jss::load_factor] == 1.0);
             BEAST_EXPECT(!info.isMember(jss::load_factor_server));
             BEAST_EXPECT(!info.isMember(jss::load_factor_local));
             BEAST_EXPECT(!info.isMember(jss::load_factor_net));
@@ -3330,7 +3329,7 @@ public:
                 info.isMember(jss::load_factor) && info[jss::load_factor] > 888.88 &&
                 info[jss::load_factor] < 888.89);
             BEAST_EXPECT(
-                info.isMember(jss::load_factor_server) && info[jss::load_factor_server] == 1);
+                info.isMember(jss::load_factor_server) && info[jss::load_factor_server] == 1.0);
             BEAST_EXPECT(!info.isMember(jss::load_factor_local));
             BEAST_EXPECT(!info.isMember(jss::load_factor_net));
             BEAST_EXPECT(
@@ -3364,10 +3363,11 @@ public:
                 serverInfo.isMember(jss::result) && serverInfo[jss::result].isMember(jss::info));
             auto const& info = serverInfo[jss::result][jss::info];
             // Avoid double rounding issues by comparing to a range.
-            BEAST_EXPECT(info.isMember(jss::load_factor) && info[jss::load_factor] == 1000);
+            BEAST_EXPECT(info.isMember(jss::load_factor) && info[jss::load_factor] == 1000.0);
             BEAST_EXPECT(!info.isMember(jss::load_factor_server));
             BEAST_EXPECT(!info.isMember(jss::load_factor_local));
-            BEAST_EXPECT(info.isMember(jss::load_factor_net) && info[jss::load_factor_net] == 1000);
+            BEAST_EXPECT(
+                info.isMember(jss::load_factor_net) && info[jss::load_factor_net] == 1000.0);
             BEAST_EXPECT(
                 info.isMember(jss::load_factor_fee_escalation) &&
                 info[jss::load_factor_fee_escalation] > 888.88 &&

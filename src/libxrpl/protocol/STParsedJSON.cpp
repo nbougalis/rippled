@@ -7,8 +7,7 @@
 #include <xrpl/beast/core/LexicalCast.h>
 #include <xrpl/beast/utility/Zero.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/LedgerFormats.h>
@@ -679,10 +678,10 @@ parseLeaf(
             try
             {
                 STVector256 tail(field);
-                for (json::UInt i = 0; value.isValidIndex(i); ++i)
+                for (auto const& element : value)
                 {
                     UInt256 s;
-                    if (!s.parseHex(value[i].asString()))
+                    if (!s.parseHex(element.asString()))
                         Throw<std::invalid_argument>("invalid data");
                     tail.pushBack(s);
                 }
@@ -713,7 +712,7 @@ parseLeaf(
             {
                 STPathSet tail(field);
 
-                for (json::UInt i = 0; value.isValidIndex(i); ++i)
+                for (json::UInt i = 0; i < value.size(); ++i)
                 {
                     STPath p;
 
@@ -733,7 +732,7 @@ parseLeaf(
                         return ret;
                     }
 
-                    for (json::UInt j = 0; value[i].isValidIndex(j); ++j)
+                    for (json::UInt j = 0; j < value[i].size(); ++j)
                     {
                         std::stringstream ss;
                         ss << fieldName << "[" << i << "][" << j << "]";
@@ -1089,7 +1088,7 @@ parseArray(
     {
         STArray tail(inName);
 
-        for (json::UInt i = 0; json.isValidIndex(i); ++i)
+        for (json::UInt i = 0; i < json.size(); ++i)
         {
             bool const isObjectOrNull(json[i].isObjectOrNull());
             bool const singleKey(isObjectOrNull ? json[i].size() == 1 : true);

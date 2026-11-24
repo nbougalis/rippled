@@ -5,7 +5,7 @@
 #include <test/jtx/JTx.h>
 #include <test/jtx/SignerUtils.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/SField.h>
 #include <xrpl/protocol/STAmount.h>
 #include <xrpl/protocol/TxFlags.h>

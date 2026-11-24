@@ -1,8 +1,7 @@
 #pragma once
 
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <rpcspec/Concepts.hpp>
 #include <rpcspec/Types.hpp>
@@ -123,8 +122,7 @@ public:
     [[nodiscard]] std::string_view
     asString() const
     {
-        auto const* str = readValue_->asCString();
-        return str != nullptr ? std::string_view{str} : std::string_view{};
+        return readValue_->asStringView();
     }
 
     [[nodiscard]] bool

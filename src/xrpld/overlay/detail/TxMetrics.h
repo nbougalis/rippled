@@ -1,6 +1,6 @@
 #pragma once
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <boost/circular_buffer.hpp>
 

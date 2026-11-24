@@ -30,8 +30,7 @@
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/core/ServiceRegistry.h>
 #include <xrpl/core/StartUpType.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/OpenView.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ApiVersion.h>
@@ -163,7 +162,7 @@ class LedgerEntry_test : public beast::unit_test::Suite
             BEAST_EXPECTS(
                 jv[jss::error] == err,
                 "Expected error " + err + ", received " + jv[jss::error].asString() + ", at line " +
-                    std::to_string(location.line()) + ", " + jv.toStyledString());
+                    std::to_string(location.line()) + ", " + toStyledString(jv));
         }
         if (BEAST_EXPECT(jv.isMember(jss::error_code)))
         {
@@ -171,14 +170,14 @@ class LedgerEntry_test : public beast::unit_test::Suite
                 jv[jss::error_code] == code,
                 "Expected error code " + std::to_string(code) + ", received " +
                     jv[jss::error_code].asString() + ", at line " +
-                    std::to_string(location.line()) + ", " + jv.toStyledString());
+                    std::to_string(location.line()) + ", " + toStyledString(jv));
         }
         if (msg.empty())
         {
             BEAST_EXPECTS(
                 jv[jss::error_message] == json::ValueType::Null || jv[jss::error_message] == "",
                 "Expected no error message, received \"" + jv[jss::error_message].asString() +
-                    "\", at line " + std::to_string(location.line()) + ", " + jv.toStyledString());
+                    "\", at line " + std::to_string(location.line()) + ", " + toStyledString(jv));
         }
         else if (BEAST_EXPECT(jv.isMember(jss::error_message)))
         {
@@ -186,7 +185,7 @@ class LedgerEntry_test : public beast::unit_test::Suite
                 jv[jss::error_message] == msg,
                 "Expected error message \"" + msg + "\", received \"" +
                     jv[jss::error_message].asString() + "\", at line " +
-                    std::to_string(location.line()) + ", " + jv.toStyledString());
+                    std::to_string(location.line()) + ", " + toStyledString(jv));
         }
     }
 
@@ -2566,7 +2565,7 @@ class LedgerEntry_test : public beast::unit_test::Suite
             BEAST_EXPECT(
                 strHex(keylet::permissionedDomain(alice, SeqProxy::rawSequence(seq)).key) == pdIdx);
 
-            params.clear();
+            params = json::ValueType::Object;
             params[jss::ledger_index] = jss::validated;
             params[jss::permissioned_domain] = pdIdx;
             jv = env.rpc("json", "ledger_entry", to_string(params));

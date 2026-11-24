@@ -5,8 +5,7 @@
 
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/basics/strHex.h>
-#include <xrpl/json/json_errors.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/ledger/helpers/CredentialHelpers.h>
 #include <xrpl/protocol/AccountID.h>
@@ -27,6 +26,7 @@
 #include <org/xrpl/rpc/v1/get_ledger_entry.pb.h>
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <expected>
 #include <functional>
@@ -359,12 +359,25 @@ parseDirectoryNode(
         return parseObjectID(params, fieldName);
     }
 
-    if (params.isMember(jss::sub_index) &&
-        (!params[jss::sub_index].isConvertibleTo(json::ValueType::UInt) ||
-         params[jss::sub_index].isBool()))
+    if (params.isMember(jss::sub_index))
     {
-        return ledger_entry_helpers::invalidFieldError(
-            "malformedRequest", jss::sub_index, "number");
+        // The sub-index must be null or a number that is exactly representable
+        // as an unsigned 32-bit integer.
+        auto const& subIndex = params[jss::sub_index];
+
+        auto const isWholeUInt = [](double d) {
+            return d >= 0 && d <= json::Value::kMaxUInt && std::trunc(d) == d;
+        };
+
+        bool const valid = subIndex.isNull() || subIndex.isUInt() ||
+            (subIndex.isInt() && subIndex.asInt() >= 0) ||
+            (subIndex.isDouble() && isWholeUInt(subIndex.asDouble()));
+
+        if (!valid)
+        {
+            return ledger_entry_helpers::invalidFieldError(
+                "malformedRequest", jss::sub_index, "number");
+        }
     }
 
     if (params.isMember(jss::owner) == params.isMember(jss::dir_root))

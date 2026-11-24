@@ -2,7 +2,7 @@
 #include <xrpld/overlay/Overlay.h>
 #include <xrpld/rpc/Context.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 namespace xrpl {
 

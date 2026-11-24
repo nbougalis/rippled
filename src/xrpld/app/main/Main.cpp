@@ -15,7 +15,7 @@
 #include <xrpl/config/Constants.h>
 #include <xrpl/core/StartUpType.h>
 #include <xrpl/git/Git.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/BuildInfo.h>
 #include <xrpl/protocol/SystemParameters.h>
 #include <xrpl/server/Vacuum.h>
@@ -516,7 +516,7 @@ run(int argc, char* const* argv)
     if (vm.contains("definitions"))
     {
         // LCOV_EXCL_START
-        std::cout << json::FastWriter().write(getServerDefinitionsJson());
+        std::cout << to_string(getServerDefinitionsJson());
         return 0;
         // LCOV_EXCL_STOP
     }

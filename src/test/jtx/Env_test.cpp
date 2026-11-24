@@ -36,7 +36,7 @@
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ErrorCodes.h>
 #include <xrpl/protocol/Feature.h>
@@ -403,7 +403,7 @@ public:
             args[jss::tx_blob] = strHex(s.slice());
             args[jss::fail_hard] = true;
 
-            return env.rpc("json", "submit", args.toStyledString());
+            return env.rpc("json", "submit", toStyledString(args));
         };
 
         auto jr = applyTxn(noop(alice), Fee(1));

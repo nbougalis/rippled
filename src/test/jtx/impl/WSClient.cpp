@@ -6,9 +6,7 @@
 #include <xrpl/basics/contract.h>
 #include <xrpl/config/BasicConfig.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 #include <xrpl/server/Port.h>
 
@@ -348,9 +346,8 @@ private:
         }
 
         json::Value jv;
-        json::Reader jr;
 
-        jr.parse(bufferString(rb_.data()), jv);
+        json::load(bufferString(rb_.data()), jv);
         rb_.consume(rb_.size());
 
         auto const m = std::make_shared<Msg>(std::move(jv));

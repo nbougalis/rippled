@@ -15,10 +15,7 @@
 #include <xrpl/beast/utility/Journal.h>
 #include <xrpl/beast/utility/Zero.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_forwards.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/to_string.h>
+#include <xrpl/json/json.h>
 #include <xrpl/net/HTTPClient.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ApiVersion.h>
@@ -595,8 +592,7 @@ private:
         if (3 == jvParams.size() || bOffline)
         {
             json::Value txJSON;
-            json::Reader reader;
-            if (reader.parse(jvParams[2u].asString(), txJSON))
+            if (json::load(jvParams[2u].asString(), txJSON))
             {
                 // sign_for txJSON.
                 json::Value jvRequest{json::ValueType::Object};
@@ -618,13 +614,12 @@ private:
     json::Value
     parseJson(json::Value const& jvParams)
     {
-        json::Reader reader;
         json::Value jvRequest;
 
         JLOG(j_.trace()) << "RPC method: " << jvParams[0u];
         JLOG(j_.trace()) << "RPC json: " << jvParams[1u];
 
-        if (reader.parse(jvParams[1u].asString(), jvRequest))
+        if (json::load(jvParams[1u].asString(), jvRequest))
         {
             if (!jvRequest.isObjectOrNull())
                 return rpcError(RpcInvalidParams);
@@ -666,9 +661,8 @@ private:
     json::Value
     parseJson2(json::Value const& jvParams)
     {
-        json::Reader reader;
         json::Value jv;
-        bool const validParse = reader.parse(jvParams[0u].asString(), jv);
+        bool const validParse = json::load(jvParams[0u].asString(), jv);
         if (validParse && isValidJson2(jv))
         {
             if (jv.isObject())
@@ -907,9 +901,9 @@ private:
 
     json::Value
     // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-    parseAccountRaw2(json::Value const& jvParams, char const* const acc2Field)
+    parseAccountRaw2(json::Value const& jvParams, json::StaticString const acc2Field)
     {
-        std::array<char const* const, 2> accFields{{jss::account, acc2Field}};
+        std::array<json::StaticString const, 2> accFields{{jss::account, acc2Field}};
         auto const nParams = jvParams.size();
         json::Value jvRequest(json::ValueType::Object);
         for (auto i = 0; i < nParams; ++i)
@@ -1014,13 +1008,12 @@ private:
     json::Value
     parseRipplePathFind(json::Value const& jvParams)
     {
-        json::Reader reader;
         json::Value jvRequest{json::ValueType::Object};
         bool const bLedger = 2 == jvParams.size();
 
         JLOG(j_.trace()) << "RPC json: " << jvParams[0u];
 
-        if (reader.parse(jvParams[0u].asString(), jvRequest))
+        if (json::load(jvParams[0u].asString(), jvRequest))
         {
             if (bLedger)
             {
@@ -1042,10 +1035,9 @@ private:
     parseSimulate(json::Value const& jvParams)
     {
         json::Value txJSON;
-        json::Reader reader;
         json::Value jvRequest{json::ValueType::Object};
 
-        if (reader.parse(jvParams[0u].asString(), txJSON))
+        if (json::load(jvParams[0u].asString(), txJSON))
         {
             jvRequest[jss::tx_json] = txJSON;
         }
@@ -1074,7 +1066,6 @@ private:
     parseSignSubmit(json::Value const& jvParams)
     {
         json::Value txJSON;
-        json::Reader reader;
         bool const bOffline = jvParams.size() >= 3 && jvParams[2u].asString() == "offline";
         std::optional<std::string> const field = [&jvParams,
                                                   bOffline] -> std::optional<std::string> {
@@ -1096,7 +1087,7 @@ private:
 
             return jvRequest;
         }
-        if ((jvParams.size() >= 2 || bOffline) && reader.parse(jvParams[1u].asString(), txJSON))
+        if ((jvParams.size() >= 2 || bOffline) && json::load(jvParams[1u].asString(), txJSON))
         {
             // Signing or submitting tx_json.
             json::Value jvRequest{json::ValueType::Object};
@@ -1126,8 +1117,7 @@ private:
         if (1 == jvParams.size())
         {
             json::Value txJSON;
-            json::Reader reader;
-            if (reader.parse(jvParams[0u].asString(), txJSON))
+            if (json::load(jvParams[0u].asString(), txJSON))
             {
                 json::Value jvRequest{json::ValueType::Object};
                 jvRequest[jss::tx_json] = txJSON;
@@ -1866,9 +1856,8 @@ struct RPCCallImp
             if (strData.starts_with("Unable to parse request") ||
                 strData.starts_with(jss::invalid_API_version.cStr()))
                 Throw<RequestNotParsable>(strData);
-            json::Reader reader;
             json::Value jvReply;
-            if (!reader.parse(strData, jvReply))
+            if (!json::load(strData, jvReply))
                 Throw<std::runtime_error>("couldn't parse reply from server");
 
             if (!jvReply)
@@ -2117,7 +2106,7 @@ fromCommandLine(Config const& config, std::vector<std::string> const& vCmd, Logs
 {
     auto const result = rpcClient(vCmd, config, logs, rpc::kApiCommandLineVersion);
 
-    std::cout << result.second.toStyledString();
+    std::cout << toStyledString(result.second);
 
     return result.first;
 }

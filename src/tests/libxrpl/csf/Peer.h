@@ -10,8 +10,7 @@
 #include <xrpl/consensus/ConsensusParms.h>
 #include <xrpl/consensus/ConsensusTypes.h>
 #include <xrpl/consensus/Validations.h>
-#include <xrpl/json/json_value.h>
-#include <xrpl/json/json_writer.h>
+#include <xrpl/json/json.h>
 
 #include <boost/container/flat_map.hpp>
 #include <boost/container/flat_set.hpp>
@@ -659,7 +658,7 @@ struct Peer
 
         if (netLgr != ledgerID)
         {
-            JLOG(j.trace()) << json::Compact(validations.getJsonTrie());
+            JLOG(j.trace()) << validations.getJsonTrie();
             issue(WrongPrevLedger{.wrong = ledgerID, .right = netLgr});
         }
 

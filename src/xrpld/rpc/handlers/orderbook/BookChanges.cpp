@@ -4,7 +4,7 @@
 #include <xrpld/rpc/Context.h>
 #include <xrpld/rpc/detail/RPCLedgerHelpers.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/STArray.h>  // IWYU pragma: keep
 
 #include <rpcspec/Errors.hpp>

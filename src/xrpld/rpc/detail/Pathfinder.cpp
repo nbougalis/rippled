@@ -12,7 +12,7 @@
 #include <xrpl/beast/utility/instrumentation.h>
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
-#include <xrpl/json/to_string.h>  // IWYU pragma: keep
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/OrderBookDB.h>
 #include <xrpl/ledger/PaymentSandbox.h>

@@ -16,7 +16,7 @@
 #include <xrpl/basics/chrono.h>
 #include <xrpl/basics/strHex.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ReadView.h>
 #include <xrpl/protocol/AccountID.h>
 #include <xrpl/protocol/ErrorCodes.h>
@@ -509,10 +509,16 @@ doAccountTx(rpc::JsonContext& context)
 
     if (params.isMember(jss::marker))
     {
-        auto& token = params[jss::marker];
-        if (!token.isMember(jss::ledger) || !token.isMember(jss::seq) ||
-            !token[jss::ledger].isConvertibleTo(json::ValueType::UInt) ||
-            !token[jss::seq].isConvertibleTo(json::ValueType::UInt))
+        auto const& token = params[jss::marker];
+
+        // The marker must be an object: indexing anything else by name is a
+        // contract violation.
+        auto const ledgerSeq =
+            token.isObject() ? json::toInteger<std::uint32_t>(token[jss::ledger]) : std::nullopt;
+        auto const txnSeq =
+            token.isObject() ? json::toInteger<std::uint32_t>(token[jss::seq]) : std::nullopt;
+
+        if (!ledgerSeq || !txnSeq)
         {
             ::rpc::Status const status{
                 RpcInvalidParams,
@@ -521,10 +527,8 @@ doAccountTx(rpc::JsonContext& context)
             rpc::injectSpecError(response, status);
             return response;
         }
-        args.marker = {
-            .ledgerSeq = token[jss::ledger].asUInt(),
-            .txnSeq = token[jss::seq].asUInt(),
-        };
+
+        args.marker = {.ledgerSeq = *ledgerSeq, .txnSeq = *txnSeq};
     }
 
     if (params.isMember(jss::delegate))

@@ -5,8 +5,7 @@
 #include <test/jtx/utility.h>
 
 #include <xrpl/basics/contract.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <string>
 #include <utility>
@@ -15,7 +14,7 @@ namespace xrpl::test::jtx {
 
 Json::Json(std::string const& s)
 {
-    if (!json::Reader().parse(s, jv_))
+    if (!json::load(s, jv_))
         Throw<ParseError>("bad json");
 }
 

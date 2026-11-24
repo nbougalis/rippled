@@ -6,7 +6,7 @@
 
 #include <xrpl/basics/CountedObject.h>
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/jss.h>
 
 #include <algorithm>

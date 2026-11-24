@@ -3,7 +3,7 @@
 #include <xrpl/beast/net/IPAddress.h>
 #include <xrpl/beast/net/IPEndpoint.h>
 #include <xrpl/beast/utility/instrumentation.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/resource/Consumer.h>
 #include <xrpl/resource/ResourceManager.h>
 #include <xrpl/server/Handoff.h>

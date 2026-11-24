@@ -2,7 +2,7 @@
 
 #include <xrpld/app/main/Application.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 
 #include <cstdint>
 

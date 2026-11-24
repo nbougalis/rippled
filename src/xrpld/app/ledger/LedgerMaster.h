@@ -17,7 +17,7 @@
 #include <xrpl/beast/insight/Gauge.h>
 #include <xrpl/beast/insight/Hook.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/CanonicalTXSet.h>
 #include <xrpl/ledger/Ledger.h>
 #include <xrpl/ledger/ReadView.h>

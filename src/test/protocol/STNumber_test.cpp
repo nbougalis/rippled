@@ -1,6 +1,6 @@
 #include <xrpl/basics/Number.h>
 #include <xrpl/beast/unit_test/suite.h>
-#include <xrpl/json/json_forwards.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/IOUAmount.h>
 #include <xrpl/protocol/Issue.h>
 #include <xrpl/protocol/SField.h>

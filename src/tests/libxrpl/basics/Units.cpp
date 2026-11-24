@@ -1,7 +1,7 @@
 #include <xrpl/protocol/Units.h>
 
 #include <xrpl/beast/utility/Zero.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/SystemParameters.h>
 #include <xrpl/protocol/XRPAmount.h>
 

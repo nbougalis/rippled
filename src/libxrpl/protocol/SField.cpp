@@ -1,6 +1,7 @@
 #include <xrpl/protocol/SField.h>
 
 #include <xrpl/beast/utility/instrumentation.h>
+#include <xrpl/json/json.h>
 
 #include <string>
 #include <unordered_map>
@@ -37,20 +38,23 @@ TypedField<T>::TypedField(PrivateAccessTagT pat, Args&&... args)
 #pragma push_macro("TYPED_SFIELD")
 #undef TYPED_SFIELD
 
+// The field name is the variable name without its "sf" prefix. Because that
+// is a suffix of a string literal it remains NUL-terminated, which is what
+// json::StaticString requires.
 #define UNTYPED_SFIELD(sfName, stiSuffix, fieldValue, ...) \
     SField const sfName(                                   \
-        access, STI_##stiSuffix, fieldValue, std::string_view(#sfName).substr(2).data(), ##__VA_ARGS__);
+        access, STI_##stiSuffix, fieldValue, json::StaticString(true, std::string_view(#sfName).substr(2)), ##__VA_ARGS__);
 #define TYPED_SFIELD(sfName, stiSuffix, fieldValue, ...) \
     SF_##stiSuffix const sfName(                         \
-        access, STI_##stiSuffix, fieldValue, std::string_view(#sfName).substr(2).data(), ##__VA_ARGS__);
+        access, STI_##stiSuffix, fieldValue, json::StaticString(true, std::string_view(#sfName).substr(2)), ##__VA_ARGS__);
 
 // SFields which, for historical reasons, do not follow naming conventions.
-SField const sfInvalid(access, -1, "");
-SField const sfGeneric(access, 0, "Generic");
+SField const sfInvalid(access, -1, json::StaticString(""));
+SField const sfGeneric(access, 0, json::StaticString("Generic"));
 // The following two fields aren't used anywhere, but they break tests/have
 // downstream effects.
-SField const kSfHash(access, STI_UINT256, 257, "hash");
-SField const kSfIndex(access, STI_UINT256, 258, "index");
+SField const kSfHash(access, STI_UINT256, 257, json::StaticString("hash"));
+SField const kSfIndex(access, STI_UINT256, 258, json::StaticString("index"));
 
 #include <xrpl/protocol/detail/sfields.macro>
 
@@ -63,7 +67,7 @@ SField::SField(
     PrivateAccessTagT,
     SerializedTypeID tid,
     int fv,
-    char const* fn,
+    json::StaticString fn,
     int meta,
     IsSigning signing)
     : fieldCodeMem(fieldCode(tid, fv))
@@ -73,7 +77,7 @@ SField::SField(
     , fieldMeta(meta)
     , fieldNum(++num)
     , signingField(signing)
-    , jsonName(fieldName.c_str())
+    , jsonName(fn)
 {
     XRPL_ASSERT(
         !knownCodeToField.contains(fieldCodeMem),
@@ -85,7 +89,7 @@ SField::SField(
     knownNameToField[fieldName] = this;
 }
 
-SField::SField(PrivateAccessTagT, int fc, char const* fn)
+SField::SField(PrivateAccessTagT, int fc, json::StaticString fn)
     : fieldCodeMem(fc)
     , fieldType(STI_UNKNOWN)
     , fieldValue(0)
@@ -93,7 +97,7 @@ SField::SField(PrivateAccessTagT, int fc, char const* fn)
     , fieldMeta(kSmdNever)
     , fieldNum(++num)
     , signingField(IsSigning::Yes)
-    , jsonName(fieldName.c_str())
+    , jsonName(fn)
 {
     XRPL_ASSERT(
         !knownCodeToField.contains(fieldCodeMem),

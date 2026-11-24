@@ -19,7 +19,7 @@
 #include <xrpl/core/Job.h>
 #include <xrpl/core/JobQueue.h>
 #include <xrpl/core/PerfLog.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/RippleLedgerHash.h>
 #include <xrpl/protocol/Serializer.h>
 #include <xrpl/protocol/jss.h>

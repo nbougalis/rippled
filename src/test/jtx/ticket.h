@@ -5,7 +5,7 @@
 #include <test/jtx/JTx.h>
 #include <test/jtx/owners.h>
 
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/protocol/LedgerFormats.h>
 
 #include <cstdint>

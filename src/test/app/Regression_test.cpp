@@ -26,8 +26,7 @@
 #include <xrpl/basics/base_uint.h>
 #include <xrpl/beast/unit_test/suite.h>
 #include <xrpl/config/Constants.h>
-#include <xrpl/json/json_reader.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/ApplyView.h>
 #include <xrpl/ledger/Ledger.h>
 #include <xrpl/ledger/OpenView.h>
@@ -264,12 +263,18 @@ struct Regression_test : public beast::unit_test::Suite
             R"json({"command":"path_find","id":19,"subcommand":"create","source_account":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh","destination_account":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh","destination_amount":"1000000","source_currencies":[{"currency":"0000000000000000000000000000000000000000"},{"currency":"0000000000000000000000005553440000000000"},{"currency":"0000000000000000000000004254430000000000"},{"issuer":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh","currency":"0000000000000000000000004254430000000000"},{"issuer":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh","currency":"0000000000000000000000004254430000000000"},{"issuer":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh","currency":"0000000000000000000000004555520000000000"},{"currency":"0000000000000000000000004554480000000000"},{"currency":"0000000000000000000000004A50590000000000"},{"issuer":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh","currency":"000000000000000000000000434E590000000000"},{"currency":"0000000000000000000000004742490000000000"},{"issuer":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh","currency":"0000000000000000000000004341440000000000"}]})json";
 
         json::Value jvRequest;
-        json::Reader jrReader;
 
         std::vector<boost::asio::const_buffer> buffers;
         buffers.emplace_back(buffer(request, 1024));
         buffers.emplace_back(buffer(request.data() + 1024, request.length() - 1024));
-        BEAST_EXPECT(jrReader.parse(jvRequest, buffers) && jvRequest.isObject());
+
+        // Documents are parsed from contiguous storage, so the pieces have to
+        // be joined first, as the server does for a multi-buffer message.
+        std::string joined;
+        for (auto const& b : buffers)
+            joined.append(static_cast<char const*>(b.data()), b.size());
+
+        BEAST_EXPECT(json::load(joined, jvRequest) && jvRequest.isObject());
     }
 
     void

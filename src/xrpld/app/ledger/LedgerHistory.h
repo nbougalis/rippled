@@ -8,7 +8,7 @@
 #include <xrpl/beast/insight/Collector.h>
 #include <xrpl/beast/insight/Counter.h>
 #include <xrpl/beast/utility/Journal.h>
-#include <xrpl/json/json_value.h>
+#include <xrpl/json/json.h>
 #include <xrpl/ledger/Ledger.h>
 #include <xrpl/protocol/Protocol.h>
 #include <xrpl/protocol/RippleLedgerHash.h>
