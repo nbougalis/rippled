@@ -55,19 +55,19 @@ struct TxResult
 {
     Transaction::pointer txn;
     std::variant<std::shared_ptr<TxMeta>, Blob> meta;
-    bool validated = false;
     std::optional<std::string> ctid;
     std::optional<NetClock::time_point> closeTime;
     std::optional<UInt256> ledgerHash;
     TxSearched searchedAll = TxSearched::Unknown;
+    bool validated = false;
 };
 
 struct TxArgs
 {
     std::optional<UInt256> hash;
     std::optional<std::pair<uint32_t, uint16_t>> ctid;
-    bool binary = false;
     std::optional<std::pair<uint32_t, uint32_t>> ledgerRange;
+    bool binary = false;
 };
 
 std::pair<TxResult, ::rpc::Status>
@@ -94,7 +94,6 @@ doTxHelp(rpc::Context& context, TxArgs args)
 
     using TxPair = std::pair<std::shared_ptr<Transaction>, std::shared_ptr<TxMeta>>;
 
-    result.searchedAll = TxSearched::Unknown;
     std::variant<TxPair, TxSearched> v;
 
     if (args.ctid)
@@ -103,7 +102,7 @@ doTxHelp(rpc::Context& context, TxArgs args)
             context.app.getLedgerMaster().txnIdFromIndex(args.ctid->first, args.ctid->second);
 
         if (args.hash)
-            range = ClosedInterval<uint32_t>(args.ctid->first, args.ctid->second);
+            range = ClosedInterval<uint32_t>(args.ctid->first, args.ctid->first);
     }
 
     if (!args.hash)
@@ -124,7 +123,7 @@ doTxHelp(rpc::Context& context, TxArgs args)
         return {result, RpcTxnNotFound};
     }
 
-    auto [txn, meta] = std::get<TxPair>(v);
+    auto& [txn, meta] = std::get<TxPair>(v);
 
     if (ec == RpcDbDeserialization)
     {
@@ -158,21 +157,16 @@ doTxHelp(rpc::Context& context, TxArgs args)
         {
             result.meta = meta;
         }
+
         result.validated =
             isValidated(context.ledgerMaster, ledger->header().seq, ledger->header().hash);
         if (result.validated)
             result.closeTime = context.ledgerMaster.getCloseTimeBySeq(txn->getLedger());
 
-        // compute outgoing CTID
-        if (meta->getAsObject().isFieldPresent(sfTransactionIndex))
-        {
-            uint32_t const lgrSeq = ledger->header().seq;
-            uint32_t const txnIdx = meta->getAsObject().getFieldU32(sfTransactionIndex);
-            uint32_t const netID = context.app.getNetworkIDService().getNetworkID();
-
-            if (txnIdx <= 0xFFFFU && netID < 0xFFFFU && lgrSeq < 0x0FFF'FFFFUL)
-                result.ctid = rpc::encodeCTID(lgrSeq, txnIdx, netID);
-        }
+        result.ctid = rpc::encodeCTID(
+            ledger->header().seq,
+            meta->getIndex(),
+            context.app.getNetworkIDService().getNetworkID());
     }
 
     return {result, RpcSuccess};
